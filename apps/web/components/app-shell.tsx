@@ -99,7 +99,7 @@ export async function AppShell({
   // dentro das listas longas não podem esticar a página — a tela de Conversas
   // ficava com uma rolagem enorme e vazia embaixo.
   return (
-    <div className="relative flex h-screen overflow-clip bg-background">
+    <div className="relative flex h-[100dvh] overflow-clip bg-background">
       <AppSidebar
         clinicName={tenant.name}
         role={role}

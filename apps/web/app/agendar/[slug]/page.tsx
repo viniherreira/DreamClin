@@ -20,7 +20,7 @@ export default async function AgendarPage({ params }: { params: Promise<{ slug: 
   if (!info) notFound();
 
   return (
-    <div className="min-h-screen bg-canvas text-foreground">
+    <div className="min-h-[100dvh] bg-canvas text-foreground">
       <header className="border-b border-border bg-surface">
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-4 sm:px-6">
           <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-base font-bold text-primary-hover" aria-hidden="true">

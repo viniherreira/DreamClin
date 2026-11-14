@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Bot, Briefcase, Clock, FileText, Hand, Link2, MessageCircle, Plus, Search, Square, Stethoscope, UserRound } from 'lucide-react';
+import { ArrowLeft, Bot, Briefcase, Clock, FileText, Hand, Link2, Megaphone, MessageCircle, Plus, Search, Square, Stethoscope, UserRound } from 'lucide-react';
 import type { ChatThread } from '@/crm/conversations';
 import { initials } from '@/crm/format';
 import {
@@ -227,6 +227,7 @@ function PaneComposer({
           </div>
         )}
         {thread.channel === 'cloud' && thread.windowEndsAt && <SessionTimer endsAt={thread.windowEndsAt} />}
+        {thread.adWindow && <AdWindowNote janela={thread.adWindow} fechada={fechada} />}
       </div>
     </>
   );
@@ -410,6 +411,44 @@ function SessionTimer({ endsAt }: { endsAt: string }) {
     <p className={`flex items-center justify-end gap-1.5 bg-surface px-3 pb-2 text-xs ${pouco ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground'}`}>
       <Clock className="h-3.5 w-3.5" aria-hidden="true" />
       A sessão de mensagens termina em: <strong className="font-semibold tabular-nums">{h > 0 ? `${h}h ${m}m` : `${m}m`}</strong>
+    </p>
+  );
+}
+
+/** "2d 14h", "5h 20m", "12m". */
+function falta(ms: number): string {
+  const d = Math.floor(ms / 86_400_000);
+  const h = Math.floor((ms % 86_400_000) / 3_600_000);
+  const m = Math.floor((ms % 3_600_000) / 60_000);
+  return d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
+/**
+ * Quem veio de anúncio: respondendo em 24 h, a Meta não cobra os modelos aprovados
+ * por 72 h. Mostra quanto falta, ou até quando responder para a janela abrir.
+ */
+function AdWindowNote({ janela, fechada }: { janela: NonNullable<ChatThread['adWindow']>; fechada: boolean }) {
+  const [agora, setAgora] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setAgora(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, []);
+  const resta = new Date(janela.state === 'open' ? janela.endsAt : janela.replyBy).getTime() - agora;
+  if (resta <= 0) return null;
+  return (
+    <p className="flex flex-wrap items-center justify-end gap-x-1.5 bg-surface px-3 pb-2 text-right text-xs text-muted-foreground">
+      <Megaphone className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+      {janela.state === 'open' ? (
+        <>
+          Veio de anúncio: modelos aprovados sem custo por mais <strong className="font-semibold tabular-nums text-foreground">{falta(resta)}</strong>
+          {fechada && <span className="basis-full">As 24 horas passaram, mas o modelo aprovado ainda sai grátis.</span>}
+        </>
+      ) : (
+        <>
+          Veio de anúncio: responda em <strong className="font-semibold tabular-nums text-foreground">{falta(resta)}</strong> para ganhar 72 horas de modelos
+          sem custo
+        </>
+      )}
     </p>
   );
 }

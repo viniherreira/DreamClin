@@ -485,7 +485,7 @@ export function Heatmap({ cells, unit = 'leads' }: { cells: number[][]; unit?: s
           ))}
           <span aria-hidden="true" />
           {Array.from({ length: 24 }, (_, h) => (
-            <span key={h} className={`pt-1 text-center font-mono text-[9px] tabular-nums ${active?.h === h ? 'font-semibold text-foreground' : 'text-muted-foreground'}`} aria-hidden="true">
+            <span key={h} className={`pt-1 text-center font-mono text-[10px] tabular-nums ${active?.h === h ? 'font-semibold text-foreground' : 'text-muted-foreground'}`} aria-hidden="true">
               {h % 3 === 0 || active?.h === h ? `${h}h` : ''}
             </span>
           ))}

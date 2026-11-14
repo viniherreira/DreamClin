@@ -396,7 +396,8 @@ function AutomationDialog({
   const [to, setTo] = useState(cond.to ?? '18:00');
   const [sources, setSources] = useState<LeadSourceKey[]>(cond.sources ?? []);
   const [condTags, setCondTags] = useState<string[]>(cond.tagIds ?? []);
-  const temCondicao = Boolean(cond.days || cond.from || cond.sources || cond.tagIds);
+  const [adWindow, setAdWindow] = useState(Boolean(cond.adWindow));
+  const temCondicao = Boolean(cond.days || cond.from || cond.sources || cond.tagIds || cond.adWindow);
   const [condAberta, setCondAberta] = useState(temCondicao);
 
   const t = templates.find((x) => x.id === templateId);
@@ -421,6 +422,7 @@ function AutomationDialog({
         ...(hours ? { from, to } : {}),
         ...(sources.length ? { sources } : {}),
         ...(condTags.length ? { tagIds: condTags } : {}),
+        ...(adWindow ? { adWindow: true } : {}),
       }
     : {};
 
@@ -537,6 +539,18 @@ function AutomationDialog({
                         ))}
                       </div>
                     </fieldset>
+                    <div>
+                      <label className="flex items-start gap-2 text-sm">
+                        <input type="checkbox" checked={adWindow} onChange={(e) => setAdWindow(e.target.checked)} className="mt-0.5 h-4 w-4 accent-primary" />
+                        <span>
+                          Só dentro da janela grátis do anúncio (72 horas)
+                          <span className="mt-0.5 block text-xs text-muted-foreground">
+                            Para quem chegou por anúncio do Facebook ou Instagram e foi respondido em até 24 horas: a Meta não cobra os modelos
+                            aprovados nas 72 horas seguintes. Fora desse prazo, esta automação não roda.
+                          </span>
+                        </span>
+                      </label>
+                    </div>
                     {tags.length > 0 && (
                       <TagPicker legend="Com alguma destas tags (nenhuma marcada: qualquer lead)" tags={tags} value={condTags} onChange={setCondTags} />
                     )}

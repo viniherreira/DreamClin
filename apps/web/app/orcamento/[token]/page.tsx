@@ -21,7 +21,7 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ to
   const actionable = quote.status === 'SENT' || quote.status === 'VIEWED';
 
   return (
-    <main className="min-h-screen bg-background px-4 py-8 sm:py-12">
+    <main className="min-h-[100dvh] bg-background px-4 py-8 sm:py-12">
       <div className="mx-auto max-w-2xl space-y-5">
         {/* Clinic header */}
         <header className="text-center">

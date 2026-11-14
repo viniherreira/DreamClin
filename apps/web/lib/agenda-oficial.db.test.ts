@@ -212,6 +212,19 @@ describe.skipIf(!process.env.DATABASE_URL)('avisos da agenda pela API oficial (b
     const depois = await prisma.whatsAppMessage.findUniqueOrThrow({ where: { id: linha.id } });
     expect(depois.status).toBe('FAILED');
     expect(depois.errorMessage).toMatch(/forma de pagamento/);
+    // A conta segue "conectada": a agenda precisa avisar que os lembretes não saem.
+    const { getWhatsAppHealth } = await import('./whatsapp');
+    // Os outros avisos deste teste são de antes do recusado.
+    await prisma.whatsAppMessage.updateMany({ where: { tenantId: tenant.id, id: { not: linha.id }, direction: 'OUTBOUND', status: { in: ['DELIVERED', 'READ'] } }, data: { createdAt: new Date(Date.now() - 60_000) } });
+    const saude = await getWhatsAppHealth(tenant.id);
+    expect(saude.problem).toMatch(/não estão saindo/);
+    expect(saude.help?.href).toBe('/ajuda/conectar-whatsapp');
+    // Um aviso mais novo entregue: o cartão foi cadastrado, o alerta some.
+    const novo = await prisma.whatsAppMessage.create({
+      data: { tenantId: tenant.id, patientId: paciente.id, direction: 'OUTBOUND', templateName: 'x', content: 'x', status: 'DELIVERED', createdAt: new Date(Date.now() + 1000) },
+    });
+    expect((await getWhatsAppHealth(tenant.id)).problem).toBeNull();
+    await prisma.whatsAppMessage.delete({ where: { id: novo.id } });
   });
 
   it('lista de modelos: os da agenda em uso primeiro, marcados', async () => {

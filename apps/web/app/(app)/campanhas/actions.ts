@@ -3,7 +3,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { prisma, getTenantClient, decrypt } from '@clinicaiq/db';
 import { redirect } from 'next/navigation';
-import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { clinicToday } from '@/lib/tz';
 import { capabilityBlocked, writeBlocked } from '@/lib/access';

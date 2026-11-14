@@ -270,7 +270,7 @@ function RevenueChart({ points, total }: { points: SeriesPoint[]; total: number 
                 title={`${p.label}: ${brl(p.value)}`}
               />
             </div>
-            <span className="truncate text-center text-[9px] text-muted-foreground">
+            <span className="truncate text-center text-[10px] text-muted-foreground">
               {i % step === 0 ? p.label : ' '}
             </span>
           </div>

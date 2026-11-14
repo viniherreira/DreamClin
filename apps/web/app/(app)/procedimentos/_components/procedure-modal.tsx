@@ -158,7 +158,7 @@ export function ProcedureModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="proc-modal-title"
-        className="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[min(640px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border border-border bg-surface shadow-xl"
+        className="fixed left-1/2 top-1/2 z-50 max-h-[90dvh] w-[min(640px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border border-border bg-surface shadow-xl"
       >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-surface px-5 py-4">
           <h2 id="proc-modal-title" className="text-base font-semibold">

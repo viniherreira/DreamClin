@@ -3,6 +3,7 @@ import { decrypt, encrypt, prisma, type LeadSource, type Prisma, type TenantPris
 import { chatKey } from '@/lib/phone';
 import { originOf, readAd } from './ad-origin';
 import { activeCloudAccount, WINDOW_MS, windowOpen } from './cloud';
+import { loadAdWindow } from './ad-window';
 import { previewText } from './chat-ingest';
 import { createLead, OPEN_LEAD, setTags, softDeleteLead, type Actor } from './leads';
 import { conversationHash, conversationHashes, decryptPhone, leadHashesForChat, maskPhone } from './phone';
@@ -354,6 +355,11 @@ export interface ChatThread {
   bot: { id: string; name: string } | null;
   /** Quando fecha a janela de 24 h (ISO), se aberta. */
   windowEndsAt: string | null;
+  /**
+   * Janela grátis do anúncio (72 h, `ad-window.ts`): aberta até `endsAt`, ou esperando a
+   * primeira resposta da clínica até `replyBy`. Nulo: a conversa não veio de anúncio, ou já passou.
+   */
+  adWindow: { state: 'open'; endsAt: string } | { state: 'waiting'; replyBy: string } | null;
 }
 
 const THREAD_LIMIT = 200;
@@ -410,9 +416,10 @@ export async function loadThread(
       buttons: Array.isArray(m.buttons) ? (m.buttons as { title?: unknown }[]).map((b) => String(b?.title ?? '')).filter(Boolean) : [],
       ad: adCard(m.ad),
     }));
-  const [cloud, bot] = await Promise.all([
+  const [cloud, bot, janela] = await Promise.all([
     activeCloudAccount(tenantId),
     conv.botFlowId ? db.chatbotFlow.findFirst({ where: { id: conv.botFlowId }, select: { id: true, name: true } }) : null,
+    loadAdWindow(db, conversationId),
   ]);
   return {
     conversation: toSummary(conv, tenantId, agenda),
@@ -424,6 +431,7 @@ export async function loadThread(
     mediaOk: Boolean(cloud) || process.env.NODE_ENV !== 'production',
     bot,
     windowEndsAt: conv.lastInboundAt && windowOpen(conv.lastInboundAt) ? new Date(conv.lastInboundAt.getTime() + WINDOW_MS).toISOString() : null,
+    adWindow: !cloud || !janela ? null : janela.state === 'open' ? { state: 'open', endsAt: janela.endsAt.toISOString() } : { state: 'waiting', replyBy: janela.replyBy.toISOString() },
   };
 }
 

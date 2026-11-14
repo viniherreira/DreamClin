@@ -11,7 +11,7 @@ const FEATURES = [
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
-      <main id="main-content" className="flex min-h-screen bg-background">
+      <main id="main-content" className="flex min-h-[100dvh] bg-background">
         {/* Brand panel */}
         <aside className="relative hidden w-1/2 flex-col justify-between overflow-hidden bg-brand-gradient p-12 text-white lg:flex xl:p-16">
           <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-white/10 blur-2xl" aria-hidden="true" />
@@ -51,7 +51,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         </aside>
 
         {/* Form */}
-        <div className="flex flex-1 items-center justify-center p-6 sm:p-10">
+        <div className="flex min-w-0 flex-1 items-center justify-center px-5 py-6 sm:p-10">
           <div className="w-full max-w-sm animate-fade-in-up">{children}</div>
         </div>
       </main>

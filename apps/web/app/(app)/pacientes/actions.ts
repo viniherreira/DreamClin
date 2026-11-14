@@ -1,7 +1,7 @@
 'use server';
 
 import { auth } from '@clerk/nextjs/server';
-import { prisma, getTenantClient, encrypt, decrypt } from '@clinicaiq/db';
+import { prisma, getTenantClient, encrypt, decrypt, Prisma } from '@clinicaiq/db';
 import { revalidatePath } from 'next/cache';
 import { after } from 'next/server';
 import { redirect } from 'next/navigation';
@@ -299,40 +299,50 @@ export async function createPatient(
     return { success: false, errors: { cpf: ['CPF já cadastrado nesta clínica'] } };
   }
 
-  const controlNumber = await nextControlNumber(tenantId);
-
-  const patient = await prisma.patient.create({
-    data: {
-      tenantId,
-      controlNumber,
-      name: data.name,
-      nickname: data.nickname || null,
-      cpfEncrypted: data.cpf ? encrypt(data.cpf, masterKey, tenantId) : null,
-      cpfHash: data.cpf ? cpfHash(data.cpf, tenantId) : null,
-      phoneEncrypted: encrypt(data.phone, masterKey, tenantId),
-      phone2Encrypted: data.phone2 ? encrypt(data.phone2, masterKey, tenantId) : null,
-      email: data.email || null,
-      birthDate: data.birthDate ? new Date(data.birthDate) : null,
-      gender: data.gender || null,
-      maritalStatus: data.maritalStatus || null,
-      profession: data.profession || null,
-      referredBy: data.referredBy || null,
-      notes: data.notes || null,
-      zipCode: data.zipCode || null,
-      street: data.street || null,
-      addressNumber: data.addressNumber || null,
-      complement: data.complement || null,
-      neighborhood: data.neighborhood || null,
-      city: data.city || null,
-      state: data.state || null,
-      lgpdConsentAt: new Date(),
-      // Só carimba quando a caixa foi marcada. Nulo aqui é a resposta honesta:
-      // "não autorizou", e não "ainda não perguntamos".
-      marketingConsentAt: data.marketingConsent ? new Date() : null,
-      createdById: userId,
-      updatedById: userId,
-    },
-  });
+  // Dois cadastros no mesmo instante pegariam o mesmo número de ficha: quem
+  // chegou depois tenta de novo com o número seguinte.
+  const criar = async (controlNumber: number) =>
+    prisma.patient.create({
+      data: {
+        tenantId,
+        controlNumber,
+        name: data.name,
+        nickname: data.nickname || null,
+        cpfEncrypted: data.cpf ? encrypt(data.cpf, masterKey, tenantId) : null,
+        cpfHash: data.cpf ? cpfHash(data.cpf, tenantId) : null,
+        phoneEncrypted: encrypt(data.phone, masterKey, tenantId),
+        phone2Encrypted: data.phone2 ? encrypt(data.phone2, masterKey, tenantId) : null,
+        email: data.email || null,
+        birthDate: data.birthDate ? new Date(data.birthDate) : null,
+        gender: data.gender || null,
+        maritalStatus: data.maritalStatus || null,
+        profession: data.profession || null,
+        referredBy: data.referredBy || null,
+        notes: data.notes || null,
+        zipCode: data.zipCode || null,
+        street: data.street || null,
+        addressNumber: data.addressNumber || null,
+        complement: data.complement || null,
+        neighborhood: data.neighborhood || null,
+        city: data.city || null,
+        state: data.state || null,
+        lgpdConsentAt: new Date(),
+        // Só carimba quando a caixa foi marcada. Nulo aqui é a resposta honesta:
+        // "não autorizou", e não "ainda não perguntamos".
+        marketingConsentAt: data.marketingConsent ? new Date() : null,
+        createdById: userId,
+        updatedById: userId,
+      },
+    });
+  let patient: Awaited<ReturnType<typeof criar>> | null = null;
+  for (let tentativa = 0; !patient; tentativa++) {
+    try {
+      patient = await criar(await nextControlNumber(tenantId));
+    } catch (e) {
+      const repetido = e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002' && String(e.meta?.target ?? '').includes('controlNumber');
+      if (!repetido || tentativa >= 4) throw e;
+    }
+  }
 
   await prisma.auditLog.create({
     data: {

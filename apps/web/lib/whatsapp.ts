@@ -126,7 +126,12 @@ export interface WhatsAppHealth {
   connected: boolean;
   /** Short, actionable sentence when something is wrong. */
   problem: string | null;
+  /** Onde resolver, quando não é a tela do WhatsApp (ex.: o passo a passo do pagamento na Meta). */
+  help?: { href: string; label: string };
 }
+
+/** Como o erro 131042 da Meta fica gravado na mensagem (`CLOUD_ERRORS`, em `@clinicaiq/whatsapp`). */
+const SEM_PAGAMENTO = 'forma de pagamento';
 
 /** Se o WhatsApp da clínica consegue mandar agora (para a agenda avisar). */
 export async function getWhatsAppHealth(tenantId: string): Promise<WhatsAppHealth> {
@@ -135,7 +140,30 @@ export async function getWhatsAppHealth(tenantId: string): Promise<WhatsAppHealt
     select: { active: true, status: true, lastError: true },
   });
   if (oficial?.active) {
-    if (oficial.status === 'CONNECTED') return { paired: true, connected: true, problem: null };
+    if (oficial.status === 'CONNECTED') {
+      // Conectada, mas a Meta recusa os avisos por falta de forma de pagamento: a
+      // conta parece certa e nada chega. Vale enquanto nenhum aviso mais novo for entregue.
+      const recusado = await prisma.whatsAppMessage.findFirst({
+        where: { tenantId, direction: 'OUTBOUND', status: 'FAILED', errorMessage: { contains: SEM_PAGAMENTO }, createdAt: { gte: new Date(Date.now() - 7 * 86_400_000) } },
+        orderBy: { createdAt: 'desc' },
+        select: { createdAt: true },
+      });
+      const entregueDepois =
+        recusado &&
+        (await prisma.whatsAppMessage.findFirst({
+          where: { tenantId, direction: 'OUTBOUND', status: { in: ['DELIVERED', 'READ'] }, createdAt: { gt: recusado.createdAt } },
+          select: { id: true },
+        }));
+      if (recusado && !entregueDepois) {
+        return {
+          paired: true,
+          connected: true,
+          problem: 'Os lembretes e as confirmações não estão saindo: falta cadastrar a forma de pagamento na conta do WhatsApp da clínica, na Meta.',
+          help: { href: '/ajuda/conectar-whatsapp', label: 'Ver como resolver' },
+        };
+      }
+      return { paired: true, connected: true, problem: null };
+    }
     return {
       paired: true,
       connected: false,
