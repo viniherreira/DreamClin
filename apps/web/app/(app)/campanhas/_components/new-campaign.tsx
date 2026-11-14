@@ -99,7 +99,7 @@ export function NewCampaign({ onClose }: { onClose: () => void }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="relative z-10 flex max-h-[92vh] w-full max-w-3xl flex-col rounded-t-2xl border border-border bg-surface shadow-2xl sm:rounded-2xl"
+        className="relative z-10 flex max-h-[92dvh] w-full max-w-3xl flex-col rounded-t-2xl border border-border bg-surface shadow-2xl sm:rounded-2xl"
       >
         <div className="flex items-start justify-between gap-3 border-b border-border p-5">
           <h2 id={titleId} className="text-lg font-semibold tracking-tight">

@@ -39,8 +39,9 @@ const STATUS_ICON = {
 } as const;
 
 export function AppointmentBlock({ appointment, onClick }: AppointmentBlockProps) {
-  const start = new Date(appointment.startTime);
-  const end = new Date(appointment.endTime);
+  // Datas guardadas pelo texto: um objeto novo a cada desenho refaria a conta à toa.
+  const start = useMemo(() => new Date(appointment.startTime), [appointment.startTime]);
+  const end = useMemo(() => new Date(appointment.endTime), [appointment.endTime]);
 
   const grid = useGrid();
   const { topPx, heightPx } = useMemo(() => {

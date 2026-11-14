@@ -26,7 +26,7 @@ export function TaskList({ tarefas, atrasada }: { tarefas: TaskRow[]; atrasada: 
                 )}
                 <span className="truncate">{t.text}</span>
               </p>
-              <Link href={`/crm/leads/${t.leadId}`} className="text-xs text-primary hover:underline">
+              <Link href={`/crm/leads/${t.leadId}`} className="rounded text-xs text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
                 {t.leadLabel}
               </Link>
             </>

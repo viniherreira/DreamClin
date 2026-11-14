@@ -27,6 +27,11 @@ export interface StageConditions {
   sources?: LeadSourceKey[];
   /** Só leads com alguma destas tags. */
   tagIds?: string[];
+  /**
+   * Só roda dentro da janela grátis do anúncio (72 h, `ad-window.ts`). Conferido
+   * na hora de rodar, não na de agendar: o follow-up de 48 h vale se a janela ainda estiver aberta.
+   */
+  adWindow?: boolean;
 }
 
 const HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -52,11 +57,12 @@ export function parseConditions(raw: unknown): StageConditions {
     const tagIds = [...new Set(c.tagIds.filter((t): t is string => typeof t === 'string' && t.length > 0))].slice(0, 20);
     if (tagIds.length > 0) out.tagIds = tagIds;
   }
+  if (c.adWindow === true) out.adWindow = true;
   return out;
 }
 
 export function hasConditions(c: StageConditions): boolean {
-  return Boolean(c.days || c.from || c.sources || c.tagIds);
+  return Boolean(c.days || c.from || c.sources || c.tagIds || c.adWindow);
 }
 
 /** O gatilho vale para este jeito de entrar na etapa? */
@@ -117,5 +123,6 @@ export function conditionChips(c: StageConditions, names: { tags: ReadonlyMap<st
   }
   if (c.sources) chips.push(`Origem: ${c.sources.map((s) => names.sources[s] ?? s).join(', ')}`);
   if (c.tagIds) chips.push(`Com a tag: ${c.tagIds.map((t) => names.tags.get(t) ?? '(apagada)').join(', ')}`);
+  if (c.adWindow) chips.push('Só na janela grátis do anúncio (72 h)');
   return chips;
 }

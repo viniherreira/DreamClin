@@ -146,7 +146,7 @@ export function CategoryManager({ open, onClose, categories }: Props) {
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/40" onClick={onClose} aria-hidden="true" />
-      <div role="dialog" aria-modal="true" aria-labelledby="cat-title" className="fixed left-1/2 top-1/2 z-50 max-h-[85vh] w-[min(480px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border border-border bg-surface shadow-xl">
+      <div role="dialog" aria-modal="true" aria-labelledby="cat-title" className="fixed left-1/2 top-1/2 z-50 max-h-[85dvh] w-[min(480px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border border-border bg-surface shadow-xl">
         <div className="sticky top-0 flex items-center justify-between border-b border-border bg-surface px-5 py-4">
           <h2 id="cat-title" className="text-base font-semibold">Gerenciar categorias</h2>
           <button type="button" onClick={onClose} aria-label="Fechar" className="rounded-md p-1.5 hover:bg-surface-alt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">

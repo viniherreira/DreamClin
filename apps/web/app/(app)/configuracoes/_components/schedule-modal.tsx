@@ -89,7 +89,7 @@ export function ScheduleModal({ open, professionalId, professionalName, onClose,
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="relative z-10 flex max-h-[90vh] w-full max-w-lg flex-col rounded-t-2xl border border-border bg-surface shadow-2xl sm:rounded-2xl"
+        className="relative z-10 flex max-h-[90dvh] w-full max-w-lg flex-col rounded-t-2xl border border-border bg-surface shadow-2xl sm:rounded-2xl"
       >
         <div className="flex items-start justify-between border-b border-border p-5">
           <div>

@@ -171,4 +171,48 @@ describe.skipIf(!process.env.DATABASE_URL)('automações por etapa (banco)', asy
     expect(copias).toHaveLength(2);
     expect(copias[1]).toMatchObject({ action: 'REMOVE_TAG', active: false });
   });
+  it('"só na janela grátis do anúncio": roda para quem veio de anúncio e foi respondido; os outros são pulados', async () => {
+    const { loadAdWindow } = await import('./ad-window');
+    const { conversationHash } = await import('./phone');
+    const { encrypt } = await import('@clinicaiq/db');
+    const anuncio = await db.leadTag.create({ data: { tenantId: tenant.id, name: 'follow-up-anuncio', color: 'pink' } });
+    expect(
+      await a.saveAutomation(db, tenant.id, { stageId: agendada.id, action: 'ADD_TAG', config: { tagIds: [anuncio.id] }, delayMinutes: 0, conditions: { adWindow: true } }),
+    ).toEqual({ ok: true });
+    const temTag = async (leadId: string) => Boolean(await db.leadTagOnLead.findFirst({ where: { leadId, tagId: anuncio.id } }));
+
+    async function leadComConversa(nome: string, fone: string, mensagens: { direction: 'INBOUND' | 'OUTBOUND'; horasAtras: number; ad?: boolean }[]) {
+      const r = await createLead(db, actor, { name: nome, phone: fone });
+      if (!r.ok) throw new Error(r.message);
+      const conv = await prisma.conversation.create({
+        data: { tenantId: tenant.id, leadId: r.leadId, phoneHash: conversationHash(fone, tenant.id), phoneEncrypted: encrypt(fone, key, tenant.id), status: 'ACTIVE' },
+      });
+      for (const [i, m] of mensagens.entries()) {
+        await prisma.chatMessage.create({
+          data: {
+            tenantId: tenant.id, conversationId: conv.id, direction: m.direction, origin: m.direction === 'INBOUND' ? 'CONTACT' : 'CRM',
+            externalId: `jan-${conv.id}-${i}`, at: new Date(Date.now() - m.horasAtras * 3_600_000),
+            ...(m.ad ? { ad: { sourceUrl: 'https://fb.me/abc', headline: 'Implante' } } : {}),
+          },
+        });
+      }
+      return { leadId: r.leadId, conversationId: conv.id };
+    }
+
+    const doAnuncio = await leadComConversa('Do Anúncio', '11 97777-0101', [{ direction: 'INBOUND', horasAtras: 50, ad: true }, { direction: 'OUTBOUND', horasAtras: 49 }]);
+    const semAnuncio = await leadComConversa('Sem Anúncio', '11 97777-0102', [{ direction: 'INBOUND', horasAtras: 50 }, { direction: 'OUTBOUND', horasAtras: 49 }]);
+    const semResposta = await leadComConversa('Sem Resposta', '11 97777-0103', [{ direction: 'INBOUND', horasAtras: 50, ad: true }]);
+    // 50 h depois do anúncio: as 24 h fecharam, a janela grátis (72 h da resposta) não.
+    expect((await loadAdWindow(db, doAnuncio.conversationId))?.state).toBe('open');
+    expect(await loadAdWindow(db, semAnuncio.conversationId)).toBeNull();
+    expect(await loadAdWindow(db, semResposta.conversationId)).toBeNull();
+
+    for (const l of [doAnuncio, semAnuncio, semResposta]) await moveLead(db, actor, l.leadId, { stageId: agendada.id });
+    await a.runDueAutomations(new Date(), { tenantId: tenant.id });
+    expect(await temTag(doAnuncio.leadId)).toBe(true);
+    expect(await temTag(semAnuncio.leadId)).toBe(false);
+    expect(await temTag(semResposta.leadId)).toBe(false);
+    const pulada = await prisma.automationRun.findFirst({ where: { leadId: semAnuncio.leadId, status: 'SKIPPED' } });
+    expect(pulada?.error).toMatch(/janela grátis/);
+  });
 });

@@ -66,7 +66,7 @@ export function CreateClinicForm({ plans, initial }: { plans: TrialPlan[]; initi
   }
 
   return (
-    <main id="main-content" className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
+    <main id="main-content" className="flex min-h-[100dvh] items-center justify-center bg-background px-4 py-10">
       <div className="w-full max-w-2xl">
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 w-fit">

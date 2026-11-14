@@ -3,6 +3,7 @@ import { assignLead, pickAssignee } from './assignment';
 import { DISTRIBUTE } from './distribution-rules';
 import { renderTemplateBody } from '@clinicaiq/whatsapp';
 import { activeCloudAccount, windowOpen } from './cloud';
+import { loadAdWindow } from './ad-window';
 import { ensureConversationForLead, writeChatMessage } from './conversations';
 import { createTask } from './tasks';
 import { moveLead } from './leads';
@@ -193,7 +194,7 @@ async function execute(
   db: TenantPrismaClient,
   tenantId: string,
   run: { id: string; leadId: string; stageEnteredAt: Date },
-  automation: { stageId: string; action: AutomationAction; config: Prisma.JsonValue },
+  automation: { stageId: string; action: AutomationAction; config: Prisma.JsonValue; conditions?: Prisma.JsonValue },
 ): Promise<{ status: 'DONE' | 'SKIPPED' | 'FAILED'; error?: string }> {
   const lead = await db.lead.findFirst({
     where: { id: run.leadId },
@@ -214,6 +215,13 @@ async function execute(
   }
   const cfg = automation.config as Record<string, unknown>;
   const actor = { tenantId, userId: null };
+
+  // "Só na janela grátis do anúncio": vale a janela de agora, não a da hora em que entrou na etapa.
+  if (parseConditions(automation.conditions).adWindow) {
+    const conversa = await db.conversation.findFirst({ where: { leadId: lead.id }, orderBy: { lastMessageAt: 'desc' }, select: { id: true } });
+    const janela = conversa ? await loadAdWindow(db, conversa.id) : null;
+    if (janela?.state !== 'open') return { status: 'SKIPPED', error: 'Fora da janela grátis do anúncio (72 horas).' };
+  }
 
   switch (automation.action) {
     case 'SEND_MESSAGE': {
@@ -305,7 +313,7 @@ async function execute(
 export async function runDueAutomations(now: Date = new Date(), opts: { tenantId?: string; limit?: number } = {}): Promise<number> {
   const due = await prisma.automationRun.findMany({
     where: { status: 'PENDING', doneAt: null, dueAt: { lte: now }, ...(opts.tenantId ? { tenantId: opts.tenantId } : {}) },
-    select: { id: true, tenantId: true, leadId: true, stageEnteredAt: true, automation: { select: { stageId: true, action: true, config: true, active: true } } },
+    select: { id: true, tenantId: true, leadId: true, stageEnteredAt: true, automation: { select: { stageId: true, action: true, config: true, conditions: true, active: true } } },
     orderBy: { dueAt: 'asc' },
     take: opts.limit ?? 100,
   });
