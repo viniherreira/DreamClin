@@ -128,6 +128,13 @@ describe('erros da Meta', () => {
     expect(describeGraphError(400, { error: { code } }).userMessage).toContain(trecho);
   });
   it('5xx pode tentar de novo', () => expect(describeGraphError(503, {}).retryable).toBe(true));
+  it('mostra o motivo de verdade em vez de "Invalid parameter"', () => {
+    const e = describeGraphError(400, {
+      error: { code: 100, message: 'Invalid parameter', error_user_msg: 'Já existe conteúdo em Português (BR) para este modelo.' },
+    });
+    expect(e.userMessage).toBe('A Meta recusou: Já existe conteúdo em Português (BR) para este modelo.');
+    expect(describeGraphError(400, { error: { code: 100, message: 'Invalid parameter' } }).userMessage).toBe('A Meta recusou: Invalid parameter');
+  });
 });
 
 describe('variáveis de modelo', () => {
