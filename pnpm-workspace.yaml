@@ -12,3 +12,12 @@ allowBuilds:
   protobufjs: true
   sharp: true
   unrs-resolver: true
+# Correções de segurança em dependências de terceiros (Next, ESLint) que ainda
+# pedem versões antigas. Cada linha só troca a faixa vulnerável.
+overrides:
+  'postcss@<8.5.18': ^8.5.18
+  'nanoid@<3.3.18': ^3.3.18
+  'source-map-js@<1.2.2': ^1.2.2
+  'brace-expansion@<1.1.20': ^1.1.22
+  'js-yaml@>=4.0.0 <4.3.2': ^4.3.2
+  'sharp@<0.35.5': ^0.35.5
