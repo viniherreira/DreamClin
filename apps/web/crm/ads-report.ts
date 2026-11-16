@@ -18,6 +18,7 @@ import {
   type MetaErrorKind,
 } from './ads-rules';
 import { daysOf, reportRange, type DayRange, type ReportPeriodKey } from './report-period';
+import { sqlInstant } from './sql';
 
 /**
  * A tela Anúncios: busca os números da Meta (com cache de 15 minutos por
@@ -60,13 +61,13 @@ export async function adLeadEvents(tenantId: string, r: Pick<DayRange, 'from' | 
     ev AS (
       SELECT al.ad_id, 'lead' AS kind, al.at AS at, 0 AS cents
       FROM ad_leads al
-      WHERE al.at >= ${r.from} AND al.at < ${r.to}
+      WHERE al.at >= ${sqlInstant(r.from)} AND al.at < ${sqlInstant(r.to)}
       UNION ALL
       SELECT al.ad_id, 'scheduled', min(a."createdAt"), 0
       FROM "lead_activities" a
       JOIN ad_leads al ON al.lead_id = a."leadId"
       WHERE a."tenantId" = ${tenantId} AND a."type" = 'STAGE_CHANGED'
-        AND a."createdAt" >= ${r.from} AND a."createdAt" < ${r.to}
+        AND a."createdAt" >= ${sqlInstant(r.from)} AND a."createdAt" < ${sqlInstant(r.to)}
         AND a."data"->>'to' = ANY(${lista(agendou)})
       GROUP BY al.ad_id, a."leadId"
       UNION ALL
@@ -74,7 +75,7 @@ export async function adLeadEvents(tenantId: string, r: Pick<DayRange, 'from' | 
       FROM "lead_activities" a
       JOIN ad_leads al ON al.lead_id = a."leadId"
       WHERE a."tenantId" = ${tenantId} AND a."type" = 'STAGE_CHANGED'
-        AND a."createdAt" >= ${r.from} AND a."createdAt" < ${r.to}
+        AND a."createdAt" >= ${sqlInstant(r.from)} AND a."createdAt" < ${sqlInstant(r.to)}
         AND a."data"->>'to' = ANY(${lista(compareceu)})
       GROUP BY al.ad_id, a."leadId"
       UNION ALL
@@ -82,7 +83,7 @@ export async function adLeadEvents(tenantId: string, r: Pick<DayRange, 'from' | 
       FROM "leads" l
       JOIN ad_leads al ON al.lead_id = l."id"
       WHERE l."tenantId" = ${tenantId} AND l."deletedAt" IS NULL
-        AND l."wonAt" >= ${r.from} AND l."wonAt" < ${r.to}
+        AND l."wonAt" >= ${sqlInstant(r.from)} AND l."wonAt" < ${sqlInstant(r.to)}
     )
     SELECT ad_id, kind,
       to_char((at AT TIME ZONE 'UTC') AT TIME ZONE 'America/Sao_Paulo', 'YYYY-MM-DD') AS day,

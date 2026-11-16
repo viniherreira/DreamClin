@@ -53,6 +53,16 @@ Every tenant-scoped table has `tenantId`. Use `getTenantClient(tenantId)` from `
 
 A extensão filtra **todo** modelo, menos os de `MODELS_WITHOUT_TENANT`. Tabela nova, inclusive de ligação, precisa ter `tenantId`.
 
+## Datas e fuso
+
+A Vercel roda em UTC e a clínica em `America/Sao_Paulo`. Tela que formata data com o fuso do navegador (ou com `new Date()` solto) sai diferente no servidor e no cliente: o React refaz a página e o tema cai no claro. Por isso:
+
+- **Dois tipos de data** (`lib/tz.ts`): *data de parede* (agendamento, validade do orçamento, nascimento) é gravada em UTC e lida pelas partes UTC (`wallDateBR`, `wallDateShortBR`, `wallClockTime`); *instante* (criado em, pago em) é lido no fuso da clínica (`instantDateBR`, `instantDateTimeBR`, `instantDateTimeShortBR`, `instantTimeBR`). Nunca `toLocaleDateString` nem `date-fns/format` direto num componente.
+- **"Hoje" é `clinicToday()`**, não `new Date()`: depois das 21 h o dia UTC já virou. Idade sai de `ageFromBirth`, a linha da hora na agenda de `clinicNowMinutes`.
+- **Iniciais de avatar** só por `lib/initials.ts` (`initials`, `leadingInitials`, `firstLetters`): `nome[0]` corta emoji ao meio e quebra a página.
+- **SQL cru com data**: as colunas são `timestamp` em UTC; um `Date` solto vai como `timestamptz` e desloca a comparação quando a sessão do banco não está em UTC (o Postgres local está em São Paulo). Use `sqlInstant(d)` de `crm/sql.ts`.
+- `components/theme-keeper.tsx` repõe o tema se a página for refeita. É rede de proteção, não desculpa para data sem fuso.
+
 ## Agenda e gestão (referência: Clínica nas Nuvens)
 
 - **Visual:** menu branco com busca, grupos que abrem e fecham e opção de recolher (`components/clinic-sidebar.tsx`, grupos em `CLINIC_NAV`), topo com o caminho e a busca de paciente (`app-header.tsx`), fundo `bg-canvas` nas telas. Cor azul mantida.
