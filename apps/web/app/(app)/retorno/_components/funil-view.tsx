@@ -51,7 +51,7 @@ export function FunilView({ data }: { data: FunilData }) {
       {data.semBaixa > 0 && <AvisoBaixa quantos={data.semBaixa} />}
 
       {/* Funil */}
-      <section aria-label="Resumo do funil" className="grid gap-3 sm:grid-cols-3 lg:grid-cols-4">
+      <section aria-label="Resumo do funil" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         <Cartao
           rotulo="A cobrar"
           valor={brl(data.emAbertoTotalCents)}
@@ -172,7 +172,7 @@ function Cartao({
   const conteudo = (
     <>
       <p className="text-xs font-medium text-muted-foreground">{rotulo}</p>
-      <p className={`mt-1 font-semibold tracking-tight ${destaque ? 'text-xl' : 'text-2xl'}`}>
+      <p className={`mt-1 font-semibold tracking-tight tabular-nums ${destaque ? 'text-xl' : 'text-2xl'}`}>
         {valor}
       </p>
       <p className="mt-0.5 text-[11px] text-muted-foreground">{hint}</p>
@@ -181,7 +181,7 @@ function Cartao({
   const base = 'rounded-xl border bg-surface p-4 text-left shadow-card transition-colors';
 
   if (!onClick) {
-    return <div className={`${base} border-border`}>{conteudo}</div>;
+    return <div className={`${base} border-border ${destaque ? 'col-span-2 sm:col-span-1' : ''}`}>{conteudo}</div>;
   }
   return (
     <button

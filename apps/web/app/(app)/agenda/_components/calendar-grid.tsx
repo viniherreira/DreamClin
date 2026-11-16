@@ -9,6 +9,8 @@ import { CurrentTimeIndicator } from './current-time-indicator';
 import { WorkingHoursOverlay } from './working-hours-overlay';
 import { BlockedSlotBlock, type BlockedSlotItem } from './blocked-slot-block';
 import type { WeekSchedule } from '@/lib/schedule';
+import { clinicToday } from '@/lib/tz';
+import { firstLetters } from '@/lib/initials';
 
 interface Professional {
   id: string;
@@ -99,7 +101,7 @@ function ProfessionalHeader({ prof }: { prof: Professional }) {
         style={{ background: prof.color }}
         aria-hidden="true"
       >
-        {prof.name.trim().charAt(0).toUpperCase()}
+        {firstLetters(prof.name)}
       </span>
       <div className="min-w-0 leading-tight">
         <p className="truncate text-xs font-semibold text-foreground">{prof.name}</p>
@@ -117,7 +119,7 @@ export function CalendarGrid({
   const TOTAL_HEIGHT_PX = grid.totalHeight;
   const GRID_BG = useMemo(() => gridBackground(grid.hourPx), [grid.hourPx]);
   const visibleProfs = professionals.filter((p) => visibleProfessionals.has(p.id));
-  const todayStr = format(new Date(), 'yyyy-MM-dd');
+  const todayStr = clinicToday();
 
   const appointmentsWithColor = appointments
     .filter((a) => visibleProfessionals.has(a.professional.id))

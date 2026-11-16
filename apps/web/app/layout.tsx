@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google';
 import { GeistMono } from 'geist/font/mono';
 import { siteUrl } from '@/lib/company';
 import { OG_IMAGE } from '@/lib/seo';
+import { ThemeKeeper } from '@/components/theme-keeper';
 import './globals.css';
 
 // A fonte do manual de marca.
@@ -67,6 +68,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         >
           Pular para o conteúdo principal
         </a>
+        <ThemeKeeper />
         {children}
       </body>
     </html>

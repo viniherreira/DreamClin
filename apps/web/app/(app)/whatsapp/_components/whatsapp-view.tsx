@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { MessageSquare } from 'lucide-react';
 import { saveWhatsAppSettings, type WhatsAppPanelData } from '../actions';
 import { OfficialCard } from './official-card';
+import { instantDateBR } from '@/lib/tz';
 
 interface Props {
   data: WhatsAppPanelData;
@@ -113,7 +114,7 @@ export function WhatsAppView({ data }: Props) {
                       {meta.label}
                     </span>
                     <p className="mt-1 text-[11px] tabular-nums text-muted-foreground">
-                      {new Date(m.createdAt).toLocaleDateString('pt-BR')}
+                      {instantDateBR(m.createdAt)}
                     </p>
                   </div>
                 </li>
@@ -214,8 +215,9 @@ function Toggle({
         }`}
       >
         <span
-          className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-            checked ? 'translate-x-5' : 'translate-x-0.5'
+          // `left-0` ancora a bolinha: sem ele, dentro de um <button> ela nasce no meio e sai da trilha.
+          className={`absolute left-0 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+            checked ? 'translate-x-[22px]' : 'translate-x-0.5'
           }`}
           aria-hidden="true"
         />

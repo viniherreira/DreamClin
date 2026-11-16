@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { AlertTriangle, Megaphone, Plus, Send, UserX } from 'lucide-react';
 import type { listCampaigns } from '../actions';
 import { NewCampaign } from './new-campaign';
+import { instantDateTimeBR } from '@/lib/tz';
 
 type Data = Awaited<ReturnType<typeof listCampaigns>>;
 
@@ -125,7 +126,7 @@ export function CampaignsView({ data }: { data: Data }) {
                   </div>
 
                   <p className="mt-1.5 text-[11px] text-muted-foreground">
-                    {new Date(c.createdAt).toLocaleString('pt-BR')}
+                    {instantDateTimeBR(c.createdAt)}
                   </p>
                 </li>
               );

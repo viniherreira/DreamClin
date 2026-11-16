@@ -49,7 +49,7 @@ export default async function DashboardPage() {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-          <p className="mt-1 text-sm capitalize text-muted-foreground">{dateLabel}</p>
+          <p className="mt-1 text-sm text-muted-foreground first-letter:uppercase">{dateLabel}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link href="/agenda" className="btn-ghost btn-md">

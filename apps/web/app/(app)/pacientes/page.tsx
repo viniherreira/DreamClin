@@ -64,15 +64,15 @@ export default async function PatientsPage({
   const page = Math.max(1, Number(params.page ?? 1));
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl">
-      <header className="mb-6 flex items-center justify-between">
+    <div className="mx-auto max-w-6xl p-6 lg:p-8">
+      <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Lista de pacientes</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">Gerencie os pacientes da clínica</p>
         </div>
         <Link
           href="/pacientes/novo"
-          className="touch-target inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          className="touch-target inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M5 12h14" /><path d="M12 5v14" />

@@ -23,11 +23,7 @@ export const SOURCE_LABEL: Record<string, string> = {
   OUTRO: 'Outro',
 };
 
-export function initials(name: string): string {
-  const partes = name.trim().split(/\s+/).filter(Boolean);
-  if (partes.length === 0) return '?';
-  return ((partes[0][0] ?? '') + (partes.length > 1 ? partes[partes.length - 1][0] : '')).toUpperCase();
-}
+export { initials } from '@/lib/initials';
 
 /** Instante real (tarefas) → "hoje 14:00", "amanhã 10:00", "12/10 09:00". */
 export function formatDue(due: Date, now: Date = new Date()): string {

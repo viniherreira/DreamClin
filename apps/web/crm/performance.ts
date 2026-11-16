@@ -4,6 +4,7 @@ import { prisma, Prisma } from '@clinicaiq/db';
 import type { CrmContext } from './guard';
 import { change, changeTone, rate, type Tone } from './ads-rules';
 import { SOURCE_LABEL } from './format';
+import { sqlInstant } from './sql';
 import { OPEN_LEAD } from './leads';
 import { addDays, clinicDay, dayStart } from './period';
 import { buildArrivals, lastMonths, responseMedians, type Arrivals, type ArrivalRow } from './performance-rules';
@@ -107,7 +108,7 @@ export async function loadPerformance(
           WHERE a."tenantId" = ${tenantId} AND a."leadId" = l."id" AND a."type" = 'STAGE_CHANGED' AND a."data"->>'to' = ANY(${lista(agenda)})
         )
       ) s ON true
-      WHERE l."tenantId" = ${tenantId} AND l."deletedAt" IS NULL AND l."createdAt" >= ${r.from} AND l."createdAt" < ${r.to} ${dono}
+      WHERE l."tenantId" = ${tenantId} AND l."deletedAt" IS NULL AND l."createdAt" >= ${sqlInstant(r.from)} AND l."createdAt" < ${sqlInstant(r.to)} ${dono}
     `).then((x) => x[0] ?? { n: 0, sched: 0, sched_won: 0 });
 
   const ganhos = (r: DayRange) =>
@@ -165,30 +166,30 @@ export async function loadPerformance(
         ceil(extract(day FROM t.loc) / 7.0)::int AS week, count(*)::int AS n
       FROM (
         SELECT ${local(Prisma.sql`l."createdAt"`)} AS loc FROM "leads" l
-        WHERE l."tenantId" = ${tenantId} AND l."deletedAt" IS NULL AND l."createdAt" >= ${chegadaDe} AND l."createdAt" < ${current.to} ${dono}
+        WHERE l."tenantId" = ${tenantId} AND l."deletedAt" IS NULL AND l."createdAt" >= ${sqlInstant(chegadaDe)} AND l."createdAt" < ${sqlInstant(current.to)} ${dono}
       ) t
       GROUP BY 1, 2, 3
     `),
     prisma.$queryRaw<{ ym: string; n: number }[]>(Prisma.sql`
       SELECT to_char(${local(Prisma.sql`l."createdAt"`)}, 'YYYY-MM') AS ym, count(*)::int AS n FROM "leads" l
-      WHERE l."tenantId" = ${tenantId} AND l."deletedAt" IS NULL AND l."createdAt" >= ${mesesDe} AND l."createdAt" < ${mesesAte} ${dono}
+      WHERE l."tenantId" = ${tenantId} AND l."deletedAt" IS NULL AND l."createdAt" >= ${sqlInstant(mesesDe)} AND l."createdAt" < ${sqlInstant(mesesAte)} ${dono}
       GROUP BY 1
     `),
     prisma.$queryRaw<{ ym: string; n: number }[]>(Prisma.sql`
       SELECT to_char(${local(Prisma.sql`l."wonAt"`)}, 'YYYY-MM') AS ym, count(*)::int AS n FROM "leads" l
-      WHERE l."tenantId" = ${tenantId} AND l."deletedAt" IS NULL AND l."wonAt" >= ${mesesDe} AND l."wonAt" < ${mesesAte} ${dono}
+      WHERE l."tenantId" = ${tenantId} AND l."deletedAt" IS NULL AND l."wonAt" >= ${sqlInstant(mesesDe)} AND l."wonAt" < ${sqlInstant(mesesAte)} ${dono}
       GROUP BY 1
     `),
     prisma.$queryRaw<{ source: string; n: number; won: number }[]>(Prisma.sql`
       SELECT l."source"::text AS source, count(*)::int AS n, count(*) FILTER (WHERE l."wonAt" IS NOT NULL)::int AS won FROM "leads" l
-      WHERE l."tenantId" = ${tenantId} AND l."deletedAt" IS NULL AND l."createdAt" >= ${current.from} AND l."createdAt" < ${current.to} ${dono}
+      WHERE l."tenantId" = ${tenantId} AND l."deletedAt" IS NULL AND l."createdAt" >= ${sqlInstant(current.from)} AND l."createdAt" < ${sqlInstant(current.to)} ${dono}
       GROUP BY 1
     `),
     // Por quais etapas passaram os leads que chegaram no período: onde estão, ou de onde saíram e para onde foram.
     prisma.$queryRaw<{ sid: string; n: number }[]>(Prisma.sql`
       WITH coorte AS (
         SELECT l."id", l."stageId" FROM "leads" l
-        WHERE l."tenantId" = ${tenantId} AND l."deletedAt" IS NULL AND l."createdAt" >= ${current.from} AND l."createdAt" < ${current.to} ${dono}
+        WHERE l."tenantId" = ${tenantId} AND l."deletedAt" IS NULL AND l."createdAt" >= ${sqlInstant(current.from)} AND l."createdAt" < ${sqlInstant(current.to)} ${dono}
       )
       SELECT t.sid, count(DISTINCT t.lead_id)::int AS n FROM (
         SELECT c."id" AS lead_id, c."stageId" AS sid FROM coorte c
@@ -206,7 +207,7 @@ export async function loadPerformance(
     prisma.$queryRaw<{ sid: string; n: number }[]>(Prisma.sql`
       SELECT a."data"->>'from' AS sid, count(DISTINCT a."leadId")::int AS n
       FROM "lead_activities" a JOIN "leads" l ON l."id" = a."leadId" AND l."tenantId" = ${tenantId} AND l."deletedAt" IS NULL
-      WHERE a."tenantId" = ${tenantId} AND a."type" = 'LOST' AND a."createdAt" >= ${current.from} AND a."createdAt" < ${current.to}
+      WHERE a."tenantId" = ${tenantId} AND a."type" = 'LOST' AND a."createdAt" >= ${sqlInstant(current.from)} AND a."createdAt" < ${sqlInstant(current.to)}
         AND a."data"->>'from' IS NOT NULL ${dono}
       GROUP BY 1
     `),
@@ -215,14 +216,14 @@ export async function loadPerformance(
     prisma.$queryRaw<{ who: string | null; bot: boolean; n: number }[]>(Prisma.sql`
       SELECT m."sentById" AS who, (m."origin" = 'BOT') AS bot, count(DISTINCT m."conversationId")::int AS n
       FROM "chat_messages" m
-      WHERE m."tenantId" = ${tenantId} AND m."direction" = 'OUTBOUND' AND m."at" >= ${current.from} AND m."at" < ${current.to}
+      WHERE m."tenantId" = ${tenantId} AND m."direction" = 'OUTBOUND' AND m."at" >= ${sqlInstant(current.from)} AND m."at" < ${sqlInstant(current.to)}
         AND ((m."origin" = 'CRM' AND m."sentById" IS NOT NULL) OR m."origin" = 'BOT')
       GROUP BY 1, 2
     `),
     prisma.$queryRaw<{ who: string | null; n: number }[]>(Prisma.sql`
       SELECT l."assignedToId" AS who, count(DISTINCT a."leadId")::int AS n
       FROM "lead_activities" a JOIN "leads" l ON l."id" = a."leadId" AND l."tenantId" = ${tenantId} AND l."deletedAt" IS NULL
-      WHERE a."tenantId" = ${tenantId} AND a."type" = 'STAGE_CHANGED' AND a."createdAt" >= ${current.from} AND a."createdAt" < ${current.to}
+      WHERE a."tenantId" = ${tenantId} AND a."type" = 'STAGE_CHANGED' AND a."createdAt" >= ${sqlInstant(current.from)} AND a."createdAt" < ${sqlInstant(current.to)}
         AND a."data"->>'to' = ANY(${lista(stages.filter((s) => s.role === 'SCHEDULED').map((s) => s.id))}) ${dono}
       GROUP BY 1
     `),
@@ -236,7 +237,7 @@ export async function loadPerformance(
     prisma.$queryRaw<{ dias: number | null }[]>(Prisma.sql`
       SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM (l."wonAt" - l."createdAt")) / 86400.0)::float8 AS dias
       FROM "leads" l
-      WHERE l."tenantId" = ${tenantId} AND l."deletedAt" IS NULL AND l."wonAt" >= ${current.from} AND l."wonAt" < ${current.to} ${dono}
+      WHERE l."tenantId" = ${tenantId} AND l."deletedAt" IS NULL AND l."wonAt" >= ${sqlInstant(current.from)} AND l."wonAt" < ${sqlInstant(current.to)} ${dono}
     `),
     prisma.$queryRaw<{ pid: string; n: number; won: number; cents: bigint | number | null }[]>(Prisma.sql`
       SELECT l."interestProcedureId" AS pid, count(*)::int AS n,
@@ -244,7 +245,7 @@ export async function loadPerformance(
         sum(CASE WHEN l."wonAt" IS NOT NULL THEN COALESCE(l."estimatedValueCents", 0) ELSE 0 END)::bigint AS cents
       FROM "leads" l
       WHERE l."tenantId" = ${tenantId} AND l."deletedAt" IS NULL AND l."interestProcedureId" IS NOT NULL
-        AND l."createdAt" >= ${current.from} AND l."createdAt" < ${current.to} ${dono}
+        AND l."createdAt" >= ${sqlInstant(current.from)} AND l."createdAt" < ${sqlInstant(current.to)} ${dono}
       GROUP BY 1
       ORDER BY 2 DESC
       LIMIT 8

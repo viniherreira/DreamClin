@@ -17,7 +17,7 @@ import { BlockSlotModal } from './block-slot-modal';
 import { getAgendaData, deleteBlockedSlot } from '../actions';
 import { GridContext } from './grid-context';
 import { makeGrid } from '@/lib/agenda-rules';
-import { wallClockTime } from '@/lib/tz';
+import { clinicToday, wallClockTime } from '@/lib/tz';
 
 type AgendaData = Awaited<ReturnType<typeof getAgendaData>>;
 type AgendaView = 'day' | 'week' | 'month';
@@ -111,7 +111,7 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
   }
   function goPrev() { navigate(passo(-1)); }
   function goNext() { navigate(passo(1)); }
-  function goToday() { navigate(format(new Date(), 'yyyy-MM-dd')); }
+  function goToday() { navigate(clinicToday()); }
 
   function openNewModal(professionalId?: string, timeStr?: string, dateOverride?: string) {
     setEditing(null);
@@ -180,9 +180,8 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
   }, [currentDate, view, modal.open, detailId]);
 
   const dateLabel = format(parseISO(currentDate), "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR });
-  // Plain string compare against the browser's calendar date — immune to
-  // timezone/parse quirks that could make other days read as "today".
-  const todayActive = currentDate === format(new Date(), 'yyyy-MM-dd');
+  // O dia da clínica (igual no servidor e no navegador), comparado como texto.
+  const todayActive = currentDate === clinicToday();
   const hasProfessionals = data.professionals.length > 0;
 
   return (

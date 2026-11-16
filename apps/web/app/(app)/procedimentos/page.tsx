@@ -53,7 +53,7 @@ export default async function ProceduresPage({
   const page = Math.max(1, Number(params.page ?? 1));
 
   return (
-    <div className="max-w-7xl p-6 lg:p-8">
+    <div className="mx-auto max-w-6xl p-6 lg:p-8">
       <Suspense fallback={<div className="py-12 text-center text-sm text-muted-foreground">Carregando...</div>}>
         <Content search={search} categoryId={categoryId} situacao={situacao} sort={sort} dir={dir} page={page} />
       </Suspense>

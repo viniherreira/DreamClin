@@ -131,7 +131,9 @@ export async function listQuotes({
     db.quote.count({ where }),
     // Totals below cover the whole filtered set, not just the current page.
     db.quote.aggregate({ where, _sum: { total: true } }),
-    db.payment.aggregate({ where: { quote: where }, _sum: { amount: true } }),
+    // Só pagamento de orçamento: sem filtro, `quote: {}` não exclui o pagamento avulso
+    // (quoteId nulo) e o "Recebido" passava do valor total dos orçamentos.
+    db.payment.aggregate({ where: { quoteId: { not: null }, quote: where }, _sum: { amount: true } }),
     db.quote.count({ where: { ...where, status: 'ACCEPTED' } }),
   ]);
 

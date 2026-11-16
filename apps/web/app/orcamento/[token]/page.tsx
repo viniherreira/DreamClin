@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { getPublicQuote } from './actions';
 import { PublicQuoteActions } from './public-quote';
 import { wallDateBR } from '@/lib/tz';
+import { firstLetters } from '@/lib/initials';
 
 export const metadata = { title: 'Seu orçamento', robots: { index: false } };
 
@@ -26,7 +27,7 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ to
         {/* Clinic header */}
         <header className="text-center">
           <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-lg font-bold text-primary-foreground">
-            {quote.clinicName.slice(0, 2).toUpperCase()}
+            {firstLetters(quote.clinicName, 2)}
           </div>
           <h1 className="text-xl font-semibold tracking-tight">{quote.clinicName}</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">

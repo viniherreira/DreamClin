@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { format } from 'date-fns';
+import { instantDateBR, wallDateBR, wallDateShortBR } from '@/lib/tz';
 import { Plus, Search, FileText, Wallet } from 'lucide-react';
 import { QUOTE_STATUS, formatBRL, quoteCode } from './constants';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
@@ -135,7 +135,7 @@ export function QuotesView({ quotes, total, pages, currentPage, search, status, 
                       ) : q.paid > 0 ? (
                         <span className="block text-xs font-medium text-amber-700 dark:text-amber-400">Parcial · {formatBRL(q.paid)}</span>
                       ) : null}
-                      <span className="mt-0.5 block text-xs text-muted-foreground">até {format(new Date(q.validUntil), 'dd/MM/yy')}</span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">até {wallDateShortBR(q.validUntil)}</span>
                     </span>
                   </Link>
                 </li>
@@ -182,8 +182,8 @@ export function QuotesView({ quotes, total, pages, currentPage, search, status, 
                           </Link>
                         </p>
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">{format(new Date(q.createdAt), 'dd/MM/yyyy')}</td>
-                      <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{format(new Date(q.validUntil), 'dd/MM/yyyy')}</td>
+                      <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">{instantDateBR(q.createdAt)}</td>
+                      <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{wallDateBR(q.validUntil)}</td>
                       <td className="px-4 py-3 text-right">
                         <span className="font-medium tabular-nums">{formatBRL(q.total)}</span>
                         {/* Em tela média, sem a coluna Recebido, a situação do pagamento fica aqui. */}

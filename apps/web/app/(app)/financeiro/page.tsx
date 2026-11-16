@@ -72,7 +72,7 @@ export default async function FinanceiroPage({ searchParams }: PageProps) {
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Financeiro</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          <span className="capitalize">{periodLabel(from, to)}</span>
+          {periodLabel(from, to)}
           <span className="print:hidden"> · resumo, recebimentos, orçamentos e agendamentos do período</span>
         </p>
       </header>
@@ -243,7 +243,9 @@ function CommissionsCard({
 
 function RevenueChart({ points, total }: { points: SeriesPoint[]; total: number }) {
   if (points.length === 0) return null;
-  const max = Math.max(1, ...points.map((p) => p.value));
+  const peak = Math.max(0, ...points.map((p) => p.value));
+  // A escala nunca é zero, para as barras vazias não dividirem por zero.
+  const max = Math.max(1, peak);
   const grouping = points[0].grouping;
   // Keep tick labels readable when there are many buckets.
   const step = Math.ceil(points.length / 12);
@@ -254,7 +256,7 @@ function RevenueChart({ points, total }: { points: SeriesPoint[]; total: number 
         <h2 className="text-sm font-semibold">
           Recebimentos por {grouping === 'day' ? 'dia' : 'mês'}
         </h2>
-        <span className="text-xs text-muted-foreground">pico {brl(max)}</span>
+        <span className="text-xs text-muted-foreground">{peak > 0 ? `pico ${brl(peak)}` : 'sem recebimentos no período'}</span>
       </div>
       <div
         className="flex h-36 items-end gap-1"
@@ -310,11 +312,11 @@ function Kpi({
   const inner = (
     <>
       <div className="flex items-center gap-2 text-muted-foreground">
-        <Icon className="h-4 w-4" aria-hidden="true" />
+        <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
         <p className="text-xs font-medium">{label}</p>
         {href && <ArrowRight className="ml-auto h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100 print:hidden" aria-hidden="true" />}
       </div>
-      <p className={`mt-2 text-2xl font-semibold tracking-tight tabular-nums ${toneCls}`}>{value}</p>
+      <p className={`mt-2 break-words text-lg font-semibold tracking-tight tabular-nums sm:text-2xl ${toneCls}`}>{value}</p>
       <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>
     </>
   );

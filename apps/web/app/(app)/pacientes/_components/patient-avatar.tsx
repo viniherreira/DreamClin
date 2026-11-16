@@ -1,3 +1,5 @@
+import { leadingInitials } from '@/lib/initials';
+
 // Texto 800 sobre fundo 100 (claro) e 200 sobre 900 (escuro): passa de 4,5:1.
 const COLORS = [
   'bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-200',
@@ -14,12 +16,7 @@ function colorIndex(name: string) {
 }
 
 export function PatientAvatar({ name, size = 'md' }: { name: string; size?: 'sm' | 'md' | 'lg' | 'xl' }) {
-  const initials = name
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0].toUpperCase())
-    .join('');
+  const initials = leadingInitials(name);
 
   const sizeClass =
     size === 'sm'

@@ -3,9 +3,10 @@
 import { useState } from 'react';
 import {
   startOfMonth, endOfMonth, startOfWeek, endOfWeek,
-  addDays, addMonths, subMonths, isSameMonth, isSameDay, isToday,
+  addDays, addMonths, subMonths, isSameMonth, isSameDay,
   format, parseISO,
 } from 'date-fns';
+import { clinicToday } from '@/lib/tz';
 import { ptBR } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -16,6 +17,7 @@ interface MiniCalendarProps {
 
 export function MiniCalendar({ selectedDate, onSelect }: MiniCalendarProps) {
   const selected = parseISO(selectedDate);
+  const hoje = clinicToday();
   const [viewMonth, setViewMonth] = useState(() => new Date(selected.getFullYear(), selected.getMonth(), 1));
 
   const calStart = startOfWeek(startOfMonth(viewMonth), { weekStartsOn: 1 });
@@ -55,8 +57,9 @@ export function MiniCalendar({ selectedDate, onSelect }: MiniCalendarProps) {
         {days.map((day) => {
           const isCurrentMonth = isSameMonth(day, viewMonth);
           const isSelected = isSameDay(day, selected);
-          const isTodayDay = isToday(day);
           const dateStr = format(day, 'yyyy-MM-dd');
+          // O dia da clínica, igual no servidor e no navegador: à noite o servidor (UTC) já está em "amanhã".
+          const isTodayDay = dateStr === hoje;
 
           return (
             <button

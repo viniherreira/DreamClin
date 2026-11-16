@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createPatient, updatePatient } from '../actions';
 import type { PatientFormState } from '../actions';
 import { nationalPhone } from '@/lib/phone';
+import { ageFromBirth, instantDateTimeBR } from '@/lib/tz';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -29,12 +30,8 @@ function maskCep(v: string) {
 }
 
 function calcAge(birthDate: string) {
-  if (!birthDate) return '';
-  const today = new Date();
-  const birth = new Date(birthDate);
-  let age = today.getFullYear() - birth.getFullYear();
-  if (today.getMonth() < birth.getMonth() || (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate())) age--;
-  return age >= 0 ? `${age} anos` : '';
+  const age = ageFromBirth(birthDate);
+  return age == null ? '' : `${age} ${age === 1 ? 'ano' : 'anos'}`;
 }
 
 // ─── Field component ─────────────────────────────────────────────────────────
@@ -378,14 +375,14 @@ export function PatientForm({
         </label>
         {isEdit && patient?.marketingConsentAt && (
           <p className="mt-2 text-xs text-muted-foreground">
-            Autorizado em {new Date(patient.marketingConsentAt).toLocaleString('pt-BR')}
+            Autorizado em {instantDateTimeBR(patient.marketingConsentAt)}
           </p>
         )}
       </div>
 
       {isEdit && patient?.lgpdConsentAt && (
         <p className="text-xs text-muted-foreground px-1">
-          Consentimento LGPD registrado em {new Date(patient.lgpdConsentAt).toLocaleString('pt-BR')}
+          Consentimento LGPD registrado em {instantDateTimeBR(patient.lgpdConsentAt)}
         </p>
       )}
 

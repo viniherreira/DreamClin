@@ -14,6 +14,7 @@ import { buildWorkingHoursMap } from '@/lib/working-hours';
 import { getUnitContext } from '@/lib/units';
 import { unitAppointmentWhere } from '@/lib/unit-rules';
 import { readAgendaRules } from '@/lib/agenda-rules';
+import { wallClockTime } from '@/lib/tz';
 
 /** Regras da agenda da clínica (Configurações → Agenda → Regras da agenda). */
 async function agendaRules(tenantId: string) {
@@ -309,7 +310,7 @@ export async function createAppointment(
     return {
       success: false,
       errors: {},
-      message: `Conflito com agendamento de ${conflict.patient.name} às ${start.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}${conflict.unit ? ` (${conflict.unit.name})` : ''}`,
+      message: `Conflito com agendamento de ${conflict.patient.name} às ${wallClockTime(start)}${conflict.unit ? ` (${conflict.unit.name})` : ''}`,
     };
   }
 

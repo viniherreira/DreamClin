@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Building2 } from 'lucide-react';
 import { LogoMark } from './logo';
+import { firstLetters } from '@/lib/initials';
 
 type RailItem = { href: string; label: string; short?: string; icon: React.ComponentType<{ className?: string }> };
 
@@ -87,7 +88,7 @@ export function CrmRail({
         )}
         <div className="flex justify-center pt-1" title={clinicName}>
           <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-gradient text-xs font-semibold text-white">
-            <span aria-hidden="true">{clinicName.slice(0, 2).toUpperCase()}</span>
+            <span aria-hidden="true">{firstLetters(clinicName, 2)}</span>
             <span className="sr-only">Clínica: {clinicName}</span>
           </span>
         </div>

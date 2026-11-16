@@ -5,6 +5,7 @@ import { addDays, format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Building2, CalendarCheck, CheckCircle2, ChevronLeft, ChevronRight, Clock, UserRound } from 'lucide-react';
 import { bookOnline, getFreeSlots, type BookingResult } from './actions';
+import { firstLetters } from '@/lib/initials';
 
 interface Professional {
   id: string;
@@ -145,7 +146,7 @@ export function BookingFlow({
               className={opcao(professionalId === p.id)}
             >
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white" style={{ backgroundColor: p.color ?? '#0F766E' }} aria-hidden="true">
-                {p.name.replace(/^(Dra?\.?\s+)/i, '').slice(0, 1).toUpperCase()}
+                {firstLetters(p.name.replace(/^(Dra?\.?\s+)/i, ''))}
               </span>
               <span className="min-w-0">
                 <span className="block font-medium">{p.name}</span>

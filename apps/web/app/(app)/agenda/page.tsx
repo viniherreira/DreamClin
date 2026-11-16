@@ -3,6 +3,8 @@ import { getAgendaData, getPrefillPatient } from './actions';
 import { AgendaShell } from './_components/agenda-shell';
 import { clinicToday } from '@/lib/tz';
 
+export const metadata = { title: 'Agenda' };
+
 interface PageProps {
   searchParams: Promise<{ date?: string; view?: string; novo?: string; paciente?: string }>;
 }

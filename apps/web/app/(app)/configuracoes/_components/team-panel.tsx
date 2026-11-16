@@ -14,6 +14,8 @@ import {
 import { consequenciasDaRemocao } from '@/lib/team';
 import type { Role } from '@/lib/permissions';
 import { SelectField } from '@/components/select-field';
+import { instantDateBR } from '@/lib/tz';
+import { leadingInitials } from '@/lib/initials';
 
 /**
  * Quem tem acesso ao sistema, e até onde.
@@ -51,17 +53,12 @@ const papeisDe = (agenda: boolean) => PAPEIS.map((p) => ({ ...p, descricao: (!ag
 
 type Filtro = 'ativos' | 'pendentes' | 'removidos';
 
-const data = (d: Date | string) => new Date(d).toLocaleDateString('pt-BR');
+const data = (d: Date | string) => instantDateBR(d);
 
 /** Iniciais no lugar de foto — a clínica não sobe avatar, e um círculo vazio
  *  fica pior do que duas letras. */
 function Avatar({ name, apagado }: { name: string; apagado?: boolean }) {
-  const iniciais = name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase() ?? '')
-    .join('');
+  const iniciais = leadingInitials(name);
   return (
     <span
       aria-hidden="true"
