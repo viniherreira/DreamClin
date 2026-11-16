@@ -5,6 +5,7 @@ import { useClerk } from '@clerk/nextjs';
 import { DoorClosed } from 'lucide-react';
 import { CreateClinicForm, type TrialPlan } from './create-clinic-form';
 import type { Product, Tier } from '@/lib/products';
+import { instantDateBR } from '@/lib/tz';
 
 /**
  * Fim de linha para quem foi removido de uma clínica.
@@ -30,7 +31,7 @@ export function AcessoEncerrado({
 
   if (abrindoPropria) return <CreateClinicForm plans={plans} initial={initial} />;
 
-  const data = em ? new Date(em).toLocaleDateString('pt-BR') : null;
+  const data = em ? instantDateBR(em) : null;
 
   return (
     <div className="rounded-xl border border-border bg-surface p-6 shadow-card">

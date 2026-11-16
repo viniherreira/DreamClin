@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { format } from 'date-fns';
 import { AlertCircle, ChevronLeft } from 'lucide-react';
 import { getContractGaps, getQuote } from '../actions';
 import { QuoteDetailActions } from '../_components/quote-detail-actions';
@@ -9,7 +8,7 @@ import { QUOTE_STATUS, formatBRL, quoteCode } from '../_components/constants';
 import { requireCapability } from '@/lib/guard';
 import { describePayment } from '@/lib/payment-terms';
 import { getReceiptMethods } from '@/lib/clinic-settings';
-import { clinicDayOf, clinicToday, wallDateBR } from '@/lib/tz';
+import { clinicDayOf, clinicToday, instantDateBR, instantDateTimeShortBR, wallDateBR } from '@/lib/tz';
 
 export const metadata = { title: 'Orçamento' };
 
@@ -57,7 +56,7 @@ export default async function OrcamentoDetailPage({ params }: { params: Promise<
           <Link href={`/pacientes/${quote.patient.id}`} className="font-medium text-foreground hover:text-primary hover:underline">
             {quote.patient.name}
           </Link>{' '}
-          · Nº {quote.patient.controlNumber} · criado em {format(new Date(quote.createdAt), 'dd/MM/yyyy')}
+          · Nº {quote.patient.controlNumber} · criado em {instantDateBR(quote.createdAt)}
           {quote.professional && (
             <>
               {' '}
@@ -161,7 +160,7 @@ export default async function OrcamentoDetailPage({ params }: { params: Promise<
               {timeline.map((t, i) => (
                 <li key={i} className="flex justify-between gap-2">
                   <span>{t.label}</span>
-                  <span className="text-muted-foreground tabular-nums">{format(new Date(t.at), "dd/MM/yy HH:mm")}</span>
+                  <span className="text-muted-foreground tabular-nums">{instantDateTimeShortBR(t.at)}</span>
                 </li>
               ))}
             </ul>

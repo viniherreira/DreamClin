@@ -314,7 +314,8 @@ function Funil({ report }: { report: AdsReport }) {
           const [topo, base] = [largura(p.value), etapas[i + 1] ? largura(etapas[i + 1].value) : largura(p.value) * 0.82];
           return (
             <li key={p.key} className="grid grid-cols-[minmax(0,6rem)_minmax(0,1fr)_minmax(0,5.5rem)] items-center gap-2 sm:grid-cols-[minmax(0,8rem)_minmax(0,1fr)_minmax(0,6.5rem)]">
-              <span className="truncate text-[13px]">{p.label}</span>
+              {/* Duas linhas em vez de cortar: "Conversas no WhatsApp" não cabe numa só. */}
+              <span className="text-[13px] leading-tight [overflow-wrap:anywhere]">{p.label}</span>
               <span className="relative block h-12" aria-hidden="true">
                 <span
                   className="viz-rise absolute inset-0"

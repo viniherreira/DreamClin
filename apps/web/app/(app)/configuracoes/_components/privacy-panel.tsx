@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { instantDateTimeShortBR } from '@/lib/tz';
 import {
   declararAceiteDeCampanhaParaTodos,
   savePrivacySettings,
@@ -330,12 +331,7 @@ export function PrivacyPanel({
                 {audit.map((e) => (
                   <tr key={e.id} className="hover:bg-surface-alt/50">
                     <td className="whitespace-nowrap px-5 py-2.5 tabular-nums text-muted-foreground">
-                      {new Date(e.createdAt).toLocaleString('pt-BR', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
+                      {instantDateTimeShortBR(e.createdAt)}
                     </td>
                     <td className="px-5 py-2.5">{e.userName ?? '-'}</td>
                     <td className="px-5 py-2.5">

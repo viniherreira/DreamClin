@@ -11,6 +11,7 @@ import { paymentSchedule } from '@/lib/payment-schedule';
 import { parseTeeth, teethLabel } from '@/lib/teeth';
 import { ProcedurePicker, type ProcedureOption } from './procedure-picker';
 import { ToothPicker } from './tooth-picker';
+import { clinicToday } from '@/lib/tz';
 
 /** O Select do Radix não aceita valor vazio; isto faz o papel de "nenhum". */
 const NENHUM = 'none';
@@ -189,7 +190,7 @@ export function QuoteBuilder({
   // Como ficariam as parcelas se o orçamento fosse aprovado hoje.
   const plano = paymentSchedule(
     { total: totals.total, downPayment: effectiveDown, installments, method: paymentMethod === NENHUM ? null : paymentMethod },
-    today ?? new Date().toISOString().slice(0, 10),
+    today ?? clinicToday(),
   );
 
   const fieldErr = (k: string) => (state && !state.success ? state.errors?.[k]?.[0] : undefined);

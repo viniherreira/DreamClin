@@ -10,7 +10,7 @@ import {
   Armchair, CalendarClock, Check, CheckCheck, ChevronDown, Clock, FileText, MessageCircle, MoreHorizontal,
   Pencil, RotateCcw, Stethoscope, Tag, Trash2, UserRound, Wallet, X,
 } from 'lucide-react';
-import { wallClockTime } from '@/lib/tz';
+import { ageFromBirth, instantDateBR, wallClockTime, wallDateBR, wallDateShortBR } from '@/lib/tz';
 import { ACTION_LABELS, STAGE_LABELS, actionsFor, stageOf, waitingMinutes, type FlowAction } from '@/lib/appointment-flow';
 import { labelClasses } from '@/lib/label-colors';
 import { advanceAppointment, deleteAppointment, getAppointmentDetail, setAppointmentLabel } from '../actions';
@@ -42,13 +42,16 @@ const brl = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', curren
 const hora = (d: Date | string) =>
   new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }).format(new Date(d));
 
+/** O dia do agendamento (hora de parede em UTC) como data local, para o date-fns escrever o dia da semana certo. */
+const diaDeParede = (d: Date | string) => {
+  const x = new Date(d);
+  return new Date(x.getUTCFullYear(), x.getUTCMonth(), x.getUTCDate());
+};
+
 function idade(nascimento: Date | string | null): string | null {
   if (!nascimento) return null;
-  const n = new Date(nascimento);
-  const hoje = new Date();
-  let anos = hoje.getUTCFullYear() - n.getUTCFullYear();
-  if (hoje.getUTCMonth() < n.getUTCMonth() || (hoje.getUTCMonth() === n.getUTCMonth() && hoje.getUTCDate() < n.getUTCDate())) anos -= 1;
-  return `${String(n.getUTCDate()).padStart(2, '0')}/${String(n.getUTCMonth() + 1).padStart(2, '0')}/${n.getUTCFullYear()} (${anos} anos)`;
+  const anos = ageFromBirth(nascimento);
+  return anos == null ? wallDateBR(nascimento) : `${wallDateBR(nascimento)} (${anos} ${anos === 1 ? 'ano' : 'anos'})`;
 }
 
 function iniciais(nome: string) {
@@ -191,7 +194,7 @@ export function AppointmentDetailModal({ open, appointmentId, labels, onClose, o
                       </Info>
                       <Info label="Último atendimento">
                         {detail.lastVisit
-                          ? `${format(new Date(detail.lastVisit.at), 'dd/MM/yy')} · ${detail.lastVisit.professional}`
+                          ? `${wallDateShortBR(detail.lastVisit.at)} · ${detail.lastVisit.professional}`
                           : 'Primeira vez'}
                       </Info>
                       {detail.patient.phone && (
@@ -249,7 +252,7 @@ export function AppointmentDetailModal({ open, appointmentId, labels, onClose, o
                       <Card titulo="Informações do atendimento">
                         <dl className="space-y-2 text-sm">
                           <Info label="Data">
-                            <span className="capitalize">{format(new Date(a.startTime), "EEEE, dd/MM/yyyy", { locale: ptBR })}</span>
+                            <span className="capitalize">{format(diaDeParede(a.startTime), "EEEE, dd/MM/yyyy", { locale: ptBR })}</span>
                           </Info>
                           <Info label="Horário">
                             <span className="tabular-nums">{wallClockTime(a.startTime)} às {wallClockTime(a.endTime)}</span>
@@ -352,7 +355,7 @@ export function AppointmentDetailModal({ open, appointmentId, labels, onClose, o
                       {detail.financial.lastPayment && (
                         <p className="text-sm text-muted-foreground">
                           Último pagamento: {brl(detail.financial.lastPayment.amount)} em{' '}
-                          {format(new Date(detail.financial.lastPayment.paidAt), 'dd/MM/yyyy')}
+                          {instantDateBR(detail.financial.lastPayment.paidAt)}
                         </p>
                       )}
                       <div className="flex flex-wrap gap-2">
@@ -377,7 +380,7 @@ export function AppointmentDetailModal({ open, appointmentId, labels, onClose, o
                           return (
                             <li key={h.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm">
                               <span className="tabular-nums">
-                                {format(new Date(h.startTime), 'dd/MM/yyyy')} · {wallClockTime(h.startTime)}
+                                {wallDateBR(h.startTime)} · {wallClockTime(h.startTime)}
                               </span>
                               <span className="min-w-0 flex-1 truncate text-muted-foreground">
                                 {h.professional.name}
@@ -488,7 +491,7 @@ function Passo({
         <Icone className="h-2.5 w-2.5 text-muted-foreground" />
       </span>
       <span className="font-medium">{titulo}</span>
-      {quando && <span className="text-muted-foreground"> · {format(new Date(quando), 'dd/MM')} às {hora(quando)}</span>}
+      {quando && <span className="text-muted-foreground"> · {instantDateBR(quando).slice(0, 5)} às {hora(quando)}</span>}
       {quem && <span className="text-muted-foreground"> · {quem}</span>}
       {extra && <span className="text-muted-foreground"> · {extra}</span>}
     </li>

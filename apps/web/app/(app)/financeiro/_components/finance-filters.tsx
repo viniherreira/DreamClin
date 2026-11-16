@@ -3,6 +3,7 @@
 import { useTransition } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { clinicToday } from '@/lib/tz';
 
 interface Option { id: string; name: string }
 
@@ -15,8 +16,21 @@ interface Props {
   procedures: Option[];
 }
 
-function pad(n: number) { return String(n).padStart(2, '0'); }
-function iso(d: Date) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
+/**
+ * Os períodos rápidos, a partir do dia da clínica. As contas são em UTC sobre
+ * AAAA-MM-DD: dão o mesmo no servidor e no navegador, a qualquer hora.
+ */
+const iso = (d: Date) => d.toISOString().slice(0, 10);
+function periodos(hoje: string) {
+  const [y, m, d] = hoje.split('-').map(Number);
+  const dia = (yy: number, mm: number, dd: number) => iso(new Date(Date.UTC(yy, mm, dd)));
+  return {
+    today: { from: hoje, to: hoje },
+    '7d': { from: dia(y, m - 1, d - 6), to: hoje },
+    month: { from: dia(y, m - 1, 1), to: hoje },
+    lastMonth: { from: dia(y, m - 2, 1), to: dia(y, m - 1, 0) },
+  } as const;
+}
 
 export function FinanceFilters({ from, to, professionalId, procedureId, professionals, procedures }: Props) {
   const router = useRouter();
@@ -34,32 +48,12 @@ export function FinanceFilters({ from, to, professionalId, procedureId, professi
   }
 
   function preset(kind: 'today' | '7d' | 'month' | 'lastMonth') {
-    const now = new Date();
-    let f: Date;
-    let t: Date = now;
-    if (kind === 'today') {
-      f = now;
-    } else if (kind === '7d') {
-      f = new Date(now.getTime() - 6 * 86400000);
-    } else if (kind === 'month') {
-      f = new Date(now.getFullYear(), now.getMonth(), 1);
-    } else {
-      f = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      t = new Date(now.getFullYear(), now.getMonth(), 0);
-    }
-    setParams({ from: iso(f), to: iso(t) });
+    setParams(periodos(clinicToday())[kind]);
   }
 
   const isActive = (() => {
-    const now = new Date();
-    if (from === to && from === iso(now)) return 'today';
-    if (from === iso(new Date(now.getTime() - 6 * 86400000)) && to === iso(now)) return '7d';
-    if (from === iso(new Date(now.getFullYear(), now.getMonth(), 1)) && to === iso(now)) return 'month';
-    if (
-      from === iso(new Date(now.getFullYear(), now.getMonth() - 1, 1)) &&
-      to === iso(new Date(now.getFullYear(), now.getMonth(), 0))
-    ) return 'lastMonth';
-    return 'custom';
+    const p = periodos(clinicToday());
+    return (['today', '7d', 'month', 'lastMonth'] as const).find((k) => p[k].from === from && p[k].to === to) ?? 'custom';
   })();
 
   const presets = [

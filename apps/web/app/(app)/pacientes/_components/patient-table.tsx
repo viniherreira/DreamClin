@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { PatientAvatar } from './patient-avatar';
 import { PatientStatusBadge } from './patient-status-badge';
 import { togglePatientActive, deletePatient } from '../actions';
+import { ageFromBirth } from '@/lib/tz';
 
 type Patient = {
   id: string;
@@ -18,12 +19,8 @@ type Patient = {
 };
 
 function calcAge(birthDate: Date | null) {
-  if (!birthDate) return '-';
-  const today = new Date();
-  const birth = new Date(birthDate);
-  let age = today.getFullYear() - birth.getFullYear();
-  if (today.getMonth() < birth.getMonth() || (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate())) age--;
-  return age >= 0 ? `${age} anos` : '-';
+  const age = ageFromBirth(birthDate);
+  return age == null ? '-' : `${age} ${age === 1 ? 'ano' : 'anos'}`;
 }
 
 function formatPhone(phone: string) {

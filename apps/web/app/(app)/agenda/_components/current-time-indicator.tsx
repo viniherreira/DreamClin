@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useGrid } from './grid-context';
+import { clinicNowMinutes } from '@/lib/tz';
 
 export function CurrentTimeIndicator() {
   const grid = useGrid();
@@ -9,8 +10,8 @@ export function CurrentTimeIndicator() {
 
   useEffect(() => {
     const calcTop = () => {
-      const now = new Date();
-      const minutes = now.getHours() * 60 + now.getMinutes();
+      // O relógio da clínica, e não o do aparelho: quem abre a agenda em outro fuso vê a linha no lugar certo.
+      const minutes = clinicNowMinutes();
       if (minutes < grid.startHour * 60 || minutes > grid.endHour * 60) return null;
       return grid.minToPx(minutes);
     };

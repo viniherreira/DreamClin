@@ -234,11 +234,11 @@ export function ProceduresView(props: Props) {
       {/* Toolbar */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-semibold tracking-tight">Procedimentos</h1>
-        <div className="flex gap-2">
-          <button type="button" onClick={() => setCatOpen(true)} className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-surface-alt transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => setCatOpen(true)} className="touch-target inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-surface-alt transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
             Gerenciar categorias
           </button>
-          <button type="button" onClick={openCreate} className="touch-target inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+          <button type="button" onClick={openCreate} className="touch-target inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
             <PlusIcon />Adicionar procedimento
           </button>
         </div>
@@ -287,7 +287,7 @@ export function ProceduresView(props: Props) {
                   <SortHeader col="name" label="Procedimento" />
                   <SortHeader col="durationMinutes" label="Duração" className="hidden sm:table-cell" />
                   <SortHeader col="basePrice" label="Valor" />
-                  <th scope="col" className="px-4 py-3 font-medium">Situação</th>
+                  <th scope="col" className="hidden px-4 py-3 font-medium sm:table-cell">Situação</th>
                   <th scope="col" className="px-4 py-3 font-medium text-right">Ações</th>
                 </tr>
               </thead>
@@ -301,13 +301,16 @@ export function ProceduresView(props: Props) {
                           <button type="button" onClick={() => openEdit(p.id)} className="truncate text-left font-medium text-foreground hover:text-primary transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring rounded">
                             {p.name}
                           </button>
-                          <p className="text-xs text-muted-foreground">{p.category?.name ?? 'Sem categoria'}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {p.category?.name ?? 'Sem categoria'}
+                            {!p.active && <span className="sm:hidden"> · inativo</span>}
+                          </p>
                         </div>
                       </div>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{formatDuration(p.durationMinutes)}</td>
                     <td className="px-4 py-3 font-medium tabular-nums">{formatBRL(p.basePrice)}</td>
-                    <td className="px-4 py-3"><StatusBadge active={p.active} /></td>
+                    <td className="hidden px-4 py-3 sm:table-cell"><StatusBadge active={p.active} /></td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end">
                         <RowMenu procedure={p} onEdit={() => openEdit(p.id)} onChanged={() => router.refresh()} />

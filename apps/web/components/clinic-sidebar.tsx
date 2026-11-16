@@ -7,6 +7,7 @@ import { ChevronDown, ChevronsLeft, ChevronsRight, Search } from 'lucide-react';
 import { Logo, LogoMark } from './logo';
 import { ModuleSwitcher } from './module-switcher';
 import type { LucideIcon } from 'lucide-react';
+import { firstLetters } from '@/lib/initials';
 
 export interface ClinicNavItem {
   href: string;
@@ -206,7 +207,7 @@ export function ClinicSidebar({
       <div className="border-t border-border p-3">
         <div className={`flex items-center gap-2.5 rounded-lg ${recolhido ? 'justify-center' : 'bg-surface-alt px-3 py-2.5'}`} title={clinicName}>
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-gradient text-xs font-semibold text-white">
-            <span aria-hidden="true">{clinicName.slice(0, 2).toUpperCase()}</span>
+            <span aria-hidden="true">{firstLetters(clinicName, 2)}</span>
           </div>
           {recolhido ? (
             <span className="sr-only">Clínica: {clinicName}</span>

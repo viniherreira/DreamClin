@@ -4,6 +4,7 @@ import { LogoMark } from '@/components/logo';
 import { clinicNow } from '@/lib/availability';
 import { getBookingInfo } from './actions';
 import { BookingFlow } from './booking-flow';
+import { firstLetters } from '@/lib/initials';
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const info = await getBookingInfo((await params).slug);
@@ -24,7 +25,7 @@ export default async function AgendarPage({ params }: { params: Promise<{ slug: 
       <header className="border-b border-border bg-surface">
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-4 sm:px-6">
           <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-base font-bold text-primary-hover" aria-hidden="true">
-            {info.name.slice(0, 2).toUpperCase()}
+            {firstLetters(info.name, 2)}
           </div>
           <div className="min-w-0">
             <p className="truncate text-base font-semibold">{info.name}</p>

@@ -39,7 +39,7 @@ import { CopyButton } from './_components/copy-button';
 import { LgpdCard } from './_components/lgpd-card';
 import { ANONYMIZED_PREFIX } from '@/lib/patient-lgpd';
 import { ANAMNESIS_QUESTIONS } from './_components/anamnesis-questions';
-import { CLINIC_TZ, wallClockTime } from '@/lib/tz';
+import { CLINIC_TZ, ageFromBirth, wallClockTime } from '@/lib/tz';
 import { CrmPatientDeals } from '@/components/crm-patient-deals';
 import { getReceiptMethods } from '@/lib/clinic-settings';
 
@@ -63,14 +63,7 @@ function formatCpf(cpf: string) {
   return d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
 }
 
-function calcAge(birthDate: Date | null) {
-  if (!birthDate) return null;
-  const today = new Date();
-  const birth = new Date(birthDate);
-  let age = today.getFullYear() - birth.getFullYear();
-  if (today.getMonth() < birth.getMonth() || (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate())) age--;
-  return age >= 0 ? age : null;
-}
+const calcAge = (birthDate: Date | null) => ageFromBirth(birthDate);
 
 /** Calendar label from a stored wall-clock UTC datetime (server may be UTC). */
 function wallDateLabel(d: Date | string, pattern = 'dd/MM/yyyy') {

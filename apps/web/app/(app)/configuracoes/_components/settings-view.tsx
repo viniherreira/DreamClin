@@ -509,7 +509,7 @@ function ClinicSection({ clinic, agenda }: { clinic: Clinic; agenda: boolean }) 
           </div>
         </div>
         <div className="space-y-1.5">
-          <label htmlFor="clinic-doc" className="text-sm font-medium">CNPJ ou CPF</label>
+          <label htmlFor="clinic-doc" className="block text-sm font-medium">CNPJ ou CPF</label>
           <input
             id="clinic-doc"
             name="document"

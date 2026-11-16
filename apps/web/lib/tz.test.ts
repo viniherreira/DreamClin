@@ -1,6 +1,11 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import {
+  ageFromBirth,
+  clinicNowMinutes,
   clinicToday,
+  instantDateTimeShortBR,
+  instantTimeBR,
+  wallDateShortBR,
   instantDateBR,
   instantDateLongBR,
   instantDateTimeBR,
@@ -54,5 +59,34 @@ describe('clinicToday', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-07-07T12:00:00.000Z'));
     expect(clinicToday()).toBe('2026-07-07');
+  });
+});
+
+describe('datas curtas e hora no fuso da clínica', () => {
+  it('data de parede curta lê os componentes UTC', () => {
+    expect(wallDateShortBR('2026-11-26T00:00:00.000Z')).toBe('26/11/26');
+    expect(wallDateShortBR(new Date('2026-01-05T00:00:00.000Z'))).toBe('05/01/26');
+  });
+
+  it('instante vira hora de Brasília, onde quer que o servidor rode', () => {
+    // 01:30 UTC do dia 16 ainda é 22:30 do dia 15 em São Paulo.
+    expect(instantTimeBR('2026-11-16T01:30:00.000Z')).toBe('22:30');
+    expect(instantDateTimeShortBR('2026-11-16T01:30:00.000Z')).toBe('15/11/26 22:30');
+    expect(clinicNowMinutes(new Date('2026-11-16T01:30:00.000Z'))).toBe(22 * 60 + 30);
+  });
+});
+
+describe('ageFromBirth', () => {
+  it('conta anos completos pelo dia da clínica', () => {
+    expect(ageFromBirth('1990-11-15T00:00:00.000Z', '2026-11-15')).toBe(36); // no aniversário já fez
+    expect(ageFromBirth('1990-11-16T00:00:00.000Z', '2026-11-15')).toBe(35); // véspera
+    expect(ageFromBirth(new Date('2000-02-29T00:00:00.000Z'), '2026-02-28')).toBe(25);
+  });
+
+  it('sem data, data inválida ou no futuro: null', () => {
+    expect(ageFromBirth(null, '2026-11-15')).toBeNull();
+    expect(ageFromBirth('', '2026-11-15')).toBeNull();
+    expect(ageFromBirth('não é data', '2026-11-15')).toBeNull();
+    expect(ageFromBirth('2030-01-01T00:00:00.000Z', '2026-11-15')).toBeNull();
   });
 });
