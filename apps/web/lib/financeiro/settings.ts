@@ -1,0 +1,108 @@
+/**
+ * Regras gerais do financeiro (`Tenant.settings.finance`). Puro: lê qualquer
+ * coisa que venha do JSON e devolve um objeto completo, com os padrões.
+ * Testado em `settings.test.ts`.
+ */
+
+export interface FinanceSettings {
+  /** Exigir bandeira e NSU ao receber no cartão. */
+  requireCardData: boolean;
+  /** Recibo A4 com o cabeçalho da clínica e a margem de cima, em milímetros. */
+  receiptHeader: boolean;
+  receiptTopMarginMm: number;
+  /** Juros e multa automáticos em título vencido. */
+  lateChargesEnabled: boolean;
+  finePercent: number;
+  dailyInterestPercent: number;
+  /** Juros dos títulos novos de uma renegociação (% ao mês) e o modo. */
+  renegotiationInterestPercent: number;
+  renegotiationInterestMode: 'SIMPLE' | 'PRICE';
+  /** Receber em dinheiro só com o caixa aberto. */
+  requireOpenCashForCash: boolean;
+  /** Fechar o caixa com atendidos sem faturar: só avisa ou bloqueia. */
+  closeWithUnbilled: 'WARN' | 'BLOCK';
+  /** Conferência cega no fechamento do caixa. */
+  blindCashCount: boolean;
+  /** Bloquear o início do atendimento: nunca, só com o título, ou só pago. */
+  blockStartWithoutPayment: 'OFF' | 'BILLED' | 'PAID';
+  /** Criar o título sozinho quando o atendimento é concluído. */
+  autoBillOnFinish: boolean;
+  /** Mostrar valores dos procedimentos para o profissional. */
+  showPricesToProfessional: boolean;
+  /** Permitir mudar procedimentos depois de atendido. */
+  editItemsAfterAttended: boolean;
+  /** Limite de desconto de quem não tem um limite próprio, em %. */
+  defaultMaxDiscountPercent: number;
+  /** Obrigar CPF/CNPJ no cadastro de fornecedor. */
+  requireSupplierDocument: boolean;
+  /** Lançar a taxa do cartão no recebimento ou só na conciliação. */
+  cardFeeWhen: 'RECEIPT' | 'RECONCILIATION';
+  /** Avisar caixa aberto há mais de N dias (0 = não avisa). */
+  openCashAlertDays: number;
+  /** Avisar o dono quando um caixa fecha com diferença. */
+  alertCashDifference: boolean;
+  /** O profissional vê as próprias comissões. */
+  professionalSeesCommissions: boolean;
+}
+
+export const DEFAULT_FINANCE_SETTINGS: FinanceSettings = {
+  requireCardData: false,
+  receiptHeader: true,
+  receiptTopMarginMm: 0,
+  lateChargesEnabled: false,
+  finePercent: 2,
+  dailyInterestPercent: 0.033,
+  renegotiationInterestPercent: 0,
+  renegotiationInterestMode: 'SIMPLE',
+  requireOpenCashForCash: true,
+  closeWithUnbilled: 'WARN',
+  blindCashCount: false,
+  blockStartWithoutPayment: 'OFF',
+  autoBillOnFinish: false,
+  showPricesToProfessional: true,
+  editItemsAfterAttended: true,
+  defaultMaxDiscountPercent: 10,
+  requireSupplierDocument: false,
+  cardFeeWhen: 'RECEIPT',
+  openCashAlertDays: 1,
+  alertCashDifference: true,
+  professionalSeesCommissions: false,
+};
+
+const bool = (v: unknown, d: boolean) => (typeof v === 'boolean' ? v : d);
+const num = (v: unknown, d: number, min: number, max: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : d);
+const pick = <T extends string>(v: unknown, options: readonly T[], d: T): T => (typeof v === 'string' && (options as readonly string[]).includes(v) ? (v as T) : d);
+
+export function cleanFinanceSettings(raw: unknown): FinanceSettings {
+  const r = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const d = DEFAULT_FINANCE_SETTINGS;
+  return {
+    requireCardData: bool(r.requireCardData, d.requireCardData),
+    receiptHeader: bool(r.receiptHeader, d.receiptHeader),
+    receiptTopMarginMm: Math.round(num(r.receiptTopMarginMm, d.receiptTopMarginMm, 0, 120)),
+    lateChargesEnabled: bool(r.lateChargesEnabled, d.lateChargesEnabled),
+    finePercent: num(r.finePercent, d.finePercent, 0, 20),
+    dailyInterestPercent: num(r.dailyInterestPercent, d.dailyInterestPercent, 0, 5),
+    renegotiationInterestPercent: num(r.renegotiationInterestPercent, d.renegotiationInterestPercent, 0, 20),
+    renegotiationInterestMode: pick(r.renegotiationInterestMode, ['SIMPLE', 'PRICE'] as const, d.renegotiationInterestMode),
+    requireOpenCashForCash: bool(r.requireOpenCashForCash, d.requireOpenCashForCash),
+    closeWithUnbilled: pick(r.closeWithUnbilled, ['WARN', 'BLOCK'] as const, d.closeWithUnbilled),
+    blindCashCount: bool(r.blindCashCount, d.blindCashCount),
+    blockStartWithoutPayment: pick(r.blockStartWithoutPayment, ['OFF', 'BILLED', 'PAID'] as const, d.blockStartWithoutPayment),
+    autoBillOnFinish: bool(r.autoBillOnFinish, d.autoBillOnFinish),
+    showPricesToProfessional: bool(r.showPricesToProfessional, d.showPricesToProfessional),
+    editItemsAfterAttended: bool(r.editItemsAfterAttended, d.editItemsAfterAttended),
+    defaultMaxDiscountPercent: num(r.defaultMaxDiscountPercent, d.defaultMaxDiscountPercent, 0, 100),
+    requireSupplierDocument: bool(r.requireSupplierDocument, d.requireSupplierDocument),
+    cardFeeWhen: pick(r.cardFeeWhen, ['RECEIPT', 'RECONCILIATION'] as const, d.cardFeeWhen),
+    openCashAlertDays: Math.round(num(r.openCashAlertDays, d.openCashAlertDays, 0, 60)),
+    alertCashDifference: bool(r.alertCashDifference, d.alertCashDifference),
+    professionalSeesCommissions: bool(r.professionalSeesCommissions, d.professionalSeesCommissions),
+  };
+}
+
+/** Lê de `Tenant.settings` inteiro. */
+export function readFinanceSettings(settings: unknown): FinanceSettings {
+  const s = settings && typeof settings === 'object' ? (settings as Record<string, unknown>).finance : undefined;
+  return cleanFinanceSettings(s);
+}
