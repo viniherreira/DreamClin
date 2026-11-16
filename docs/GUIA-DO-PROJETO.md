@@ -146,6 +146,18 @@ A Vercel roda em UTC e a clínica em `America/Sao_Paulo`. Tela que formata data 
 - **"/" na caixa de texto, como no Kommo** (`components/crm-chat/chat-composer.tsx`): a barra (ou o raio ao lado) abre um menu só com **Robôs** (os ligados, como o Salesbot) e **Respostas rápidas**, filtrados pelo que vem depois da barra. Resposta vira o texto (`{nome}` preenchido); robô vira a etiqueta "/Nome" e o Enviar executa (`startBotAction`: do primeiro passo, só dentro da janela de 24 h na API oficial, anotado no histórico do lead). Com robô conversando, a faixa acima da caixa diz qual e tem **Parar robô** (`stopBotOnConversation`). Na API oficial, embaixo, "A sessão de mensagens termina em" (`ChatThread.windowEndsAt`).
 - Spec e plano: `docs/specs/2026-10-16-crm-pacote-a-dados-lista-design.md` e `docs/planos/2026-10-16-crm-pacote-a-plan.md`.
 
+## Financeiro completo (em fases, atrás de bandeira)
+
+Spec e plano: `docs/specs/2026-11-16-financeiro-completo.md` e `docs/planos/2026-11-16-financeiro-completo.md`.
+
+- **Bandeira:** `fin/flag.ts` (`financeEnabled`): liga na conta em cortesia, ou para todos com `FINANCEIRO_COMPLETO=todos` na Vercel. Desligada, a clínica segue no financeiro antigo (`Payment`) e nenhuma tabela nova é tocada.
+- **Porta única:** `fin/guard.ts`. Página usa `requireFinance(cap)`; Server Action usa `finRead(cap)` ou `finWrite(cap)` (esta confere também se a conta pode gravar). Capacidades `fin_*` em `lib/permissions.ts`; por cima, `FinancialPermission` por usuário (`lib/financeiro/access.ts`, puro). A capacidade antiga `financeiro` continua valendo para as telas antigas.
+- **Contas puras em centavos inteiros** (`lib/financeiro/`, testadas em `financeiro.test.ts`): `money` (converter, porcentagem), `dates` (datas sem hora), `installments` (parcelas e recorrência), `interest` (juros, multa, Price), `title-status`, `allocation` (rateio), `card` (taxa e compensação), `balance`, `dre`, `defaults` (plano de contas e formas padrão), `settings` (`Tenant.settings.finance`). Nunca fazer conta de dinheiro em `number` solto.
+- **Tabelas:** título (`financial_titles`, o "faturar") e movimento (`financial_transactions`, o "baixar"). Vencido não é situação gravada. Estorno cria movimento, nunca apaga. Saldo de conta e de carteira nunca é guardado: sai da soma.
+- **Preparo da clínica:** `fin/setup.ts` (`ensureFinanceSetup`) cria o caixa interno, o plano de contas e as formas na primeira vez, com ids fixos (`fa_<clínica>`, `fc_<clínica>_<chave>`, `fm_<clínica>_<tipo>`). Roda quantas vezes for e não muda o que a clínica editou. O SQL de produção só cria tabela.
+- **Número de exibição** (título, movimento, caixa): `fin/codes.ts`, com trava consultiva dentro da transação de quem grava.
+- **Telas (F1):** Configurações › Financeiro (contas, categorias, centros de custo, formas, clientes e fornecedores, regras, permissões) em `configuracoes/finance-actions.ts` e `_components/finance-*-panels.tsx`. Peças de tela em `components/fin/ui.tsx`.
+
 ## Site público e SEO
 
 - **Clerk só onde é usado:** o `ClerkProvider` fica em `components/auth-provider.tsx`, chamado pelos layouts de `(app)`, `(crm)`, `(auth)` e `onboarding`, e não no layout raiz. O site de vendas, as páginas legais, `/agendar` e `/orcamento` não baixam o JavaScript do Clerk. Componente novo com `useClerk`/`useUser` precisa estar debaixo de um desses layouts. Ler a sessão no servidor (`auth()`) não precisa do provider.

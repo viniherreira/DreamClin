@@ -52,6 +52,12 @@ const TABLES: Table[] = [
     columns: ['phone', 'lastPreview'],
     hash: { column: 'phoneHash', candidates: (o, r) => (o.phone ? [conversationHashes(o.phone, r.tenantId)] : []) },
   },
+  // Clientes e fornecedores do financeiro: CPF/CNPJ com o mesmo índice cego do CPF do paciente.
+  {
+    table: 'fin_contacts',
+    columns: ['document'],
+    hash: { column: 'documentHash', candidates: (o, r) => (o.document ? [cpfHashes(o.document, r.tenantId)] : []) },
+  },
   { table: 'chat_messages', columns: ['text'] },
   { table: 'whatsapp_cloud_accounts', columns: ['accessToken'] },
   { table: 'whatsapp_auth_keys', columns: ['value'] },
