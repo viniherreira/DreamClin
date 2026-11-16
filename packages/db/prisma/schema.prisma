@@ -195,6 +195,7 @@ model Tenant {
   appointmentItems      AppointmentItem[]
   financialPermissions  FinancialPermission[]
   financialAttachments  FinancialAttachment[]
+  financialReleases     FinancialRelease[]
 
   @@map("tenants")
 }
@@ -2314,6 +2315,7 @@ model FinancialTransaction {
   @@index([tenantId, patientId, paidOn])
   @@index([tenantId, receiptGroupId])
   @@index([tenantId, competence])
+  @@index([tenantId, mirrorPaymentId])
   @@map("financial_transactions")
 }
 
@@ -2556,4 +2558,31 @@ model FinancialAttachment {
   @@index([tenantId, titleId])
   @@index([tenantId, transactionId])
   @@map("financial_attachments")
+}
+
+/// Pedido de liberação: alguém precisa passar do próprio limite (desconto,
+/// tirar juros) e um dono ou administrador autoriza na tela dele. Vale uma vez
+/// e por pouco tempo; no lugar de senha compartilhada.
+model FinancialRelease {
+  id            String    @id @default(cuid())
+  tenantId      String
+  /// "DISCOUNT" (desconto acima do limite) ou "WAIVE_LATE" (tirar juros e multa).
+  kind          String
+  titleId       String?
+  /// O que foi pedido: { percent, amountCents, note }.
+  payload       Json
+  /// "PENDING", "APPROVED", "DENIED".
+  status        String    @default("PENDING")
+  requestedById String
+  decidedById   String?
+  decidedAt     DateTime?
+  usedAt        DateTime?
+  expiresAt     DateTime
+  createdAt     DateTime  @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, requestedById])
+  @@map("financial_releases")
 }
