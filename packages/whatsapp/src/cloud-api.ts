@@ -76,9 +76,12 @@ export function describeDeliveryError(
 
 /** Códigos da Meta → mensagem e se vale tentar de novo. */
 export function describeGraphError(status: number, body: unknown): CloudApiError {
-  const err = (body as { error?: { code?: number; message?: string; error_data?: { details?: string } } })?.error;
+  const err = (body as { error?: { code?: number; message?: string; error_user_msg?: string; error_data?: { details?: string } } })?.error;
   const code = err?.code;
   const raw = err?.message ?? `HTTP ${status}`;
+  // "Invalid parameter" sozinho não diz nada; a Meta põe o motivo de verdade em error_user_msg
+  // (ex.: já existe um modelo com esse nome) ou em error_data.details.
+  const detail = err?.error_user_msg?.trim() || err?.error_data?.details?.trim();
   const make = (msg: string, retryable = false, windowClosed = false) =>
     new CloudApiError(status, code, msg, retryable, windowClosed, raw);
 
@@ -95,7 +98,7 @@ export function describeGraphError(status: number, body: unknown): CloudApiError
   if (code === 131031) return make('A conta do WhatsApp da clínica está bloqueada na Meta.');
   if (code !== undefined && RATE_LIMIT.has(code)) return make('Muitas mensagens em pouco tempo. Vamos tentar de novo.', true);
   if (status >= 500) return make('A Meta está instável agora. Vamos tentar de novo.', true);
-  return make(`A Meta recusou: ${raw}`);
+  return make(`A Meta recusou: ${detail || raw}`);
 }
 
 export class CloudApi {

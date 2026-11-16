@@ -60,7 +60,11 @@ const DELAYS: { value: number; label: string }[] = [
   { value: 30, label: 'Depois de 30 minutos' },
   { value: 60, label: 'Depois de 1 hora' },
   { value: 180, label: 'Depois de 3 horas' },
+  { value: 720, label: 'Depois de 12 horas' },
   { value: 1440, label: 'Depois de 1 dia' },
+  // 2 dias e 2 dias e meio: cabem na janela grátis de 72 horas do anúncio (follow-up).
+  { value: 2880, label: 'Depois de 2 dias' },
+  { value: 3600, label: 'Depois de 2 dias e meio' },
   { value: 4320, label: 'Depois de 3 dias' },
   { value: 10080, label: 'Depois de 7 dias' },
 ];
