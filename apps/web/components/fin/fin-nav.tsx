@@ -35,6 +35,7 @@ export function FinNav({ access }: { access: FinNavAccess }) {
     { href: '/financeiro/renegociacoes', label: 'Renegociações' },
     { href: '/financeiro/transferencias', label: 'Transferências' },
     ...(access.commissions ? [{ href: '/financeiro/comissoes', label: 'Comissões' }] : []),
+    ...(access.reports ? [{ href: '/financeiro/conciliacao', label: 'Conciliação' }] : []),
     ...(access.reports ? [{ href: '/financeiro/relatorios', label: 'Relatórios' }] : []),
     ...(access.reverse ? [{ href: '/financeiro/estornos', label: 'Estornos' }, { href: '/financeiro/liberacoes', label: 'Liberações', badge: access.pendingReleases }] : []),
   ];
