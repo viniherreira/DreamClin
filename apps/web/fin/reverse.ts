@@ -6,6 +6,7 @@ import { fromCents, toCents } from '@/lib/financeiro/money';
 import { settledStatus } from '@/lib/financeiro/title-status';
 import { refreshBillingOfTitlesTx } from './billing-sync';
 import { openCashOf } from './cash';
+import { lockWallet } from './settle';
 import { nextCode } from './codes';
 import type { Tx } from './titles';
 
@@ -30,6 +31,8 @@ export interface ReverseInput {
   alsoIds?: string[];
   /** Confirma estornar uma parcela com parcelas seguintes já pagas. */
   confirmOutOfOrder?: boolean;
+  /** Estorno pela tela de Transferências: desfaz as duas pontas. */
+  transfer?: boolean;
 }
 
 export type ReverseResult =
@@ -65,7 +68,7 @@ export async function reverseTransactionTx(tx: Tx, env: ReverseEnv, input: Rever
   if (!alvo) return no('Movimento não encontrado.');
   if (alvo.kind === 'REVERSAL') return no('Este movimento já é um estorno.');
   if (alvo.reversedAt) return no('Este movimento já foi estornado.');
-  if (alvo.kind === 'TRANSFER_IN' || alvo.kind === 'TRANSFER_OUT') return no('Para desfazer uma transferência, estorne pela tela de Transferências.');
+  if ((alvo.kind === 'TRANSFER_IN' || alvo.kind === 'TRANSFER_OUT') && !input.transfer) return no('Para desfazer uma transferência, estorne pela tela de Transferências.');
 
   // A taxa do cartão deste movimento vai sempre junto; do resto do recebimento, só o que a pessoa escolheu.
   const relacionados = await relatedTransactions(tx, tenantId, alvo.id);
@@ -73,7 +76,7 @@ export async function reverseTransactionTx(tx: Tx, env: ReverseEnv, input: Rever
   const idsEscolhidos = new Set([alvo.id, ...relacionados.filter((r) => escolhidos.has(r.id)).map((r) => r.id)]);
   const taxas = relacionados.filter((r) => r.origin === 'CARD_FEE' && r.originId && idsEscolhidos.has(r.originId)).map((r) => r.id);
   // Reforço ou sangria que virou transferência: a outra ponta (cofre, banco) é desfeita junto.
-  const outraPonta = alvo.transferId && (alvo.kind === 'REINFORCEMENT' || alvo.kind === 'WITHDRAWAL') ? (await tx.financialTransaction.findMany({ where: { tenantId, transferId: alvo.transferId, id: { not: alvo.id } }, select: { id: true } })).map((r) => r.id) : [];
+  const outraPonta = alvo.transferId && (alvo.kind === 'REINFORCEMENT' || alvo.kind === 'WITHDRAWAL' || alvo.kind === 'TRANSFER_IN' || alvo.kind === 'TRANSFER_OUT') ? (await tx.financialTransaction.findMany({ where: { tenantId, transferId: alvo.transferId, id: { not: alvo.id } }, select: { id: true } })).map((r) => r.id) : [];
   const ids = [...new Set([...idsEscolhidos, ...taxas, ...outraPonta])];
   const movimentos = await tx.financialTransaction.findMany({ where: { tenantId, id: { in: ids }, reversedAt: null, kind: { not: 'REVERSAL' } }, orderBy: { code: 'asc' } });
 
@@ -94,6 +97,15 @@ export async function reverseTransactionTx(tx: Tx, env: ReverseEnv, input: Rever
 
   // Em que caixa o estorno entra: no do movimento original, se ainda estiver aberto (o dinheiro sai da
   // mesma gaveta); senão, no caixa aberto de quem estorna. Um caixa fechado nunca é alterado.
+  // Crédito que entrou na carteira e já foi usado não volta: a carteira ficaria negativa.
+  const creditos = await tx.walletEntry.findMany({ where: { tenantId, transactionId: { in: movimentos.map((m) => m.id) }, amount: { gt: 0 } }, select: { patientId: true, amount: true } });
+  const porPaciente = new Map<string, number>();
+  for (const c of creditos) porPaciente.set(c.patientId, (porPaciente.get(c.patientId) ?? 0) + toCents(c.amount));
+  for (const [patientId, valor] of porPaciente) {
+    const saldo = await lockWallet(tx, tenantId, patientId);
+    if (saldo < valor) return no('Este crédito da carteira já foi usado. Estorne primeiro o pagamento que usou o crédito.');
+  }
+
   const caixa = await openCashOf(tx, tenantId, env.userId, env.unitId, true);
   const sessoesOriginais = [...new Set(movimentos.map((m) => m.cashSessionId).filter((x): x is string => Boolean(x)))];
   const aindaAbertas = new Set(
