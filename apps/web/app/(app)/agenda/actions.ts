@@ -30,6 +30,7 @@ import { getWhatsAppHealth, prepareAppointmentMessage, deliverPrepared } from '@
 import type { Preparation } from '@/lib/whatsapp';
 import { refOutsideTenant, refErrorMessage } from '@/lib/owns';
 import { appointmentStatusEvent, notifyCrm } from '@/crm/notify';
+import { agendaFinance, AgendaAbort } from '@/fin/agenda-bridge';
 
 // ─── Auth helper ─────────────────────────────────────────────────────────────
 
@@ -152,9 +153,22 @@ export async function getAgendaData(dateStr: string, view: 'day' | 'week' | 'mon
   // Nesse caso vale o horário de sempre de cada um (senão a grade ficaria toda fechada).
   const horarios = noneHere ? await buildWorkingHoursMap(tenantId, professionals.map((p) => p.id)) : workingHours;
 
+  // Financeiro completo: o cifrão de cada horário e o que a janela de agendar precisa.
+  const fin = await agendaFinance(tenantId);
+  const preco = new Map(serializedProcedures.map((p) => [p.id, p.basePrice]));
+  const finance = fin
+    ? {
+        billing: fin.statuses(appointments, (id) => preco.get(id)),
+        showPrices: fin.showPrices,
+        canReceive: fin.ctx.can('fin_receber'),
+        insurers: await fin.insurers(),
+      }
+    : null;
+
   return {
     appointments,
     blockedSlots,
+    finance,
     professionals: daUnidade,
     unit: { id: unit.id, name: unit.name, multi: units.multi, noneHere },
     rules,
@@ -276,6 +290,15 @@ async function checkBlocked(
   });
 }
 
+/** Itens e convênio que a janela de agendar manda quando o financeiro novo está ligado. */
+async function financeFields(fin: NonNullable<Awaited<ReturnType<typeof agendaFinance>>>, formData: FormData, type: string) {
+  const lidos = fin.readItems(formData);
+  if (!lidos.ok) return { ok: false as const, message: lidos.message };
+  const convenio = type === 'CONVENIO' ? String(formData.get('insuranceContactId') ?? '').trim() || null : null;
+  if (convenio && !(await fin.insurerOk(convenio))) return { ok: false as const, message: 'Convênio não encontrado.' };
+  return { ok: true as const, items: lidos.items, insuranceContactId: convenio };
+}
+
 // ─── Create appointment ───────────────────────────────────────────────────────
 
 export async function createAppointment(
@@ -324,22 +347,38 @@ export async function createAppointment(
   }
 
   const { current: unit } = await getUnitContext(tenantId, userId);
-  const appointment = await prisma.appointment.create({
-    data: {
-      tenantId,
-      unitId: unit.id,
-      patientId,
-      professionalId,
-      procedureId: procedureId || null,
-      startTime: start,
-      endTime: end,
-      status,
-      type,
-      notes: notes || null,
-      createdById: userId,
-      updatedById: userId,
-    },
-  });
+  const fin = await agendaFinance(tenantId);
+  const extra = fin ? await financeFields(fin, formData, type) : { ok: true as const, items: null, insuranceContactId: null };
+  if (!extra.ok) return { success: false, errors: {}, message: extra.message };
+  const dados = {
+    tenantId,
+    unitId: unit.id,
+    patientId,
+    professionalId,
+    procedureId: procedureId || null,
+    startTime: start,
+    endTime: end,
+    status,
+    type,
+    notes: notes || null,
+    createdById: userId,
+    updatedById: userId,
+    ...(fin ? { insuranceContactId: extra.insuranceContactId } : {}),
+  };
+  let appointment;
+  try {
+    // Com o financeiro novo, os itens (procedimentos e valores) entram junto, na mesma transação.
+    appointment = fin
+      ? await fin.ctx.db.$transaction(async (tx) => {
+          const criado = await tx.appointment.create({ data: dados });
+          await fin.save(tx, criado.id, extra.items);
+          return criado;
+        })
+      : await prisma.appointment.create({ data: dados });
+  } catch (e) {
+    if (e instanceof AgendaAbort) return { success: false, errors: {}, message: e.message };
+    throw e;
+  }
 
   // Avisa o CRM depois da resposta; ele nunca falha nem atrasa o agendamento.
   after(() => notifyCrm(tenantId, { type: 'appointment.created', patientId, appointmentId: appointment.id }));
@@ -421,20 +460,36 @@ export async function updateAppointment(
     };
   }
 
-  await prisma.appointment.update({
-    where: { id, tenantId },
-    data: {
-      patientId,
-      professionalId,
-      procedureId: procedureId || null,
-      startTime: start,
-      endTime: end,
-      status,
-      type,
-      notes: notes || null,
-      updatedById: userId,
-    },
-  });
+  const fin = await agendaFinance(tenantId);
+  const extra = fin ? await financeFields(fin, formData, type) : { ok: true as const, items: null, insuranceContactId: null };
+  if (!extra.ok) return { success: false, errors: {}, message: extra.message };
+  const dados = {
+    patientId,
+    professionalId,
+    procedureId: procedureId || null,
+    startTime: start,
+    endTime: end,
+    status,
+    type,
+    notes: notes || null,
+    updatedById: userId,
+    ...(fin ? { insuranceContactId: extra.insuranceContactId } : {}),
+  };
+  try {
+    if (fin) {
+      await fin.ctx.db.$transaction(async (tx) => {
+        const r = await tx.appointment.updateMany({ where: { id, tenantId }, data: dados });
+        if (!r.count) throw new AgendaAbort('Agendamento não encontrado.');
+        await fin.save(tx, id, extra.items);
+      });
+    } else {
+      await prisma.appointment.update({ where: { id, tenantId }, data: dados });
+    }
+  } catch (e) {
+    if (e instanceof AgendaAbort) return { success: false, errors: {}, message: e.message };
+    throw e;
+  }
+  if (fin && status === 'ATTENDED') await fin.attended(id);
 
   after(() => notifyCrm(tenantId, { type: appointmentStatusEvent(status), patientId, appointmentId: id }));
 
@@ -587,6 +642,7 @@ export async function updateAppointmentStatus(
       updatedById: userId,
     },
   });
+  if (status === 'ATTENDED') await (await agendaFinance(tenantId))?.attended(id);
   after(() => notifyCrm(tenantId, { type: appointmentStatusEvent(status), patientId: atualizado.patientId, appointmentId: id }));
 
   revalidatePath('/agenda');
@@ -616,6 +672,11 @@ export async function deleteAppointment(id: string) {
     select: { id: true, patientId: true },
   });
   if (!appt) return { success: false as const, error: 'not-found' };
+
+  // Financeiro completo: com pagamento não exclui; sem pagamento, as contas em aberto são canceladas.
+  const fin = await agendaFinance(tenantId);
+  const recusa = fin ? await fin.deleting(id) : null;
+  if (recusa) return { success: false as const, error: 'has-payment' as const, message: recusa };
 
   await prisma.$transaction([
     prisma.whatsAppMessage.updateMany({
@@ -662,10 +723,15 @@ export async function advanceAppointment(
   id: string,
   action: FlowAction,
   cancelReason?: string,
-): Promise<{ ok: true } | { ok: false; message: string }> {
+): Promise<{ ok: true; openCents?: number } | { ok: false; message: string }> {
   const { tenantId, userId } = await requireTenant();
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { ok: false, message: bloqueio };
+  const fin = await agendaFinance(tenantId);
+  if (fin && action === 'start') {
+    const travado = await fin.startBlock(id);
+    if (travado) return { ok: false, message: travado };
+  }
 
   const appt = await prisma.appointment.findFirst({
     where: { id, tenantId },
@@ -689,9 +755,11 @@ export async function advanceAppointment(
     const status = mudanca.status;
     after(() => notifyCrm(tenantId, { type: appointmentStatusEvent(status), patientId: appt.patientId, appointmentId: id }));
   }
+  // Terminou: fatura sozinho (se a clínica ligou) e devolve o que falta receber, para a tela sugerir "Receber agora".
+  const openCents = fin && mudanca.status === 'ATTENDED' ? await fin.attended(id) : undefined;
   revalidatePath('/agenda');
   revalidatePath('/dashboard');
-  return { ok: true };
+  return { ok: true, openCents };
 }
 
 /** Põe ou tira o rótulo de um horário. */
@@ -797,6 +865,8 @@ export async function getAppointmentDetail(id: string) {
     lastVisit: ultimo ? { at: ultimo.startTime, professional: ultimo.professional.name } : null,
     history: historico,
     financial: financeiro,
+    /** Financeiro completo ligado: a aba Financeiro carrega os itens e as contas deste agendamento. */
+    newFinance: Boolean(await agendaFinance(tenantId)),
     createdBy: nomeDe(appointment.createdById),
     updatedBy: nomeDe(appointment.updatedById),
   };

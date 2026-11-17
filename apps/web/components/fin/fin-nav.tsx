@@ -24,6 +24,7 @@ export function FinNav({ access }: { access: FinNavAccess }) {
   const itens: { href: string; label: string; badge?: number }[] = [
     { href: '/financeiro', label: 'Visão geral' },
     ...(access.cash ? [{ href: '/financeiro/caixa', label: 'Caixa', badge: access.cashAlerts }] : []),
+    { href: '/financeiro/a-faturar', label: 'A faturar' },
     { href: '/financeiro/contas', label: 'Contas a receber e a pagar' },
     { href: '/financeiro/movimentacoes', label: 'Movimentações' },
     ...(access.reverse ? [{ href: '/financeiro/estornos', label: 'Estornos' }, { href: '/financeiro/liberacoes', label: 'Liberações', badge: access.pendingReleases }] : []),

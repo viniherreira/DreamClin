@@ -2,14 +2,15 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, Eye, EyeOff, FileDown, Lock } from 'lucide-react';
 import { Badge, ErrorText, Field, inputCls, Modal, MoneyInput } from '@/components/fin/ui';
 import type { CashAlerts, CashListRow, CashView } from '@/fin/cash-read';
 import { COUNT_GROUPS, COUNT_GROUP_LABEL, ZERO_COUNT, countRows, type CountRow, type Counted } from '@/lib/financeiro/cash';
 import { formatCents } from '@/lib/financeiro/money';
 import { CLINIC_TZ } from '@/lib/tz';
-import { cashMoveAction, closeCashAction, markCashSeenAction, openCashAction } from '../cash-actions';
+import { cashMoveAction, cashPendingAction, closeCashAction, markCashSeenAction, openCashAction } from '../cash-actions';
+import { wallClockTime } from '@/lib/tz';
 
 /**
  * As peças da tela do caixa: abrir, o caixa aberto (saldo por meio, reforço,
@@ -321,6 +322,10 @@ function FecharDialog({ view, canManage, onClose }: { view: CashView; canManage:
   const [recontar, setRecontar] = useState(false);
   const [justificativa, setJustificativa] = useState('');
   const [erro, setErro] = useState('');
+  const [pendentes, setPendentes] = useState<Awaited<ReturnType<typeof cashPendingAction>> | null>(null);
+  useEffect(() => {
+    void cashPendingAction(view.id).then(setPendentes);
+  }, [view.id]);
   const [pending, start] = useTransition();
 
   // Sem conferência cega, a diferença aparece enquanto a pessoa digita.
@@ -353,6 +358,24 @@ function FecharDialog({ view, canManage, onClose }: { view: CashView; canManage:
             enviar();
           }}
         >
+          {pendentes && pendentes.items.length > 0 && (
+            <div className={`rounded-lg border p-3 text-sm ${pendentes.blocks ? 'border-red-300/60 bg-red-50 text-red-900 dark:bg-red-950/40 dark:text-red-200' : 'border-amber-300/60 bg-amber-50 text-amber-900 dark:bg-amber-950/40 dark:text-amber-200'}`}>
+              <p className="font-medium">
+                {pendentes.items.length} atendimento(s) de hoje ficaram sem faturar nem receber{pendentes.blocks ? '. A clínica pede para resolver antes de fechar.' : '.'}
+              </p>
+              <ul className="mt-1 space-y-0.5">
+                {pendentes.items.slice(0, 6).map((p) => (
+                  <li key={p.id}>
+                    {wallClockTime(p.startTime)} · {p.patientName}
+                    {p.cents > 0 ? ` · ${formatCents(p.cents)}` : ''}
+                  </li>
+                ))}
+              </ul>
+              <Link href="/financeiro/a-faturar" className="mt-1 inline-block font-medium underline underline-offset-2">
+                Abrir A faturar
+              </Link>
+            </div>
+          )}
           <p className="text-sm text-muted-foreground">
             {travado
               ? 'Sua contagem já está registrada. Como não bateu com o esperado, escreva a justificativa para fechar.'

@@ -8,6 +8,7 @@ import type { AppointmentFormState } from '../actions';
 import { STATUS_LABELS, TYPE_LABELS } from './constants';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { firstLetters } from '@/lib/initials';
+import { AppointmentItems, type ItemRow, type ItemsFinance } from './appointment-items';
 
 interface Professional {
   id: string;
@@ -59,6 +60,8 @@ interface AppointmentModalProps {
   editing?: EditingAppointment | null;
   /** Paciente já escolhido ao abrir um agendamento novo (ex.: vindo do CRM). */
   defaultPatient?: Patient | null;
+  /** Financeiro completo: procedimentos com valores, "Trazer do orçamento" e convênio. */
+  finance?: ItemsFinance | null;
   onSuccess: () => void;
 }
 
@@ -82,8 +85,11 @@ export function AppointmentModal({
   defaultDate, defaultTime = '08:00', defaultProfessionalId,
   editing = null,
   defaultPatient = null,
+  finance = null,
   onSuccess,
 }: AppointmentModalProps) {
+  const [itens, setItens] = useState<ItemRow[] | null>(null);
+  const [convenio, setConvenio] = useState('');
   const [state, formAction, pending] = useActionState<AppointmentFormState | null, FormData>(
     editing ? updateAppointment.bind(null, editing.id) : createAppointment,
     null,
@@ -185,6 +191,13 @@ export function AppointmentModal({
     if (proc) setEndTime(addMinutesToTime(startTime, proc.durationMinutes));
   }
 
+  /** Com itens, o primeiro procedimento manda na duração (como o seletor antigo). */
+  function onFirstProcedure(id: string | null) {
+    setProcId(id ?? '');
+    const proc = procedures.find((p) => p.id === id);
+    if (proc) setEndTime(addMinutesToTime(startTime, proc.durationMinutes));
+  }
+
   function onStartTimeChange(t: string) {
     setStartTime(t);
     const proc = procedures.find((p) => p.id === procId);
@@ -222,6 +235,23 @@ export function AppointmentModal({
               <input type="hidden" name="procedureId" value={procId} />
               <input type="hidden" name="type" value={type} />
               <input type="hidden" name="status" value={status} />
+              {finance && itens && (
+                <input
+                  type="hidden"
+                  name="items"
+                  value={JSON.stringify(
+                    itens.map((i) => ({
+                      procedureId: i.procedureId,
+                      name: i.name,
+                      quantity: i.quantity,
+                      unitPriceCents: finance.showPrices ? i.unitPriceCents : null,
+                      discountCents: finance.showPrices ? i.discountCents : null,
+                      quoteItemId: i.quoteItemId,
+                    })),
+                  )}
+                />
+              )}
+              {finance && type === 'CONVENIO' && <input type="hidden" name="insuranceContactId" value={convenio} />}
 
               {state && !state.success && state.message && (
                 <p role="alert" className="rounded-lg bg-destructive/10 px-3 py-2.5 text-sm font-medium text-destructive">
@@ -265,7 +295,7 @@ export function AppointmentModal({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className={`grid grid-cols-1 gap-3 ${finance ? '' : 'sm:grid-cols-2'}`}>
                   <div className="space-y-1.5">
                     <span className={`${labelCls} block`} id="prof-label">Profissional <span className="text-destructive">*</span></span>
                     <Select value={profId || undefined} onValueChange={setProfId}>
@@ -285,7 +315,7 @@ export function AppointmentModal({
                     </Select>
                     {errorFor('professionalId') && <p className="text-xs text-destructive">{errorFor('professionalId')}</p>}
                   </div>
-                  <div className="space-y-1.5">
+                  {!finance && (<div className="space-y-1.5">
                     <span className={`${labelCls} block`} id="proc-label">Procedimento</span>
                     <Select value={procId || undefined} onValueChange={(v) => onProcedureChange(v === '__none__' ? '' : v)}>
                       <SelectTrigger aria-labelledby="proc-label">
@@ -303,7 +333,7 @@ export function AppointmentModal({
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
+                  </div>)}
                 </div>
               </fieldset>
 
@@ -378,6 +408,20 @@ export function AppointmentModal({
                   {errorFor('patientId') && <p className="text-xs text-destructive">{errorFor('patientId')}</p>}
                 </div>
               </fieldset>
+
+              {finance && (
+                <AppointmentItems
+                  finance={finance}
+                  procedures={procedures}
+                  patientId={selectedPatient?.id ?? null}
+                  appointmentId={editing?.id ?? null}
+                  type={type}
+                  insurerId={convenio}
+                  onInsurerChange={setConvenio}
+                  onChange={setItens}
+                  onFirstProcedure={onFirstProcedure}
+                />
+              )}
 
               {/* Situação + Observações */}
               <fieldset className="space-y-3">

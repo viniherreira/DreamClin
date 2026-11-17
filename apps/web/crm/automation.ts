@@ -30,7 +30,9 @@ export type ClinicEvent =
   | { type: 'quote.accepted'; patientId: string; quoteId: string }
   | { type: 'quote.reopened'; patientId: string; quoteId: string }
   | { type: 'quote.rejected'; patientId: string; quoteId: string; reason?: string | null }
-  | { type: 'quote.deleted'; patientId: string; quoteId: string };
+  | { type: 'quote.deleted'; patientId: string; quoteId: string }
+  /** Recebimento do financeiro novo. Hoje só fica registrado; serve para automações futuras. */
+  | { type: 'payment.received'; patientId: string; receiptId: string; amountCents: number };
 
 export interface LeadSnapshot {
   id: string;
@@ -160,5 +162,8 @@ export function planForEvent(ctx: AutomationContext, event: ClinicEvent): Automa
     case 'quote.rejected':
     case 'quote.deleted':
       return ctx.hasOpenQuote ? NADA : { tasks: [{ text: TASK_RETOMAR, inDays: 1 }] };
+
+    case 'payment.received':
+      return NADA;
   }
 }

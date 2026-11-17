@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation';
 import { useLiveUnread } from './crm-chat/unread';
 import {
   LayoutDashboard, CalendarDays, Users, Stethoscope, FileText, Wallet,
-  MessageCircle, Megaphone, Settings, PhoneCall, KanbanSquare, List, ListChecks, Smartphone, BarChart3, Zap, TrendingUp, Receipt, Banknote,
+  MessageCircle, Megaphone, Settings, PhoneCall, KanbanSquare, List, ListChecks, Smartphone, BarChart3, Zap, TrendingUp, Receipt, Banknote, ClipboardList,
 } from 'lucide-react';
 import { CrmRail } from './crm-rail';
 import { ClinicSidebar } from './clinic-sidebar';
@@ -53,6 +53,7 @@ export const CLINIC_NAV: NavItem[] = [
  */
 export const FINANCE_NAV: NavItem[] = [
   { href: '/financeiro/caixa', label: 'Caixa', icon: Banknote, capability: 'fin_caixa', group: 'Financeiro' },
+  { href: '/financeiro/a-faturar', label: 'A faturar', icon: ClipboardList, capability: 'fin_ver', group: 'Financeiro' },
   { href: '/financeiro/contas', label: 'Contas', icon: Receipt, capability: 'fin_ver', group: 'Financeiro' },
 ];
 

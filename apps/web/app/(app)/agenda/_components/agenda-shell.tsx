@@ -60,6 +60,7 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
   const [modal, setModal] = useState<ModalState>({ open: false, defaultDate: initialDate });
   const [blockModal, setBlockModal] = useState<BlockModalState>({ open: false, defaultDate: initialDate });
   const [removingBlockId, setRemovingBlockId] = useState<string | null>(null);
+  const [soDevendo, setSoDevendo] = useState(false);
 
   // Veio com paciente na URL: abre o agendamento e limpa a URL, para um
   // recarregar não abrir o modal de novo. `history.replaceState`, e não
@@ -198,8 +199,16 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
             />
           </div>
           <div className="border-t border-border pt-4">
-            <WaitingRoom appointments={data.appointments} onOpen={setDetailId} />
+            <WaitingRoom appointments={data.appointments} onOpen={setDetailId} billing={data.finance?.billing} />
           </div>
+          {data.finance && (
+            <div className="border-t border-border pt-4">
+              <label className="flex cursor-pointer items-center gap-2 text-sm">
+                <input type="checkbox" className="h-4 w-4 rounded accent-primary" checked={soDevendo} onChange={(e) => setSoDevendo(e.target.checked)} />
+                Só quem falta pagar
+              </label>
+            </div>
+          )}
         </aside>
 
         {/* Main */}
@@ -349,6 +358,8 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
                   onBlockedSlotClick={(id) => setRemovingBlockId(id)}
                   onSlotClick={(professionalId, slotDate, timeStr) => openNewModal(professionalId, timeStr, slotDate)}
                   onDayClick={(d) => navigate(d, 'day')}
+                  billing={data.finance?.billing}
+                  onlyOwing={soDevendo}
                 />
                 <div className="h-10" aria-hidden="true" />
               </>
@@ -383,6 +394,7 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
         }}
         professionals={data.professionals}
         procedures={data.procedures}
+        finance={data.finance ? { showPrices: data.finance.showPrices, insurers: data.finance.insurers } : null}
         defaultDuration={data.rules.defaultDurationMinutes}
         defaultDate={modal.defaultDate}
         defaultTime={modal.defaultTime}

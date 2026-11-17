@@ -4,6 +4,7 @@ import { afterAll, describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
 vi.mock('next/cache', () => ({ revalidatePath: () => undefined }));
+vi.mock('next/server', async (original) => ({ ...(await original<typeof import('next/server')>()), after: () => undefined }));
 vi.mock('next/navigation', () => ({
   redirect: (to: string) => {
     throw new Error(`redirect:${to}`);

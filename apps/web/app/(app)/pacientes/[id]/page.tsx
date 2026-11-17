@@ -32,6 +32,10 @@ import { PatientStatusBadge } from '../_components/patient-status-badge';
 import { RecordTabs } from './_components/record-tabs';
 import { Odontogram } from './_components/odontogram';
 import { FinancialSection } from './_components/financial-section';
+import { PatientFinancePanel } from './_components/patient-finance-panel';
+import { finContext } from '@/fin/guard';
+import { financeAdvanced } from '@/fin/flag';
+import { financeOptions } from '../../configuracoes/finance-actions';
 import { AnamnesisSection } from './_components/anamnesis-section';
 import { EvolutionsSection } from './_components/evolutions-section';
 import { ImagesSection } from './_components/images-section';
@@ -39,7 +43,7 @@ import { CopyButton } from './_components/copy-button';
 import { LgpdCard } from './_components/lgpd-card';
 import { ANONYMIZED_PREFIX } from '@/lib/patient-lgpd';
 import { ANAMNESIS_QUESTIONS } from './_components/anamnesis-questions';
-import { CLINIC_TZ, ageFromBirth, wallClockTime } from '@/lib/tz';
+import { CLINIC_TZ, ageFromBirth, clinicToday, wallClockTime } from '@/lib/tz';
 import { CrmPatientDeals } from '@/components/crm-patient-deals';
 import { getReceiptMethods } from '@/lib/clinic-settings';
 
@@ -137,7 +141,10 @@ export default async function PatientPage({
   searchParams: Promise<{ aba?: string }>;
 }) {
   const [{ id }, { aba }] = await Promise.all([params, searchParams]);
-  const [patient, record, methods] = await Promise.all([getPatient(id), getPatientRecord(id), getReceiptMethods()]);
+  const [patient, record, methods, fin] = await Promise.all([getPatient(id), getPatientRecord(id), getReceiptMethods(), finContext()]);
+  // Financeiro completo: a aba Financeiro mostra as contas novas do paciente.
+  const finOpcoes = fin?.can('fin_ver') ? await financeOptions() : null;
+  const finAvancado = fin ? await financeAdvanced(fin.tenantId) : false;
   if (!patient) notFound();
 
   const age = calcAge(patient.birthDate);
@@ -531,7 +538,9 @@ export default async function PatientPage({
             id: 'financeiro',
             label: 'Financeiro',
             icon: <Wallet />,
-            content: record.canSeeFinance ? (
+            content: fin?.can('fin_ver') ? (
+              <PatientFinancePanel patient={{ id: patient.id, name: patient.name }} options={finOpcoes} today={clinicToday()} advanced={finAvancado} />
+            ) : record.canSeeFinance ? (
               <FinancialSection
                 patientId={patient.id}
                 contracted={record.financial.contracted}

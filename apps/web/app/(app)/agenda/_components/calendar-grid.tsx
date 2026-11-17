@@ -5,6 +5,7 @@ import { addDays, format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useGrid } from './grid-context';
 import { AppointmentBlock } from './appointment-block';
+import { owesMoney, type BillingStatus } from '@/lib/financeiro/billing';
 import { CurrentTimeIndicator } from './current-time-indicator';
 import { WorkingHoursOverlay } from './working-hours-overlay';
 import { BlockedSlotBlock, type BlockedSlotItem } from './blocked-slot-block';
@@ -43,6 +44,10 @@ interface CalendarGridProps {
   onSlotClick?: (professionalId: string, dateStr: string, timeStr: string) => void;
   /** Week view: clicking a day header opens that day. */
   onDayClick?: (dateStr: string) => void;
+  /** Situação financeira de cada horário (financeiro completo). */
+  billing?: Record<string, BillingStatus> | null;
+  /** "Só quem falta pagar". */
+  onlyOwing?: boolean;
 }
 
 /** Weekday index (0=Sun..6=Sat) for a `yyyy-MM-dd` string. */
@@ -113,7 +118,7 @@ function ProfessionalHeader({ prof }: { prof: Professional }) {
 
 export function CalendarGrid({
   dateStr, view, professionals, appointments, blockedSlots, workingHours, visibleProfessionals, mode,
-  onAppointmentClick, onBlockedSlotClick, onSlotClick, onDayClick,
+  onAppointmentClick, onBlockedSlotClick, onSlotClick, onDayClick, billing, onlyOwing = false,
 }: CalendarGridProps) {
   const grid = useGrid();
   const TOTAL_HEIGHT_PX = grid.totalHeight;
@@ -123,6 +128,7 @@ export function CalendarGrid({
 
   const appointmentsWithColor = appointments
     .filter((a) => visibleProfessionals.has(a.professional.id))
+    .filter((a) => !onlyOwing || owesMoney(billing?.[a.id]))
     .map((apt) => ({
       ...apt,
       professionalColor: professionals.find((p) => p.id === apt.professional.id)?.color,
@@ -205,7 +211,7 @@ export function CalendarGrid({
                   .filter((b) => new Date(b.startTime).toISOString().slice(0, 10) === iso)
                   .map((b) => <BlockedSlotBlock key={b.id} slot={b} onClick={onBlockedSlotClick} />)}
                 {dayApts.map((apt) => (
-                  <AppointmentBlock key={apt.id} appointment={apt} onClick={onAppointmentClick} />
+                  <AppointmentBlock key={apt.id} appointment={apt} onClick={onAppointmentClick} billing={billing?.[apt.id]} />
                 ))}
               </div>
             </div>
@@ -246,7 +252,7 @@ export function CalendarGrid({
                   .filter((b) => b.professional?.id === prof.id)
                   .map((b) => <BlockedSlotBlock key={b.id} slot={b} onClick={onBlockedSlotClick} />)}
                 {profApts.map((apt) => (
-                  <AppointmentBlock key={apt.id} appointment={apt} onClick={onAppointmentClick} />
+                  <AppointmentBlock key={apt.id} appointment={apt} onClick={onAppointmentClick} billing={billing?.[apt.id]} />
                 ))}
               </div>
             </div>
@@ -289,7 +295,7 @@ export function CalendarGrid({
             <BlockedSlotBlock key={b.id} slot={b} onClick={onBlockedSlotClick} />
           ))}
           {appointmentsWithColor.map((apt) => (
-            <AppointmentBlock key={apt.id} appointment={apt} onClick={onAppointmentClick} />
+            <AppointmentBlock key={apt.id} appointment={apt} onClick={onAppointmentClick} billing={billing?.[apt.id]} />
           ))}
         </div>
       </div>

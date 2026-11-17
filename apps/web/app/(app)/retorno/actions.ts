@@ -2,7 +2,7 @@
 
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
-import { prisma } from '@clinicaiq/db';
+import { getTenantClient, prisma } from '@clinicaiq/db';
 import {
   montarFunil,
   type EntradaPaciente,
@@ -10,6 +10,9 @@ import {
   type Prioridade,
 } from '@/lib/recall';
 import { capabilityBlocked } from '@/lib/access';
+import { financeEnabled } from '@/fin/flag';
+import { ensureLegacyMigrated } from '@/fin/quotes';
+import { ensureFinanceSetup } from '@/fin/setup';
 
 async function requireTenant() {
   const { userId } = await auth();
@@ -166,8 +169,11 @@ export async function getFunil(): Promise<FunilData> {
   }
 
   // ── Dinheiro ──────────────────────────────────────────────────────────────
+  // Financeiro completo: o que o paciente deve sai das contas a receber em aberto
+  // (orçamentos, atendimentos faturados, parcelas), não mais de orçamento menos pagamento.
+  const devidoPorTitulo = (await financeEnabled(tenantId)) ? await devidoPelasContas(tenantId) : null;
   const aprovadoPorPaciente = new Map<string, number>();
-  for (const q of orcamentos) {
+  for (const q of devidoPorTitulo ? [] : orcamentos) {
     const cents = Math.round(Number(q.total) * 100);
     aprovadoPorPaciente.set(q.patientId, (aprovadoPorPaciente.get(q.patientId) ?? 0) + cents);
   }
@@ -212,7 +218,7 @@ export async function getFunil(): Promise<FunilData> {
       naoQuerContato: p.whatsappOptOut,
       temTelefone: Boolean(p.phoneEncrypted),
       // Nunca negativo: quem pagou adiantado não "deve" menos que zero.
-      emAbertoCents: Math.max(0, aprovado - pago),
+      emAbertoCents: devidoPorTitulo ? (devidoPorTitulo.get(p.id) ?? 0) : Math.max(0, aprovado - pago),
       totalPagoCents: pago,
       visitas: a?.visitas ?? 0,
       faltas: a?.faltas ?? 0,
@@ -232,4 +238,16 @@ export async function getFunil(): Promise<FunilData> {
     semRecorrencia: procedimentos.filter((p) => !p.recurrenceIntervalDays).length,
     totalPacientes: pacientes.length,
   };
+}
+
+/** Em aberto por paciente, nas contas a receber do financeiro novo (centavos). */
+async function devidoPelasContas(tenantId: string): Promise<Map<string, number>> {
+  await ensureFinanceSetup(tenantId);
+  await ensureLegacyMigrated(tenantId);
+  const grupos = await getTenantClient(tenantId).financialTitle.groupBy({
+    by: ['patientId'],
+    where: { tenantId, direction: 'RECEIVABLE', status: { in: ['OPEN', 'PARTIAL'] }, patientId: { not: null } },
+    _sum: { amount: true, paidAmount: true },
+  });
+  return new Map(grupos.map((g) => [g.patientId!, Math.max(0, Math.round((Number(g._sum.amount ?? 0) - Number(g._sum.paidAmount ?? 0)) * 100))]));
 }

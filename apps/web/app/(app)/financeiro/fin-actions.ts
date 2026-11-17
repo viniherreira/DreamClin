@@ -1,6 +1,8 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { after } from 'next/server';
+import { notifyCrm } from '@/crm/notify';
 import { z } from 'zod';
 import type { Prisma } from '@clinicaiq/db';
 import { openCashOf } from '@/fin/cash';
@@ -571,6 +573,11 @@ export async function settleAction(input: z.input<typeof settleSchema>): Promise
   if (r.ok) {
     await ctx.db.auditLog.create({ data: { tenantId: ctx.tenantId, userId: ctx.userId, action: t.direction === 'RECEIVABLE' ? 'RECEIVE' : 'PAY', entity: 'FinancialTitle', entityId: parsed.data.titleId, metadata: { recibo: r.receiptGroupId, movimentos: r.transactionIds.length } } });
     refresh(t.patientId);
+    if (t.direction === 'RECEIVABLE' && t.patientId) {
+      const patientId = t.patientId;
+      const amountCents = parsed.data.lines.reduce((soma, l) => soma + l.amountCents, 0);
+      after(() => notifyCrm(ctx.tenantId, { type: 'payment.received', patientId, receiptId: r.receiptGroupId, amountCents }));
+    }
   }
   return r;
 }

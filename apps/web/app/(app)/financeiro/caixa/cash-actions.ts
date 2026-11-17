@@ -3,7 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { cashMoveTx, closeCashTx, openCashTx, type CashEnv } from '@/fin/cash';
-import { finWrite, type FinContext } from '@/fin/guard';
+import { unbilledAttended } from '@/fin/appointments';
+import { finRead, finWrite, type FinContext } from '@/fin/guard';
 import { ensureFinanceSetup } from '@/fin/setup';
 import type { CountRow } from '@/lib/financeiro/cash';
 import { clinicToday } from '@/lib/tz';
@@ -70,9 +71,27 @@ export async function closeCashAction(input: z.input<typeof closeSchema>): Promi
   const ctx = gate.ctx;
   // Quem gerencia os caixas confere vendo o esperado; a conferência cega é para quem opera o próprio caixa.
   const blind = ctx.settings.blindCashCount && !ctx.can('fin_caixas_outros');
-  const r = await ctx.db.$transaction((tx) => closeCashTx(tx, env(ctx), parsed.data, { blind }));
+  // Regra da clínica: atendidos de hoje sem faturar nem receber só avisam, ou impedem o fechamento.
+  const pendentes = ctx.settings.closeWithUnbilled === 'BLOCK' ? await pendingFor(ctx, parsed.data.sessionId) : [];
+  const block = pendentes.length ? `Há ${pendentes.length} atendimento(s) de hoje sem faturar nem receber. Receba, fature ou marque como "não cobrar" antes de fechar o caixa.` : null;
+  const r = await ctx.db.$transaction((tx) => closeCashTx(tx, env(ctx), parsed.data, { blind, block }));
   if (r.ok) revalidatePath('/financeiro', 'layout');
   return r;
+}
+
+/** Os atendidos de hoje na unidade do caixa que ficaram sem faturar nem receber. */
+async function pendingFor(ctx: FinContext, sessionId: string) {
+  const s = await ctx.db.cashSession.findFirst({ where: { id: sessionId }, select: { unitId: true } });
+  if (!s) return [];
+  const principal = await ctx.db.clinicUnit.findFirst({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }], select: { id: true } });
+  return unbilledAttended(ctx.db, ctx.tenantId, clinicToday() as Day, s.unitId, principal?.id ?? null);
+}
+
+/** Para a janela de fechar: os atendidos de hoje sem cobrança e se isso bloqueia o fechamento. */
+export async function cashPendingAction(sessionId: string): Promise<{ items: Awaited<ReturnType<typeof unbilledAttended>>; blocks: boolean }> {
+  const gate = await finRead('fin_caixa');
+  if (!gate.ok) return { items: [], blocks: false };
+  return { items: await pendingFor(gate.ctx, sessionId), blocks: gate.ctx.settings.closeWithUnbilled === 'BLOCK' };
 }
 
 /** Dono ou administrador viu o fechamento com diferença: o aviso some. */
