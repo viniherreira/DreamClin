@@ -36,6 +36,7 @@
     "class-variance-authority": "^0.7",
     "clsx": "^2",
     "date-fns": "^4",
+    "fflate": "0.8.3",
     "geist": "^1.7.1",
     "lucide-react": "^0.468",
     "next": "^15.5.29",
