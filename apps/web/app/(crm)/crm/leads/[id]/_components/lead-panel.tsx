@@ -13,6 +13,7 @@ import { moveLeadAction } from '../../../actions';
 import { LostReasonModal } from '../../../_components/lost-reason-modal';
 import { createTagAction, revealPhoneAction, setLeadFieldsAction, setLeadTagsAction, updateLeadAction } from '../actions';
 import { formatFieldValue, type FieldDef } from '@/crm/custom-fields';
+import { CLINIC_TZ } from '@/lib/tz';
 
 /**
  * A metade esquerda da ficha: quem é, em que etapa está e o que fazer.
@@ -244,6 +245,11 @@ export function LeadPanel({
             onSave={(v) => salvar({ source: v as 'MANUAL' }, 'Origem salva.')}
           />
         </Field>
+        {lead.origin && (
+          <Field label="Anúncio">
+            <OriginBox origin={lead.origin} />
+          </Field>
+        )}
         {fields.map((d) => (
           <Field key={d.id} label={d.name}>
             <CustomFieldEditor def={d} value={lead.fields[d.id]} onSave={(v) => salvarCampo(d, v)} />
@@ -342,6 +348,26 @@ function CustomFieldEditor({ def, value, onSave }: { def: FieldDef; value: LeadD
 }
 
 /** Um dado da ficha, como no Kommo: o nome à esquerda, o valor à direita. */
+/** O anúncio de onde o lead veio, como a Meta mandou no primeiro contato. Não muda com a conversa. */
+function OriginBox({ origin: o }: { origin: NonNullable<LeadDetail['origin']> }) {
+  const dia = new Date(o.at).toLocaleDateString('pt-BR', { timeZone: CLINIC_TZ });
+  return (
+    <div className="flex min-w-0 gap-2.5 rounded-lg border border-border bg-surface-alt/40 p-2">
+      {o.imageUrl && (
+        // eslint-disable-next-line @next/next/no-img-element -- miniatura da Meta, endereço externo que muda
+        <img src={o.imageUrl} alt="" className="h-12 w-12 shrink-0 rounded object-cover" loading="lazy" referrerPolicy="no-referrer" />
+      )}
+      <div className="min-w-0 space-y-0.5 text-xs">
+        <p className="text-sm font-medium text-foreground">{o.topic ?? 'Assunto não definido'}</p>
+        {o.campaignName && <p className="truncate text-muted-foreground">Campanha: <span className="text-foreground/90">{o.campaignName}</span></p>}
+        {o.adName && <p className="truncate text-muted-foreground">Anúncio: <span className="text-foreground/90">{o.adName}</span></p>}
+        {o.headline && o.headline !== o.adName && <p className="truncate text-muted-foreground">Título: <span className="text-foreground/90">{o.headline}</span></p>}
+        <p className="text-muted-foreground">Primeiro contato em {dia}</p>
+      </div>
+    </div>
+  );
+}
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] items-baseline gap-3 py-1.5">

@@ -5,7 +5,7 @@ import { NO_PERIOD } from './period';
 describe('parseFilters', () => {
   it('sem nada: leads ativos de todos', () => {
     expect(parseFilters({})).toEqual({
-      q: '', resp: 'all', tarefa: '', tags: [], origem: '', funil: '', etapa: '', periodo: NO_PERIOD, valorMin: null, valorMax: null, campos: [],
+      q: '', resp: 'all', tarefa: '', tags: [], origem: '', campanha: '', anuncio: '', assunto: '', funil: '', etapa: '', periodo: NO_PERIOD, valorMin: null, valorMax: null, campos: [],
     });
   });
 
@@ -28,6 +28,12 @@ describe('parseFilters', () => {
     const f = parseFilters({ origem: 'HACK', tarefa: 'qualquer' });
     expect([f.origem, f.tarefa]).toEqual(['', '']);
     expect(parseFilters({ origem: 'INSTAGRAM', tarefa: 'overdue' })).toMatchObject({ origem: 'INSTAGRAM', tarefa: 'overdue' });
+  });
+
+  it('anúncio e campanha só aceitam ids da Meta; o assunto é texto curto', () => {
+    expect(parseFilters({ anuncio: '120210000000001', campanha: '1 OR 1' })).toMatchObject({ anuncio: '120210000000001', campanha: '' });
+    expect(parseFilters({ assunto: '  Carga imediata ' }).assunto).toBe('Carga imediata');
+    expect(parseFilters({ assunto: 'x'.repeat(200) }).assunto).toHaveLength(60);
   });
 
   it('período: atalho, dias do calendário e o "criado" dos links antigos', () => {

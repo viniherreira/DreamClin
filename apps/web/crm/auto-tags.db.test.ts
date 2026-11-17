@@ -50,36 +50,33 @@ describe.skipIf(!process.env.DATABASE_URL)('tags automáticas (banco)', async ()
     return r.leadId;
   };
 
-  it('lead do WhatsApp nasce com a tag whatsapp; manual nasce sem', async () => {
-    expect(await tagsDo(await novo('11 97777-1001', 'WHATSAPP'))).toEqual(['whatsapp']);
+  // A origem é um campo do lead (e o anúncio fica em origin.ts): o canal não vira mais tag.
+  it('lead novo não ganha tag de canal, venha de onde vier', async () => {
+    expect(await tagsDo(await novo('11 97777-1001', 'WHATSAPP'))).toEqual([]);
     expect(await tagsDo(await novo('11 97777-1002', 'MANUAL'))).toEqual([]);
   });
 
-  it('anúncio do Instagram troca a tag whatsapp pela instagram', async () => {
+  it('anúncio do Instagram muda a origem, sem tag', async () => {
     const id = await novo('11 97777-1003', 'WHATSAPP');
     await applyOrigin(db, tenant.id, id, 'INSTAGRAM', { sourceUrl: 'https://www.instagram.com/p/x', headline: 'Implante' });
-    expect(await tagsDo(id)).toEqual(['instagram']);
+    expect(await tagsDo(id)).toEqual([]);
+    expect((await db.lead.findFirst({ where: { id }, select: { source: true } }))?.source).toBe('INSTAGRAM');
   });
 
-  it('mudar a origem à mão troca a tag do canal', async () => {
+  it('mudar a origem à mão não mexe nas tags', async () => {
     const id = await novo('11 97777-1004', 'WHATSAPP');
     await updateLead(db, actor, id, { source: 'INDICACAO' });
-    expect(await tagsDo(id)).toEqual(['indicação']);
+    expect(await tagsDo(id)).toEqual([]);
   });
 
   it('procedimento citado vira tag e o interesse do lead', async () => {
     const id = await novo('11 97777-1005', 'WHATSAPP');
     expect(await applyProcedureTags(db, tenant.id, id, 'Oi! Quanto custa implante e clareamento?')).toEqual(['implante', 'clareamento']);
-    expect(await tagsDo(id)).toEqual(['clareamento', 'implante', 'whatsapp']);
+    expect(await tagsDo(id)).toEqual(['clareamento', 'implante']);
     const lead = await db.lead.findFirst({ where: { id }, select: { interestProcedureId: true } });
     expect(lead?.interestProcedureId).toBe(implante.id);
     // Repetir não duplica nem anota de novo.
     expect(await applyProcedureTags(db, tenant.id, id, 'é o implante mesmo')).toEqual([]);
   });
 
-  it('desligado nas configurações: lead novo sem tag de canal', async () => {
-    await prisma.tenant.update({ where: { id: tenant.id }, data: { settings: { crm: { autoTags: false } } } });
-    expect(await tagsDo(await novo('11 97777-1006', 'WHATSAPP'))).toEqual([]);
-    await prisma.tenant.update({ where: { id: tenant.id }, data: { settings: {} } });
-  });
 });

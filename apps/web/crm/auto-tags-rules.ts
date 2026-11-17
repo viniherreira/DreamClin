@@ -26,6 +26,8 @@ export const CHANNEL_TAG_NAMES = Object.values(CHANNEL_TAG).map((t) => t!.name);
  * maiúscula e plural não importam): "quero fazer implantes" acha implante.
  */
 export const PROCEDURE_DICTIONARY: readonly { tag: string; words: readonly string[] }[] = [
+  // Antes de implante: "implante com carga imediata" é carga imediata.
+  { tag: 'carga imediata', words: ['carga imediata', 'dente no mesmo dia', 'dentes no mesmo dia'] },
   { tag: 'implante', words: ['implante', 'implante dentario', 'implantodontia'] },
   { tag: 'protocolo', words: ['protocolo', 'protese protocolo', 'dentadura fixa'] },
   { tag: 'prótese', words: ['protese', 'dentadura', 'ponte movel', 'ponte fixa'] },

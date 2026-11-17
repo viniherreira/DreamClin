@@ -11,6 +11,9 @@ import { refreshAdsAction } from '../whatsapp/ads-actions';
 import { ReportFrame } from '../_components/report/frame';
 import { EmptyState } from '../_components/report/parts';
 import { AdsReportView } from './_components/report-view';
+import { AdTopics } from './_components/ad-topics';
+import { after } from 'next/server';
+import { adOrigins, backfillOriginsSometimes } from '@/crm/origin';
 
 export const metadata = { title: 'Anúncios' };
 
@@ -41,7 +44,14 @@ export default async function AnunciosPage({ searchParams }: { searchParams: Pro
     );
   }
 
-  const data = await loadAdsPage(ctx.tenantId, period, campanha);
+  const [data, origens, procedimentos] = await Promise.all([
+    loadAdsPage(ctx.tenantId, period, campanha),
+    adOrigins(ctx.tenantId),
+    ctx.db.procedure.findMany({ where: { active: true, deletedAt: null }, select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+  ]);
+  // A origem dos leads que chegaram antes desta versão (no máximo uma vez por hora).
+  after(() => backfillOriginsSometimes(ctx.tenantId));
+  const assuntos = <AdTopics rows={origens} procedures={procedimentos} canManage={ctx.manager} />;
 
   if (data.state === 'not_connected' || data.state === 'choosing') {
     const tenant = await prisma.tenant.findUnique({ where: { id: ctx.tenantId }, select: { settings: true } });
@@ -73,6 +83,7 @@ export default async function AnunciosPage({ searchParams }: { searchParams: Pro
             canManage={ctx.manager}
           />
         </div>
+        {assuntos}
       </ReportFrame>
     );
   }
@@ -97,6 +108,7 @@ export default async function AnunciosPage({ searchParams }: { searchParams: Pro
           {data.kind !== 'auth' && data.kind !== 'permission' && <p>Use o botão Atualizar, ali em cima, para tentar de novo. Nada foi perdido: os números continuam na Meta e no CRM.</p>}
           {(data.kind === 'auth' || data.kind === 'permission') && !ctx.manager && <p>Peça a um gestor do CRM para reconectar o Gerenciador de Anúncios.</p>}
         </EmptyState>
+        {assuntos}
       </ReportFrame>
     );
   }
@@ -111,6 +123,7 @@ export default async function AnunciosPage({ searchParams }: { searchParams: Pro
       accountName={data.connection.accountName}
       range={data.range}
       fetchedAt={data.fetchedAt}
+      extra={assuntos}
     />
   );
 }

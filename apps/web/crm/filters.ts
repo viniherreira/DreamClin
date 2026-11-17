@@ -25,6 +25,9 @@ export function parseFilters(sp: Record<string, string | string[] | undefined>):
       .filter((t) => /^[a-z0-9]{8,40}$/i.test(t))
       .slice(0, 20),
     origem: (SOURCES as readonly string[]).includes(origem) ? origem : '',
+    campanha: /^\d{5,25}$/.test(one('campanha')) ? one('campanha') : '',
+    anuncio: /^\d{5,25}$/.test(one('anuncio')) ? one('anuncio') : '',
+    assunto: one('assunto').trim().slice(0, 60),
     funil: one('funil').slice(0, 40),
     etapa: one('etapa').slice(0, 40),
     periodo: parsePeriod(sp),

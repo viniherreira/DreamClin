@@ -3,7 +3,6 @@ import { isClosedStage, mainPipeline, stageByRole, type StageLike } from './pipe
 import { conversationHashes, encryptPhone, phoneHash } from './phone';
 import { queueTriggeredBot } from './bot-queue';
 import { queueStageAutomations } from './stage-queue';
-import { channelTagForNewLead } from './auto-tags';
 import { conversionForRole } from './meta-conversions-rules';
 import { reportConversion } from './meta-conversions';
 import { runAfter } from './run-after';
@@ -299,7 +298,6 @@ export async function createLead(
     return { ok: true as const, leadId: lead.id };
   });
   // A tag do canal de entrada (fora da transação: se falhar, o lead fica).
-  if (r.ok) await channelTagForNewLead(db, tenantId, r.leadId, input.source ?? 'MANUAL');
   return r;
 }
 
@@ -314,12 +312,9 @@ export async function updateLead(
   patch: LeadPatch,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const { tenantId } = actor;
-  let trocouOrigem = false;
   const r = await db.$transaction(async (tx) => {
     const lead = await tx.lead.findFirst({ where: { id: leadId, tenantId, deletedAt: null } });
     if (!lead) return { ok: false as const, message: 'Lead não encontrado.' };
-    trocouOrigem = patch.source !== undefined && patch.source !== lead.source;
-
     const data: Prisma.LeadUncheckedUpdateInput = { updatedById: actor.userId };
     if (patch.name !== undefined) data.name = patch.name.trim();
     if (patch.title !== undefined) data.title = patch.title?.trim() || null;
@@ -346,7 +341,6 @@ export async function updateLead(
     return { ok: true as const };
   });
   // Mudou a origem à mão: a tag do canal acompanha.
-  if (r.ok && trocouOrigem && patch.source) await channelTagForNewLead(db, tenantId, leadId, patch.source);
   return r;
 }
 

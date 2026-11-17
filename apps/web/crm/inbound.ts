@@ -3,6 +3,7 @@ import { readCrmPrefs } from './crm-prefs';
 import { runBotOnInbound } from './bot';
 import { distributeConversation } from './assignment';
 import { applyOrigin, originOf, readAd } from './ad-origin';
+import { captureOrigin } from './origin';
 import { applyCapture } from './capture';
 import { applyProcedureTags } from './auto-tags';
 import { acceptConversation, classifyConversation } from './conversations';
@@ -35,7 +36,7 @@ export async function afterInbound(
 
   const msg = await db.chatMessage.findFirst({
     where: { id: messageId, origin: 'CONTACT' },
-    select: { id: true, textEncrypted: true, ad: true },
+    select: { id: true, textEncrypted: true, ad: true, at: true },
   });
   if (!msg) return;
 
@@ -95,7 +96,11 @@ export async function afterInbound(
         select: { lead: { select: { id: true, wonAt: true, lostAt: true, deletedAt: true } } },
       });
       const lead = c?.lead && !c.lead.wonAt && !c.lead.lostAt && !c.lead.deletedAt ? c.lead : null;
-      if (lead) await applyOrigin(db, tenantId, lead.id, origem, ad);
+      if (lead) {
+        await applyOrigin(db, tenantId, lead.id, origem, ad);
+        // O anúncio exato (id, campanha, assunto), gravado uma vez e nunca trocado pelo que a pessoa escreve.
+        if (ad) await captureOrigin(db, tenantId, lead.id, msg.ad, msg.at);
+      }
     } catch (e) {
       console.error('[crm] origem do anúncio falhou', e instanceof Error ? e.message : e);
     }
