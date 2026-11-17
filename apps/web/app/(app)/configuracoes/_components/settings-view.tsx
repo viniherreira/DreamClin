@@ -18,6 +18,7 @@ import { AgendaRulesPanel } from './agenda-rules-panel';
 import { PaymentMethodsPanel } from './payment-methods-panel';
 import { CostCentersPanel, FinanceAccountsPanel, FinanceCategoriesPanel } from './finance-structure-panels';
 import { FinanceContactsPanel, FinanceMethodsPanel, FinancePermissionsPanel, FinanceRulesPanel } from './finance-rules-panels';
+import { FinanceCommissionPanel } from './finance-commission-panel';
 import type { AgendaRules } from '@/lib/agenda-rules';
 import { TeamPanel } from './team-panel';
 import { PrivacyPanel } from './privacy-panel';
@@ -194,6 +195,7 @@ export function SettingsView({
           { id: 'fin-formas', group: 'Financeiro', label: 'Formas de recebimento e pagamento', panel: <FinanceMethodsPanel /> },
           { id: 'fin-contatos', group: 'Financeiro', label: 'Clientes e fornecedores', panel: <FinanceContactsPanel /> },
           { id: 'fin-regras', group: 'Financeiro', label: 'Regras do financeiro', panel: <FinanceRulesPanel /> },
+          { id: 'fin-comissoes', group: 'Financeiro', label: 'Comissões e repasses', panel: <FinanceCommissionPanel /> },
           { id: 'fin-permissoes', group: 'Financeiro', label: 'Permissões financeiras', panel: <FinancePermissionsPanel /> },
         ]
       : []),

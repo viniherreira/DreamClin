@@ -13,6 +13,8 @@ export interface FinNavAccess {
   reverse: boolean;
   /** Pedidos de liberação esperando resposta. */
   pendingReleases?: number;
+  /** Confere as comissões: vê a aba Comissões. */
+  commissions?: boolean;
   /** Opera o caixa: vê a aba Caixa. */
   cash?: boolean;
   /** Avisos do caixa (aberto há muito tempo, fechado com diferença). */
@@ -30,6 +32,7 @@ export function FinNav({ access }: { access: FinNavAccess }) {
     { href: '/financeiro/carteiras', label: 'Carteiras' },
     { href: '/financeiro/renegociacoes', label: 'Renegociações' },
     { href: '/financeiro/transferencias', label: 'Transferências' },
+    ...(access.commissions ? [{ href: '/financeiro/comissoes', label: 'Comissões' }] : []),
     ...(access.reverse ? [{ href: '/financeiro/estornos', label: 'Estornos' }, { href: '/financeiro/liberacoes', label: 'Liberações', badge: access.pendingReleases }] : []),
   ];
   const ativo = itens.filter((i) => pathname === i.href || pathname.startsWith(`${i.href}/`)).sort((a, b) => b.href.length - a.href.length)[0]?.href;
