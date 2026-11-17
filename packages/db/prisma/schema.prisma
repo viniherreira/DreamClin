@@ -201,6 +201,7 @@ model Tenant {
   commissionEntries     CommissionEntry[]
   bankStatementImports  BankStatementImport[]
   bankStatementLines    BankStatementLine[]
+  collectionDispatches  CollectionDispatch[]
 
   @@map("tenants")
 }
@@ -2727,4 +2728,26 @@ model BankStatementLine {
   @@index([tenantId, accountId, status, date])
   @@index([tenantId, transactionId])
   @@map("bank_statement_lines")
+}
+
+/// Um aviso da régua de cobrança para uma conta: um por passo (3 dias antes, no dia, 5 dias depois…), nunca repetido.
+model CollectionDispatch {
+  id        String   @id @default(cuid())
+  tenantId  String
+  titleId   String
+  patientId String
+  /// "B3" (3 dias antes), "D0" (no dia), "A5" (5 dias depois).
+  step      String
+  /// "SENT", "SKIPPED" ou "FAILED".
+  status    String
+  reason    String?
+  /// A linha do histórico do WhatsApp (entregue, lida, falhou).
+  messageId String?
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, titleId, step])
+  @@index([tenantId, createdAt])
+  @@map("collection_dispatches")
 }

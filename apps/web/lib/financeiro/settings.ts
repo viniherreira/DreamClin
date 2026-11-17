@@ -57,6 +57,11 @@ export interface FinanceSettings {
   /** Categoria e conta da conta a pagar gerada ao faturar as comissões. */
   commissionCategoryId: string | null;
   commissionAccountId: string | null;
+  /** Régua de cobrança pelo WhatsApp: ligada, dias antes, no dia, dias depois. */
+  collectionEnabled: boolean;
+  collectionDaysBefore: number;
+  collectionOnDueDay: boolean;
+  collectionDaysAfter: number[];
 }
 
 export interface CommissionDefault {
@@ -95,6 +100,10 @@ export const DEFAULT_FINANCE_SETTINGS: FinanceSettings = {
   commissionWhen: 'EXECUTION',
   commissionCategoryId: null,
   commissionAccountId: null,
+  collectionEnabled: false,
+  collectionDaysBefore: 3,
+  collectionOnDueDay: true,
+  collectionDaysAfter: [3, 10],
 };
 
 const bool = (v: unknown, d: boolean) => (typeof v === 'boolean' ? v : d);
@@ -140,6 +149,12 @@ export function cleanFinanceSettings(raw: unknown): FinanceSettings {
     commissionWhen: pick(r.commissionWhen, ['EXECUTION', 'BILLING', 'RECEIPT'] as const, d.commissionWhen),
     commissionCategoryId: typeof r.commissionCategoryId === 'string' && r.commissionCategoryId ? r.commissionCategoryId.slice(0, 64) : null,
     commissionAccountId: typeof r.commissionAccountId === 'string' && r.commissionAccountId ? r.commissionAccountId.slice(0, 64) : null,
+    collectionEnabled: bool(r.collectionEnabled, d.collectionEnabled),
+    collectionDaysBefore: Math.round(num(r.collectionDaysBefore, d.collectionDaysBefore, 0, 30)),
+    collectionOnDueDay: bool(r.collectionOnDueDay, d.collectionOnDueDay),
+    collectionDaysAfter: Array.isArray(r.collectionDaysAfter)
+      ? [...new Set(r.collectionDaysAfter.filter((x): x is number => typeof x === 'number' && Number.isInteger(x) && x >= 1 && x <= 90))].sort((a, b) => a - b).slice(0, 3)
+      : d.collectionDaysAfter,
   };
 }
 
