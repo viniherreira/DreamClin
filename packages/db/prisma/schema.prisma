@@ -199,6 +199,8 @@ model Tenant {
   commissionExceptions  CommissionException[]
   transferTypes         TransferType[]
   commissionEntries     CommissionEntry[]
+  bankStatementImports  BankStatementImport[]
+  bankStatementLines    BankStatementLine[]
 
   @@map("tenants")
 }
@@ -2675,4 +2677,54 @@ model CommissionEntry {
   @@index([tenantId, triggerTransactionId])
   @@index([tenantId, payableTitleId])
   @@map("commission_entries")
+}
+
+/// Um extrato bancário importado (OFX ou CSV) para conciliar com os movimentos de uma conta.
+model BankStatementImport {
+  id          String    @id @default(cuid())
+  tenantId    String
+  accountId   String
+  filename    String
+  /// "OFX" ou "CSV".
+  format      String
+  periodFrom  DateTime? @db.Date
+  periodTo    DateTime? @db.Date
+  lineCount   Int       @default(0)
+  createdById String?
+  createdAt   DateTime  @default(now())
+
+  tenant Tenant              @relation(fields: [tenantId], references: [id])
+  lines  BankStatementLine[]
+
+  @@index([tenantId, accountId, createdAt])
+  @@map("bank_statement_imports")
+}
+
+/// Uma linha do extrato: casada com um movimento, virou movimento novo, transferência, ou foi descartada.
+model BankStatementLine {
+  id            String    @id @default(cuid())
+  tenantId      String
+  importId      String
+  accountId     String
+  date          DateTime  @db.Date
+  /// Com sinal: positivo entrou, negativo saiu.
+  amount        Decimal   @db.Decimal(12, 2)
+  description   String
+  /// Identificador da linha no banco (FITID do OFX); evita importar a mesma linha duas vezes.
+  externalId    String?
+  /// "PENDING", "MATCHED", "CREATED", "TRANSFER" ou "DISCARDED".
+  status        String    @default("PENDING")
+  transactionId String?
+  resolvedAt    DateTime?
+  resolvedById  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  tenant          Tenant              @relation(fields: [tenantId], references: [id])
+  statementImport BankStatementImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, accountId, externalId])
+  @@index([tenantId, accountId, status, date])
+  @@index([tenantId, transactionId])
+  @@map("bank_statement_lines")
 }
