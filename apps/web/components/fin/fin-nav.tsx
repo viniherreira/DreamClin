@@ -13,6 +13,8 @@ export interface FinNavAccess {
   reverse: boolean;
   /** Pedidos de liberação esperando resposta. */
   pendingReleases?: number;
+  /** Vê os relatórios gerenciais: a Visão geral e a aba Relatórios. */
+  reports?: boolean;
   /** Confere as comissões: vê a aba Comissões. */
   commissions?: boolean;
   /** Opera o caixa: vê a aba Caixa. */
@@ -24,7 +26,7 @@ export interface FinNavAccess {
 export function FinNav({ access }: { access: FinNavAccess }) {
   const pathname = usePathname();
   const itens: { href: string; label: string; badge?: number }[] = [
-    { href: '/financeiro', label: 'Visão geral' },
+    ...(access.reports ? [{ href: '/financeiro', label: 'Visão geral' }] : []),
     ...(access.cash ? [{ href: '/financeiro/caixa', label: 'Caixa', badge: access.cashAlerts }] : []),
     { href: '/financeiro/a-faturar', label: 'A faturar' },
     { href: '/financeiro/contas', label: 'Contas a receber e a pagar' },
@@ -33,6 +35,7 @@ export function FinNav({ access }: { access: FinNavAccess }) {
     { href: '/financeiro/renegociacoes', label: 'Renegociações' },
     { href: '/financeiro/transferencias', label: 'Transferências' },
     ...(access.commissions ? [{ href: '/financeiro/comissoes', label: 'Comissões' }] : []),
+    ...(access.reports ? [{ href: '/financeiro/relatorios', label: 'Relatórios' }] : []),
     ...(access.reverse ? [{ href: '/financeiro/estornos', label: 'Estornos' }, { href: '/financeiro/liberacoes', label: 'Liberações', badge: access.pendingReleases }] : []),
   ];
   const ativo = itens.filter((i) => pathname === i.href || pathname.startsWith(`${i.href}/`)).sort((a, b) => b.href.length - a.href.length)[0]?.href;

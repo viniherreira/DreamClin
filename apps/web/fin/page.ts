@@ -15,7 +15,7 @@ import type { FinCapability } from '@/lib/financeiro/access';
 export async function finPage(capability: FinCapability): Promise<{
   ctx: FinContext;
   advanced: boolean;
-  nav: { reverse: boolean; pendingReleases: number; cash: boolean; cashAlerts: number; commissions: boolean };
+  nav: { reverse: boolean; pendingReleases: number; cash: boolean; cashAlerts: number; commissions: boolean; reports: boolean };
 }> {
   const ctx = await requireFinance(capability);
   await ensureFinanceSetup(ctx.tenantId);
@@ -27,5 +27,5 @@ export async function finPage(capability: FinCapability): Promise<{
     reverse && (ctx.role === 'OWNER' || ctx.role === 'ADMIN') ? ctx.db.financialRelease.count({ where: { status: 'PENDING', expiresAt: { gt: new Date() } } }) : 0,
     cash ? cashAlertCount(ctx) : 0,
   ]);
-  return { ctx, advanced, nav: { reverse, pendingReleases, cash, cashAlerts, commissions: ctx.can('fin_comissoes') } };
+  return { ctx, advanced, nav: { reverse, pendingReleases, cash, cashAlerts, commissions: ctx.can('fin_comissoes'), reports: ctx.can('fin_relatorios') } };
 }

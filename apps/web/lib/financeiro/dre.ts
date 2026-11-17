@@ -88,7 +88,8 @@ export function buildDre(totals: Partial<Record<DreLine, number>>): DreRow[] {
   let despesas = 0;
   return DRE_ROWS.map((row) => {
     if (row.kind === 'line') {
-      const value = row.sign * Math.abs(totals[row.id] ?? 0);
+      // `|| 0` tira o zero negativo (que sairia como "-R$ 0,00").
+      const value = row.sign * Math.abs(totals[row.id] ?? 0) || 0;
       acumulado += value;
       if (DESPESAS.includes(row.id)) despesas += value;
       return { id: row.id, label: row.label, kind: 'line', symbol: row.sign === 1 ? '+' : '-', value };
