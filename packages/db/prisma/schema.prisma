@@ -202,6 +202,7 @@ model Tenant {
   bankStatementImports  BankStatementImport[]
   bankStatementLines    BankStatementLine[]
   collectionDispatches  CollectionDispatch[]
+  adTopics              AdTopic[]
 
   @@map("tenants")
 }
@@ -1158,6 +1159,18 @@ model Lead {
   /// automações pulam; a conversa continua.
   whatsappOptOut Boolean @default(false)
 
+  /// De onde veio, gravado uma vez no primeiro contato com anúncio (os dados
+  /// que a Meta manda junto, nunca o texto da conversa). Regras em `crm/origin.ts`.
+  originAdId         String?
+  originCampaignId   String?
+  originCampaignName String?
+  originAdName       String?
+  originHeadline     String?
+  originImageUrl     String?
+  /// O assunto do anúncio ("Implante", "Carga imediata"): da tabela ad_topics ou do nome do anúncio.
+  originTopic        String?
+  originAt           DateTime?
+
   /// Campos personalizados da clínica: { [LeadField.id]: valor }. Regras em `crm/custom-fields.ts`.
   fields Json @default("{}")
 
@@ -1193,6 +1206,8 @@ model Lead {
   @@index([tenantId, patientId])
   @@index([tenantId, assignedToId])
   @@index([tenantId, deletedAt])
+  @@index([tenantId, originAdId])
+  @@index([tenantId, originCampaignId])
   @@map("leads")
 }
 
@@ -2750,4 +2765,24 @@ model CollectionDispatch {
   @@unique([tenantId, titleId, step])
   @@index([tenantId, createdAt])
   @@map("collection_dispatches")
+}
+
+/// O assunto de um anúncio ou campanha da Meta, escolhido pela clínica na tela
+/// Anúncios ("Implante", "Prótese"). Vale para os leads que vieram dele.
+model AdTopic {
+  id          String   @id @default(cuid())
+  tenantId    String
+  /// 'AD' (um anúncio) ou 'CAMPAIGN' (a campanha toda).
+  scope       String
+  /// O id do anúncio ou da campanha na Meta.
+  externalId  String
+  topic       String
+  procedureId String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, scope, externalId])
+  @@map("ad_topics")
 }

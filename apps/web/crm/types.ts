@@ -61,6 +61,15 @@ export interface BoardLead {
   fields: FieldValues;
   /** Os campos marcados "mostrar no card", já escritos para a tela. */
   cardFields: { name: string; value: string }[];
+  /** O anúncio de onde veio (gravado no primeiro contato), ou nulo. */
+  origin: { topic: string | null; adName: string | null; campaignName: string | null; headline: string | null } | null;
+}
+
+/** As campanhas, anúncios e assuntos que já trouxeram leads (opções dos filtros). */
+export interface OriginOptions {
+  campaigns: { id: string; name: string }[];
+  ads: { id: string; name: string }[];
+  topics: string[];
 }
 
 export interface BoardFilters {
@@ -71,6 +80,10 @@ export interface BoardFilters {
   /** Tags marcadas: o lead aparece se tiver qualquer uma delas. */
   tags: string[];
   origem: string;
+  /** O anúncio de onde veio (ids da Meta) e o assunto dele (`crm/origin.ts`). */
+  campanha: string;
+  anuncio: string;
+  assunto: string;
   /** Funil. No quadro é sempre o da tela; na lista, vazio = todos. */
   funil: string;
   etapa: string;

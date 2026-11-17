@@ -6,7 +6,7 @@ import { Megaphone, Search, X } from 'lucide-react';
 import { colorClasses } from '@/crm/colors';
 import { formatCents, SOURCE_LABEL } from '@/crm/format';
 import { hasPeriod, NO_PERIOD, periodLabel, periodParams } from '@/crm/period';
-import type { BoardFilters, BoardPerson, BoardPipeline, BoardStage } from '@/crm/types';
+import type { BoardFilters, BoardPerson, BoardPipeline, BoardStage, OriginOptions } from '@/crm/types';
 import { PeriodPicker } from '@/components/crm-period-picker';
 import { countLeadsAction } from '../actions';
 import { fieldFilterParams, type FieldDef } from '@/crm/custom-fields';
@@ -23,6 +23,9 @@ function toParams(f: BoardFilters, extra: FilterParams = {}): FilterParams {
     tarefa: f.tarefa,
     tag: f.tags.join(','),
     origem: f.origem,
+    campanha: f.campanha,
+    anuncio: f.anuncio,
+    assunto: f.assunto,
     funil: f.funil,
     etapa: f.etapa,
     ...periodParams(f.periodo),
@@ -35,7 +38,7 @@ function toParams(f: BoardFilters, extra: FilterParams = {}): FilterParams {
 
 /** O nome do atalho ativo, que aparece no começo da busca como no Kommo. */
 function presetLabel(f: BoardFilters): string {
-  const outros = f.q || f.tags.length || f.campos.length || f.origem || f.etapa || hasPeriod(f.periodo) || f.valorMin != null || f.valorMax != null ||
+  const outros = f.q || f.tags.length || f.campos.length || f.origem || f.campanha || f.anuncio || f.assunto || f.etapa || hasPeriod(f.periodo) || f.valorMin != null || f.valorMax != null ||
     (f.resp !== 'all' && f.resp !== 'me');
   if (outros) return 'Filtro';
   if (f.resp === 'me' && !f.tarefa) return 'Meus leads';
@@ -50,7 +53,7 @@ const reaisCurto = (v: number) => formatCents(Math.round(v * 100)).replace(/,00$
 /** Cada filtro ligado vira uma etiqueta na busca, com o seu "x". */
 function chipsFor(
   f: BoardFilters,
-  ctx: { tags: TagWithCount[]; team: BoardPerson[]; stages: BoardStage[]; pipelines: BoardPipeline[]; fields: FieldDef[] },
+  ctx: { tags: TagWithCount[]; team: BoardPerson[]; stages: BoardStage[]; pipelines: BoardPipeline[]; fields: FieldDef[]; origins?: OriginOptions },
 ): { key: string; label: string; clear: Partial<BoardFilters> }[] {
   const out: { key: string; label: string; clear: Partial<BoardFilters> }[] = [];
   const atalho = presetLabel(f) !== 'Filtro';
@@ -64,6 +67,9 @@ function chipsFor(
     out.push({ key: 'tags', label: nome ? `Tag: ${nome}` : `Tags: ${f.tags.length}`, clear: { tags: [] } });
   }
   if (f.origem) out.push({ key: 'origem', label: `Origem: ${SOURCE_LABEL[f.origem] ?? f.origem}`, clear: { origem: '' } });
+  if (f.assunto) out.push({ key: 'assunto', label: `Assunto: ${f.assunto}`, clear: { assunto: '' } });
+  if (f.campanha) out.push({ key: 'campanha', label: `Campanha: ${ctx.origins?.campaigns.find((c) => c.id === f.campanha)?.name ?? f.campanha}`, clear: { campanha: '' } });
+  if (f.anuncio) out.push({ key: 'anuncio', label: `Anúncio: ${ctx.origins?.ads.find((a) => a.id === f.anuncio)?.name ?? f.anuncio}`, clear: { anuncio: '' } });
   for (const c of f.campos) {
     const nome = ctx.fields.find((d) => d.id === c.id)?.name ?? 'Campo';
     out.push({ key: `campo_${c.id}`, label: `${nome}: ${c.value}`, clear: { campos: f.campos.filter((x) => x.id !== c.id) } });
@@ -104,6 +110,7 @@ export function FilterSearch({
   stages,
   pipelines,
   fields = [],
+  origins,
   canConfig,
   today,
   onApply,
@@ -114,6 +121,8 @@ export function FilterSearch({
   tags: TagWithCount[];
   /** Campos personalizados de lista e sim/não (viram filtro). */
   fields?: FieldDef[];
+  /** Campanhas, anúncios e assuntos que já trouxeram leads. */
+  origins?: OriginOptions;
   team: BoardPerson[];
   stages: BoardStage[];
   /** Só na lista: escolher o funil. */
@@ -195,6 +204,9 @@ export function FilterSearch({
     tarefa: '',
     tags: [],
     origem: '',
+    campanha: '',
+    anuncio: '',
+    assunto: '',
     etapa: '',
     periodo: { ...NO_PERIOD },
     valorMin: null,
@@ -202,7 +214,7 @@ export function FilterSearch({
     campos: [],
   };
   const label = presetLabel(filters);
-  const chips = chipsFor(filters, { tags, team, stages, pipelines, fields });
+  const chips = chipsFor(filters, { tags, team, stages, pipelines, fields, origins });
   const rascunhoComBusca = { ...rascunho, q: busca.trim() };
 
   const presetCls = (ativo: boolean) =>
@@ -362,6 +374,30 @@ export function FilterSearch({
                     <option key={v} value={v}>{l}</option>
                   ))}
                 </Select>
+                {origins && origins.topics.length > 0 && (
+                  <Select label="Assunto do anúncio" id={`${id}-assunto`} value={rascunho.assunto} onChange={(v) => setRascunho({ ...rascunho, assunto: v })}>
+                    <option value="">Todos</option>
+                    {origins.topics.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </Select>
+                )}
+                {origins && origins.campaigns.length > 0 && (
+                  <Select label="Campanha" id={`${id}-campanha`} value={rascunho.campanha} onChange={(v) => setRascunho({ ...rascunho, campanha: v })}>
+                    <option value="">Todas</option>
+                    {origins.campaigns.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </Select>
+                )}
+                {origins && origins.ads.length > 0 && (
+                  <Select label="Anúncio" id={`${id}-anuncio`} value={rascunho.anuncio} onChange={(v) => setRascunho({ ...rascunho, anuncio: v })}>
+                    <option value="">Todos</option>
+                    {origins.ads.map((a) => (
+                      <option key={a.id} value={a.id}>{a.name}</option>
+                    ))}
+                  </Select>
+                )}
                 <Select label="Responsável" id={`${id}-resp`} value={rascunho.resp === 'all' ? '' : rascunho.resp} onChange={(v) => setRascunho({ ...rascunho, resp: v || 'all' })}>
                   <option value="">Todos</option>
                   <option value="me">Eu</option>

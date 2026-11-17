@@ -7,6 +7,8 @@ import { clinicToday } from '@/lib/tz';
 import { loadCrmBasics } from '@/crm/page-data';
 import { classifyPending } from '@/crm/conversations';
 import { Board } from './_components/board';
+import { after } from 'next/server';
+import { backfillOriginsSometimes, originFilterOptions } from '@/crm/origin';
 import { CrmToolbar } from './_components/toolbar';
 import { PipelineEditor } from './_components/pipeline-editor';
 
@@ -39,7 +41,7 @@ export default async function FunilPage({
 
   await classifyPending(ctx.db, ctx.tenantId);
   // Cada coluna vem com os primeiros cards; as contas do topo contam todos.
-  const [leads, stats, counts, porEtapa] = await Promise.all([
+  const [leads, stats, counts, porEtapa, origins] = await Promise.all([
     editando ? Promise.resolve([]) : loadBoardLeads(ctx, filters, funil.columns.map((s) => s.id)),
     editando ? Promise.resolve<Record<string, ColumnStats>>({}) : boardColumnStats(ctx, filters),
     tagCounts(ctx),
@@ -50,7 +52,10 @@ export default async function FunilPage({
           _count: { _all: true },
         })
       : Promise.resolve([]),
+    originFilterOptions(ctx.db),
   ]);
+  // A origem dos leads que chegaram antes desta versão, das mensagens de anúncio (no máximo uma vez por hora).
+  after(() => backfillOriginsSometimes(ctx.tenantId));
 
   if (editando) {
     const totais = new Map(porEtapa.map((r) => [r.stageId, r._count._all]));
@@ -73,6 +78,7 @@ export default async function FunilPage({
         tags={basics.tags.map((t) => ({ ...t, count: counts.get(t.id) ?? 0 }))}
         team={basics.team}
         fields={basics.fields}
+        origins={origins}
         procedures={basics.procedures}
         meId={ctx.userId}
         summary={funil.columns.reduce(

@@ -1,7 +1,6 @@
 import type { TenantPrismaClient } from '@clinicaiq/db';
 import { normalize } from './bot-engine';
 import type { CrmColor } from './defaults';
-import { applyChannelTag } from './auto-tags';
 
 /**
  * De onde veio o contato: anúncio do Facebook, do Instagram ou o site. A Meta
@@ -9,8 +8,9 @@ import { applyChannelTag } from './auto-tags';
  * "Enviar mensagem" num anúncio; o site não manda nada, então vale a frase
  * que o botão do site já escreve ("Vim pelo site").
  *
- * O lead ganha a origem e uma tag (facebook, instagram ou site), e o
- * histórico diz de qual anúncio veio. Chamado por `afterInbound`.
+ * O lead ganha a origem (sem tag: a origem é um campo do lead, e o anúncio
+ * exato fica em `origin.ts`), e o histórico diz de qual anúncio veio.
+ * Chamado por `afterInbound`.
  */
 
 export type OriginKey = 'FACEBOOK' | 'INSTAGRAM' | 'SITE';
@@ -61,7 +61,7 @@ export function readAd(raw: unknown): (AdLite & { body: string | null; imageUrl:
 }
 
 /**
- * Põe a origem no lead: a tag, a origem (anúncio sempre manda; o site só
+ * Põe a origem no lead: a origem (anúncio sempre manda; o site só
  * troca a origem genérica WhatsApp) e, com anúncio, uma nota no histórico.
  */
 export async function applyOrigin(
@@ -75,9 +75,6 @@ export async function applyOrigin(
   if (!lead) return;
   const trocar = key !== 'SITE' ? lead.source !== key : lead.source === 'WHATSAPP' || lead.source === 'MANUAL';
   if (trocar) await db.lead.updateMany({ where: { id: leadId }, data: { source: key } });
-
-  // A tag do canal (a "whatsapp" genérica sai, se estava).
-  await applyChannelTag(db, tenantId, leadId, key);
 
   if (ad) {
     const titulo = ad.headline ? ` “${ad.headline.slice(0, 120)}”` : '';

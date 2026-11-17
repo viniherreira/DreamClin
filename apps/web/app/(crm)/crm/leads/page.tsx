@@ -17,6 +17,7 @@ import { loadCrmBasics } from '@/crm/page-data';
 import { COLUMNS_COOKIE, parseColumns } from '@/crm/list-columns';
 import { hasPeriod } from '@/crm/period';
 import { CrmToolbar } from '../_components/toolbar';
+import { originFilterOptions } from '@/crm/origin';
 import { LeadTable } from './_components/lead-table';
 import { AutoRefresh } from '@/components/auto-refresh';
 
@@ -44,12 +45,13 @@ export default async function LeadsPage({
   const { status: pedida, order, page } = parseListParams(sp);
   const status = effectiveStatus(pedida, filters);
   const porFechamento = filters.periodo.field === 'fechado' && hasPeriod(filters.periodo);
-  const [basics, leads, total, counts, jar] = await Promise.all([
+  const [basics, leads, total, counts, jar, origins] = await Promise.all([
     loadCrmBasics(ctx),
     loadLeadList(ctx, filters, status, order, new Date(), page),
     countLeads(ctx, filters, statusWhere(status)),
     tagCounts(ctx),
     cookies(),
+    originFilterOptions(ctx.db),
   ]);
   const colunas = parseColumns(jar.get(COLUMNS_COOKIE)?.value, basics.fields.map((f) => f.id));
 
@@ -75,6 +77,7 @@ export default async function LeadsPage({
         tags={basics.tags.map((t) => ({ ...t, count: counts.get(t.id) ?? 0 }))}
         team={basics.team}
         fields={basics.fields}
+        origins={origins}
         procedures={basics.procedures}
         meId={ctx.userId}
         summary={{ count: total, valueCents: leads.reduce((s, l) => s + (l.valueCents ?? 0), 0) }}

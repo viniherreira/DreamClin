@@ -3,9 +3,10 @@
 import Link from 'next/link';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { CalendarDays, Check, ChevronRight, FileText, GripVertical, MoreHorizontal, Trash2, X } from 'lucide-react';
+import { CalendarDays, Check, ChevronRight, FileText, GripVertical, Megaphone, MoreHorizontal, Trash2, X } from 'lucide-react';
 import { colorClasses } from '@/crm/colors';
-import { formatCents, formatDue, formatWallDateTime, initials, timeAgo } from '@/crm/format';
+import { formatCents, formatDue, formatWallDateTime, initials, SOURCE_LABEL, timeAgo } from '@/crm/format';
+import { originShort } from '@/crm/origin-rules';
 import type { BoardLead, BoardStage } from '@/crm/types';
 
 /** "09/10" neste ano, "09/10/2025" nos outros — sobra espaço para o nome no card. */
@@ -118,6 +119,7 @@ export function LeadCard({
               {c.name}: <span className="text-foreground/90">{c.value}</span>
             </p>
           ))}
+          {lead.origin && <OriginLine lead={lead} />}
         </div>
       </div>
 
@@ -169,6 +171,25 @@ export function LeadCard({
         </span>
       </div>
     </article>
+  );
+}
+
+/** De qual anúncio veio: o assunto (ou o nome do anúncio), com a campanha ao passar o mouse. */
+function OriginLine({ lead }: { lead: BoardLead }) {
+  const o = lead.origin!;
+  const curto = originShort(o);
+  const canal = lead.source === 'INSTAGRAM' || lead.source === 'FACEBOOK' ? SOURCE_LABEL[lead.source] : null;
+  const detalhe = [o.campaignName && `Campanha: ${o.campaignName}`, o.adName && `Anúncio: ${o.adName}`].filter(Boolean).join(' · ');
+  return (
+    <p className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground" title={detalhe || undefined}>
+      <Megaphone className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+      {/* O assunto primeiro: no card estreito, é o que não pode ser cortado. */}
+      <span className="truncate">
+        <span className="sr-only">Veio do anúncio: </span>
+        {curto ? <span className="font-medium text-foreground/90">{curto}</span> : 'Anúncio'}
+        {canal && <> · {canal}</>}
+      </span>
+    </p>
   );
 }
 

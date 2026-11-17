@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { Download, KanbanSquare, List, Megaphone, MoreHorizontal, Pencil, Plus, Tags, Upload, Zap } from 'lucide-react';
-import type { BoardFilters, BoardPerson, BoardPipeline } from '@/crm/types';
+import type { BoardFilters, BoardPerson, BoardPipeline, OriginOptions } from '@/crm/types';
 import { formatCents } from '@/crm/format';
 import { NewLeadModal } from './new-lead-modal';
 import { PipelineMenu } from './pipeline-menu';
@@ -34,7 +34,10 @@ export function CrmToolbar({
   canExport = canConfig,
   today,
   fields = [],
+  origins,
 }: {
+  /** Campanhas, anúncios e assuntos que já trouxeram leads (filtros de origem). */
+  origins?: OriginOptions;
   /** "Exportar" no quadro de permissões. */
   canExport?: boolean;
   view: 'quadro' | 'lista';
@@ -125,6 +128,7 @@ export function CrmToolbar({
         stages={currentPipeline ? currentPipeline.columns : pipelines.flatMap((p) => p.columns.map((s) => ({ ...s, name: pipelines.length > 1 ? `${p.name} · ${s.name}` : s.name })))}
         pipelines={view === 'lista' ? pipelines : []}
         fields={fields.filter((f) => isFilterable(f.type))}
+        origins={origins}
         canConfig={canConfig}
         today={today}
         onApply={(next) => {

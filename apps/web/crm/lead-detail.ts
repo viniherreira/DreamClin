@@ -16,6 +16,8 @@ export interface LeadDetail {
   phoneMasked: string;
   email: string | null;
   source: string;
+  /** O anúncio de onde veio, gravado no primeiro contato (não muda com a conversa). */
+  origin: { adId: string | null; topic: string | null; adName: string | null; campaignName: string | null; headline: string | null; imageUrl: string | null; at: string } | null;
   stageId: string;
   stageEnteredAt: string;
   interestProcedureId: string | null;
@@ -86,6 +88,9 @@ export async function loadLeadDetail(ctx: CrmContext, leadId: string, now: Date 
     phoneMasked: maskPhone(decryptPhone(lead.phoneEncrypted, ctx.tenantId)),
     email: lead.email,
     source: lead.source,
+    origin: lead.originAt
+      ? { adId: lead.originAdId, topic: lead.originTopic, adName: lead.originAdName, campaignName: lead.originCampaignName, headline: lead.originHeadline, imageUrl: lead.originImageUrl, at: lead.originAt.toISOString() }
+      : null,
     stageId: lead.stageId,
     stageEnteredAt: lead.stageEnteredAt.toISOString(),
     interestProcedureId: lead.interestProcedureId,

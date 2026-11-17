@@ -32,6 +32,9 @@ export function leadWhere(
   else if (f.resp !== 'all') where.assignedToId = f.resp;
   if (f.tags.length) where.tags = { some: { tagId: { in: f.tags } } };
   if (f.origem) where.source = f.origem as LeadSource;
+  if (f.campanha) where.originCampaignId = f.campanha;
+  if (f.anuncio) where.originAdId = f.anuncio;
+  if (f.assunto) where.originTopic = f.assunto;
   if (f.etapa) where.stageId = f.etapa;
   else if (f.funil) where.stage = { pipelineId: f.funil };
   const periodo = periodWhere(f.periodo, clinicDay(now));
@@ -105,6 +108,7 @@ export async function toBoardLeads(ctx: CrmContext, rows: LeadRow[], now: Date =
       wonAt: r.wonAt?.toISOString() ?? null,
       lostAt: r.lostAt?.toISOString() ?? null,
       fields,
+      origin: r.originAt ? { topic: r.originTopic, adName: r.originAdName, campaignName: r.originCampaignName, headline: r.originHeadline } : null,
       cardFields: noCard.flatMap((d) => {
         const value = formatFieldValue(d, fields[d.id]);
         return value ? [{ name: d.name, value }] : [];

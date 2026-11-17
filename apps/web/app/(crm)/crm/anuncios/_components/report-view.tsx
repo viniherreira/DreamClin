@@ -23,7 +23,10 @@ export function AdsReportView({
   accountName,
   range,
   fetchedAt,
+  extra,
 }: {
+  /** O que vem depois dos números (o assunto de cada anúncio). */
+  extra?: React.ReactNode;
   report: AdsReport;
   breakdowns: AdsBreakdowns;
   period: ReportPeriodKey;
@@ -269,6 +272,7 @@ export function AdsReportView({
         Conta quem chegou pelo botão “Enviar mensagem” do anúncio. Quem viu o anúncio e chamou depois por conta própria aparece como WhatsApp
         direto. Agendou, compareceu e fechou vêm das etapas do funil do CRM. Idade, gênero, lugar e hora são informados pela Meta.
       </p>
+      {extra}
     </ReportFrame>
   );
 }
