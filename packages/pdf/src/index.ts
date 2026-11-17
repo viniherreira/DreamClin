@@ -3,9 +3,11 @@ import { renderToBuffer } from '@react-pdf/renderer';
 import { QuoteDocument, type QuoteDocumentProps } from './quote-template';
 import { ReceiptDocument, type ReceiptDocumentProps } from './receipt-template';
 import { ContractDocument, type ContractDocumentProps } from './contract-template';
+import { CouponDocument, type CouponDocumentProps } from './receipt-coupon';
+import { CashReportDocument, type CashReportProps } from './cash-report';
 
-export { QuoteDocument, ReceiptDocument, ContractDocument };
-export type { QuoteDocumentProps, ReceiptDocumentProps, ContractDocumentProps };
+export { QuoteDocument, ReceiptDocument, ContractDocument, CouponDocument, CashReportDocument };
+export type { QuoteDocumentProps, ReceiptDocumentProps, ContractDocumentProps, CouponDocumentProps, CashReportProps };
 export type { ClinicInfo, Person, TreatmentItem } from './theme';
 
 // `renderToBuffer` is typed for a root <Document>; every template renders one,
@@ -25,4 +27,14 @@ export async function renderReceiptPdf(props: ReceiptDocumentProps): Promise<Uin
 /** Renders a service contract (built from a quote) to PDF bytes. */
 export async function renderContractPdf(props: ContractDocumentProps): Promise<Uint8Array> {
   return renderToBuffer(createElement(ContractDocument, props) as never);
+}
+
+/** Renders a receipt as an 80 mm thermal-printer coupon. */
+export async function renderCouponPdf(props: CouponDocumentProps): Promise<Uint8Array> {
+  return renderToBuffer(createElement(CouponDocument, props) as never);
+}
+
+/** Renders the cash register report (closed, or partial while open). */
+export async function renderCashReportPdf(props: CashReportProps): Promise<Uint8Array> {
+  return renderToBuffer(createElement(CashReportDocument, props) as never);
 }

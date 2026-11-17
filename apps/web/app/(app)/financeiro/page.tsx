@@ -9,6 +9,11 @@ import { FinanceFilters } from './_components/finance-filters';
 import { FinancialDetail } from './_components/financial-detail';
 
 import { requireCapability } from '@/lib/guard';
+import { FinNav } from '@/components/fin/fin-nav';
+import { finContext } from '@/fin/guard';
+import { finPage } from '@/fin/page';
+import { redirect } from 'next/navigation';
+import { OverviewView } from './_components/overview-view';
 export const metadata = { title: 'Financeiro' };
 
 const TYPES: ReportType[] = ['recebimentos', 'orcamentos', 'agendamentos'];
@@ -37,10 +42,38 @@ interface PageProps {
  * do topo valem para os dois, e cada número do resumo abre o detalhe dele.
  */
 export default async function FinanceiroPage({ searchParams }: PageProps) {
-  await requireCapability('financeiro');
-
   const sp = await searchParams;
   const one = (k: string) => (typeof sp[k] === 'string' ? (sp[k] as string) : undefined);
+
+  // Financeiro completo ligado: a visão geral nova (o relatório antigo continua em ?antigo=1).
+  const fin = await finContext();
+  if (fin?.can('fin_ver') && one('antigo') !== '1') {
+    // A visão geral é da gestão; a recepção começa o dia pelo caixa.
+    if (!fin.can('fin_relatorios')) redirect(fin.can('fin_caixa') ? '/financeiro/caixa' : '/financeiro/contas');
+    const { nav } = await finPage('fin_relatorios');
+    return (
+      <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
+        <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Visão geral</h1>
+            <p className="mt-1 text-sm text-muted-foreground">Como está o dinheiro da clínica.</p>
+          </div>
+          <div className="flex gap-2">
+            <Link href="/financeiro/relatorios" className="btn-outline btn-md">
+              Relatórios
+            </Link>
+            <Link href="/financeiro?antigo=1" className="btn-ghost btn-md">
+              Relatório detalhado antigo
+            </Link>
+          </div>
+        </header>
+        <FinNav access={nav} />
+        <OverviewView today={clinicToday()} />
+      </div>
+    );
+  }
+  await requireCapability('financeiro');
+  const abas = fin?.can('fin_ver') ? { reverse: fin.can('fin_estornar'), cash: fin.can('fin_caixa'), reports: fin.can('fin_relatorios') } : null;
 
   const today = clinicToday();
   const from = DATE_RE.test(one('from') ?? '') ? (one('from') as string) : `${today.slice(0, 8)}01`;
@@ -76,6 +109,11 @@ export default async function FinanceiroPage({ searchParams }: PageProps) {
           <span className="print:hidden"> · resumo, recebimentos, orçamentos e agendamentos do período</span>
         </p>
       </header>
+      {abas && (
+        <div className="print:hidden">
+          <FinNav access={abas} />
+        </div>
+      )}
 
       <div className="print:hidden">
         <FinanceFilters

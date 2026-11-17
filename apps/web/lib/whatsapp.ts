@@ -778,3 +778,41 @@ export async function applyMessageStatus(
     },
   });
 }
+
+// ─── Outbound: régua de cobrança (financeiro completo) ───────────────────────
+
+export interface CollectionSend {
+  tenantId: string;
+  patientId: string;
+  /** Número já no formato da Meta (55 + DDD + número). */
+  to: string;
+  templateName: string;
+  language: string;
+  params: string[];
+  /** O texto como o paciente lê, para o histórico. */
+  content: string;
+}
+
+/**
+ * Manda um aviso da régua de cobrança pelo modelo aprovado e deixa a linha no
+ * histórico do WhatsApp (enviada, entregue, lida ou falhou, com o motivo).
+ * Devolve o id da linha do histórico.
+ */
+export async function sendCollectionTemplate(m: CollectionSend): Promise<{ ok: boolean; messageId: string | null; error?: string }> {
+  const account = await activeCloudAccount(m.tenantId);
+  if (!account) {
+    await recordSkip('not-configured', { tenantId: m.tenantId, patientId: m.patientId, templateName: m.templateName, content: m.content });
+    return { ok: false, messageId: null, error: 'not-configured' };
+  }
+  const rowId = await openOutboxRow({ tenantId: m.tenantId, patientId: m.patientId, templateName: m.templateName, content: m.content });
+  if (!rowId) return { ok: false, messageId: null, error: 'outbox-write-failed' };
+  let result: SendMessageResult;
+  try {
+    const r = await cloudClient(account).sendTemplate(m.to, m.templateName, m.language, m.params);
+    result = { success: true, messageId: r.id };
+  } catch (e) {
+    result = { success: false, error: e instanceof CloudApiError ? e.userMessage : 'send-failed' };
+  }
+  await closeAttempt(rowId, result);
+  return { ok: result.success, messageId: rowId, error: result.success ? undefined : result.error };
+}

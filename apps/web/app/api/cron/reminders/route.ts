@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { runFinanceRoutine } from '@/fin/routine';
 import { prisma } from '@clinicaiq/db';
 import { bearerMatches } from '@/lib/bearer';
 import { reconcileSubscriptions } from '@/lib/subscription-sync';
@@ -55,6 +56,14 @@ export async function GET(req: Request) {
   });
   for (const t of emAnalise) await refreshAgendaTemplates(t.tenantId).catch(() => undefined);
 
+  // Rotina do financeiro (lançamentos recorrentes). Num try próprio: não pode segurar os lembretes.
+  let finance: Awaited<ReturnType<typeof runFinanceRoutine>> | { error: string };
+  try {
+    finance = await runFinanceRoutine();
+  } catch {
+    finance = { error: 'falhou' };
+  }
+
   const porDia = await sendDueReminders();
 
   return NextResponse.json({
@@ -64,5 +73,6 @@ export async function GET(req: Request) {
     sent: porDia.reduce((n, d) => n + d.sent, 0),
     failed: porDia.reduce((n, d) => n + d.failed, 0),
     subscriptions,
+    finance,
   });
 }

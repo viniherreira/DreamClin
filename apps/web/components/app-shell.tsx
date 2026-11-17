@@ -2,6 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { prisma } from '@clinicaiq/db';
 import { AppSidebar } from '@/components/app-sidebar';
+import { financeEnabled } from '@/fin/flag';
 import { AppHeader } from '@/components/app-header';
 import { SubscriptionBanner } from '@/components/subscription-banner';
 import type { Space } from '@/components/module-switcher';
@@ -65,6 +66,7 @@ export async function AppShell({
   const seat = Boolean(me?.crmSeat) || modules.crmWholeTeam;
   guard?.({ role, crm: modules.crm, seat, clinic: modules.clinic });
   const crmOnly = !modules.clinic;
+  const finance = space === 'clinic' && (await financeEnabled(tenant.id));
 
   // O seletor só aparece para quem consegue entrar no CRM.
   const showSwitcher = modules.crm && seat && can(role, 'crm');
@@ -108,6 +110,7 @@ export async function AppShell({
         counts={{ '/crm/conversas': unread }}
         crmOnly={crmOnly}
         crmManager={crmManager}
+        finance={finance}
       />
       <div className="flex min-w-0 flex-1 flex-col">
         <AppHeader

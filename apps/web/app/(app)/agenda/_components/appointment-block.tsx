@@ -1,7 +1,8 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Check, CheckCheck, X, Ban, Clock, RotateCw, Armchair, Stethoscope } from 'lucide-react';
+import { Check, CheckCheck, X, Ban, Clock, RotateCw, Armchair, Stethoscope, DollarSign } from 'lucide-react';
+import { BILLING_LABEL, BILLING_TONE, type BillingStatus } from '@/lib/financeiro/billing';
 import { wallClockTime, wallClockMinutes } from '@/lib/tz';
 import { stageOf, STAGE_LABELS } from '@/lib/appointment-flow';
 import { labelClasses } from '@/lib/label-colors';
@@ -25,7 +26,16 @@ interface Appointment {
 interface AppointmentBlockProps {
   appointment: Appointment;
   onClick?: (id: string) => void;
+  /** Situação financeira (financeiro completo): o cifrão colorido no card. */
+  billing?: BillingStatus;
 }
+
+const CIFRAO: Record<'gray' | 'amber' | 'blue' | 'green', string> = {
+  gray: 'text-slate-400 dark:text-slate-500',
+  amber: 'text-amber-600 dark:text-amber-400',
+  blue: 'text-blue-600 dark:text-blue-400',
+  green: 'text-emerald-600 dark:text-emerald-400',
+};
 
 const STATUS_ICON = {
   SCHEDULED: Clock,
@@ -38,7 +48,7 @@ const STATUS_ICON = {
   RESCHEDULED: RotateCw,
 } as const;
 
-export function AppointmentBlock({ appointment, onClick }: AppointmentBlockProps) {
+export function AppointmentBlock({ appointment, onClick, billing }: AppointmentBlockProps) {
   // Datas guardadas pelo texto: um objeto novo a cada desenho refaria a conta à toa.
   const start = useMemo(() => new Date(appointment.startTime), [appointment.startTime]);
   const end = useMemo(() => new Date(appointment.endTime), [appointment.endTime]);
@@ -75,7 +85,7 @@ export function AppointmentBlock({ appointment, onClick }: AppointmentBlockProps
         borderLeftWidth: 3,
         borderLeftColor: appointment.professionalColor ?? '#94a3b8',
       }}
-      aria-label={`${timeLabel} ${appointment.patient.name}, ${appointment.professional.name}, ${statusLabel}${label ? `, rótulo ${label.name}` : ''}`}
+      aria-label={`${timeLabel} ${appointment.patient.name}, ${appointment.professional.name}, ${statusLabel}${label ? `, rótulo ${label.name}` : ''}${billing ? `, financeiro: ${BILLING_LABEL[billing]}` : ''}`}
     >
       <div className="flex min-w-0 items-center gap-1">
         <Icon className={`h-3.5 w-3.5 shrink-0 ${style.icon}`} aria-hidden="true" />
@@ -83,6 +93,9 @@ export function AppointmentBlock({ appointment, onClick }: AppointmentBlockProps
         <span className={`truncate text-xs font-semibold leading-tight ${isCancelled ? 'line-through' : ''}`}>
           {appointment.patient.name}
         </span>
+        {billing && billing !== 'NONE' && (
+          <DollarSign className={`h-3.5 w-3.5 shrink-0 ${label ? '' : 'ml-auto'} ${CIFRAO[BILLING_TONE[billing]]}`} aria-hidden="true" />
+        )}
         {label && (
           <span className={`ml-auto shrink-0 rounded px-1 text-[10px] font-semibold leading-4 ${labelClasses(label.color).chip}`} aria-hidden="true">
             {label.name}

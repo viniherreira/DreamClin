@@ -75,6 +75,7 @@ export function FinancialSection({
     null,
   );
   const [isDeleting, startDelete] = useTransition();
+  const [erroExcluir, setErroExcluir] = useState('');
 
   useEffect(() => {
     if (state?.success) {
@@ -256,6 +257,11 @@ export function FinancialSection({
           </form>
         )}
 
+        {erroExcluir && (
+          <p role="alert" className="px-4 pt-3 text-sm text-destructive sm:px-5">
+            {erroExcluir}
+          </p>
+        )}
         {payments.length === 0 ? (
           <p className="px-4 py-8 text-center text-sm text-muted-foreground">Nenhum pagamento registrado.</p>
         ) : (
@@ -292,7 +298,7 @@ export function FinancialSection({
                 <button
                   type="button"
                   disabled={isDeleting}
-                  onClick={() => startDelete(async () => { await deletePayment(p.id, patientId); router.refresh(); })}
+                  onClick={() => startDelete(async () => { const r = await deletePayment(p.id, patientId); setErroExcluir(r?.message ?? ''); router.refresh(); })}
                   aria-label={`Excluir pagamento de ${brl(p.amount)}`}
                   className="rounded-md p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                 >

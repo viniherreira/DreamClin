@@ -36,7 +36,31 @@ export type Capability =
   /** CRM: leads, funil, tarefas e conversão em paciente. */
   | 'crm'
   /** CRM: etapas do funil, tags, motivos de perda e excluir lead. */
-  | 'crm_config';
+  | 'crm_config'
+  // ── Financeiro completo (spec 2026-11-16). A capacidade `financeiro` acima
+  // continua valendo para as telas antigas; estas são as do módulo novo.
+  /** Ver contas a receber e a pagar e as movimentações. */
+  | 'fin_ver'
+  /** Receber: na agenda, no orçamento, na ficha e nas contas. */
+  | 'fin_receber'
+  /** Lançar e pagar contas a pagar. */
+  | 'fin_pagar'
+  /** Abrir, movimentar e fechar o próprio caixa. */
+  | 'fin_caixa'
+  /** Ver e fechar o caixa de outra pessoa. */
+  | 'fin_caixas_outros'
+  /** Estornar pagamento e cancelar título. */
+  | 'fin_estornar'
+  /** Renegociar dívida. */
+  | 'fin_renegociar'
+  /** Conferir, aprovar e faturar comissões. */
+  | 'fin_comissoes'
+  /** Ver as próprias comissões (o profissional, se a clínica liberar). */
+  | 'fin_comissoes_proprias'
+  /** Relatórios gerenciais: visão geral, fluxo de caixa e DRE. */
+  | 'fin_relatorios'
+  /** Configurações do financeiro: contas, categorias, formas, regras. */
+  | 'fin_config';
 
 /**
  * O que cada papel alcança.
@@ -74,11 +98,21 @@ const DIA_A_DIA: readonly Capability[] = [
 const CRM: readonly Capability[] = ['crm'];
 const CRM_ADMIN: readonly Capability[] = ['crm', 'crm_config'];
 
+/**
+ * Financeiro novo. A recepção trabalha sem depender do dono (recebe, lança,
+ * opera o caixa, renegocia); fica trancado o que é difícil de desfazer ou é
+ * de gestão: estorno, caixa dos outros, comissões, relatórios e configuração.
+ * O profissional só vê as próprias comissões, e só se a clínica liberar
+ * (`Tenant.settings.finance.professionalSeesCommissions`, conferido em `fin/guard.ts`).
+ */
+const FIN_RECEPCAO: readonly Capability[] = ['fin_ver', 'fin_receber', 'fin_pagar', 'fin_caixa', 'fin_renegociar', 'fin_comissoes_proprias'];
+const FIN_GESTAO: readonly Capability[] = [...FIN_RECEPCAO, 'fin_caixas_outros', 'fin_estornar', 'fin_comissoes', 'fin_relatorios', 'fin_config'];
+
 const GRANTS: Record<Role, readonly Capability[]> = {
-  OWNER: [...DIA_A_DIA, ...ADMIN_ONLY, ...CRM_ADMIN],
-  ADMIN: [...DIA_A_DIA, ...ADMIN_ONLY, ...CRM_ADMIN],
-  RECEPTIONIST: [...DIA_A_DIA, ...CRM],
-  PROFESSIONAL: [...DIA_A_DIA, ...CRM],
+  OWNER: [...DIA_A_DIA, ...ADMIN_ONLY, ...CRM_ADMIN, ...FIN_GESTAO],
+  ADMIN: [...DIA_A_DIA, ...ADMIN_ONLY, ...CRM_ADMIN, ...FIN_GESTAO],
+  RECEPTIONIST: [...DIA_A_DIA, ...CRM, ...FIN_RECEPCAO],
+  PROFESSIONAL: [...DIA_A_DIA, ...CRM, 'fin_comissoes_proprias'],
 };
 
 /**
@@ -112,6 +146,17 @@ const LABEL: Record<Capability, string> = {
   privacidade: 'os dados de privacidade e o histórico de alterações',
   crm: 'o CRM',
   crm_config: 'a configuração do funil do CRM',
+  fin_ver: 'as contas e movimentações do financeiro',
+  fin_receber: 'os recebimentos',
+  fin_pagar: 'as contas a pagar',
+  fin_caixa: 'o caixa',
+  fin_caixas_outros: 'o caixa de outras pessoas',
+  fin_estornar: 'estornos e cancelamentos',
+  fin_renegociar: 'as renegociações',
+  fin_comissoes: 'o faturamento de comissões',
+  fin_comissoes_proprias: 'as comissões',
+  fin_relatorios: 'os relatórios gerenciais do financeiro',
+  fin_config: 'as configurações do financeiro',
 };
 
 export function capabilityDeniedMessage(capability: Capability): string {

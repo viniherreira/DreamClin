@@ -60,6 +60,8 @@ export async function notifyPatientCreated(tenantId: string, patientId: string):
 const QUOTE_OPEN = ['DRAFT', 'SENT', 'VIEWED'] as const;
 
 async function applyEvent(tenantId: string, event: ClinicEvent) {
+  // Pagamento recebido ainda não move o lead: nenhuma automação usa este aviso por enquanto.
+  if (event.type === 'payment.received') return;
   const db = getTenantClient(tenantId);
   const refId = 'appointmentId' in event ? event.appointmentId : event.quoteId;
   const ref = 'appointmentId' in event ? { appointmentId: refId } : { quoteId: refId };

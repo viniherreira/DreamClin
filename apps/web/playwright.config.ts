@@ -4,6 +4,9 @@ import { loadTestEnv } from './e2e/support/env';
 loadTestEnv();
 
 const OWNER_STATE = 'e2e/.auth/owner.json';
+// Para apontar os testes a um servidor que já está de pé em outra porta
+// (ex.: E2E_BASE_URL=http://localhost:3200). Sem ela, o padrão de sempre.
+const BASE_URL = process.env.E2E_BASE_URL ?? 'http://localhost:3000';
 
 export default defineConfig({
   testDir: './e2e',
@@ -21,7 +24,7 @@ export default defineConfig({
   timeout: 90_000,
   expect: { timeout: 20_000 },
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: BASE_URL,
     trace: 'on-first-retry',
   },
   projects: [
@@ -47,7 +50,7 @@ export default defineConfig({
   ],
   webServer: {
     command: 'pnpm dev',
-    url: 'http://localhost:3000',
+    url: BASE_URL,
     reuseExistingServer: !process.env.CI,
     // O primeiro build do Turbopack numa máquina fria passa fácil do minuto.
     timeout: 180_000,

@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Armchair, Stethoscope } from 'lucide-react';
+import { Armchair, DollarSign, Stethoscope } from 'lucide-react';
+import { BILLING_LABEL, owesMoney, type BillingStatus } from '@/lib/financeiro/billing';
 import { stageOf, waitingMinutes } from '@/lib/appointment-flow';
 import { wallClockTime } from '@/lib/tz';
 
@@ -25,7 +26,7 @@ function hojeNaClinica() {
  * tempo espera) e quem está em atendimento. Clicar abre os detalhes, onde a
  * recepção chama o paciente para entrar.
  */
-export function WaitingRoom({ appointments, onOpen }: { appointments: Item[]; onOpen: (id: string) => void }) {
+export function WaitingRoom({ appointments, onOpen, billing }: { appointments: Item[]; onOpen: (id: string) => void; billing?: Record<string, BillingStatus> | null }) {
   const [agora, setAgora] = useState(() => new Date());
   useEffect(() => {
     const t = setInterval(() => setAgora(new Date()), 30_000);
@@ -66,6 +67,11 @@ export function WaitingRoom({ appointments, onOpen }: { appointments: Item[]; on
                     <span className="block truncate text-[11px] text-muted-foreground">
                       {wallClockTime(a.startTime)} · {a.professional.name}
                     </span>
+                    {owesMoney(billing?.[a.id]) && (
+                      <span className="mt-0.5 inline-flex items-center gap-0.5 text-[11px] font-medium text-amber-800 dark:text-amber-300">
+                        <DollarSign className="h-3 w-3" aria-hidden="true" /> {BILLING_LABEL[billing![a.id]]}
+                      </span>
+                    )}
                   </span>
                   <span
                     className={`shrink-0 text-xs font-semibold tabular-nums ${min >= 20 ? 'text-red-700 dark:text-red-400' : min >= 10 ? 'text-amber-800 dark:text-amber-300' : 'text-muted-foreground'}`}

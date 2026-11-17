@@ -23,6 +23,8 @@ import { requireCapability } from '@/lib/guard';
 import { cloudAccountSummary } from '@/lib/cloud-account-admin';
 import { can } from '@/lib/permissions';
 import { getTenantModules } from '@/lib/access';
+import { finContext } from '@/fin/guard';
+import { financeAdvanced } from '@/fin/flag';
 export const metadata = { title: 'Configurações' };
 
 export default async function ConfiguracoesPage() {
@@ -35,6 +37,9 @@ export default async function ConfiguracoesPage() {
   const podeEquipe = can(role, 'equipe');
   const podePlano = can(role, 'planos');
   const podePrivacidade = can(role, 'privacidade');
+  // Financeiro completo: as seções novas só para a clínica com a bandeira e para quem configura.
+  const fin = await finContext();
+  const finance = fin?.can('fin_config') ? { advanced: await financeAdvanced(tenantId) } : null;
 
   // As abas de administração nem são buscadas para quem não vai vê-las. Esconder
   // a aba mas mandar a lista da equipe junto no HTML seria esconder com a mão.
@@ -79,6 +84,7 @@ export default async function ConfiguracoesPage() {
       podePlano={podePlano}
       podePrivacidade={podePrivacidade}
       agenda={modules.clinic}
+      finance={finance}
       // Renderizado aqui, no servidor, e entregue pronto para a aba: busca
       // cobranças no Asaas e não pode virar componente de cliente. O Suspense
       // impede que a rede do Asaas segure as outras cinco abas.

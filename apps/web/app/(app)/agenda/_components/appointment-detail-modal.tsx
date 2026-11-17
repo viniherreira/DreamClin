@@ -15,6 +15,8 @@ import { ACTION_LABELS, STAGE_LABELS, actionsFor, stageOf, waitingMinutes, type 
 import { labelClasses } from '@/lib/label-colors';
 import { advanceAppointment, deleteAppointment, getAppointmentDetail, setAppointmentLabel } from '../actions';
 import { STATUS_STYLES, TYPE_LABELS } from './constants';
+import { AppointmentFinanceTab } from './appointment-finance-tab';
+import { clinicToday } from '@/lib/tz';
 
 type Detail = NonNullable<Awaited<ReturnType<typeof getAppointmentDetail>>>;
 type LabelOption = { id: string; name: string; color: string };
@@ -75,6 +77,7 @@ export function AppointmentDetailModal({ open, appointmentId, labels, onClose, o
   const [aviso, setAviso] = useState('');
   const [cancelando, setCancelando] = useState(false);
   const [motivo, setMotivo] = useState('');
+  const [sugereReceber, setSugereReceber] = useState(false);
   const [pending, start] = useTransition();
 
   const carregar = useCallback(async (id: string) => {
@@ -93,6 +96,7 @@ export function AppointmentDetailModal({ open, appointmentId, labels, onClose, o
     setAba('detalhes');
     setCancelando(false);
     setMotivo('');
+    setSugereReceber(false);
     void carregar(appointmentId);
   }, [open, appointmentId, carregar]);
 
@@ -119,6 +123,11 @@ export function AppointmentDetailModal({ open, appointmentId, labels, onClose, o
       // Faltou e cancelado encerram o dia do paciente: a janela fecha e o resultado aparece na agenda.
       if (action === 'miss' || action === 'cancel') return onClose();
       await carregar(appointmentId);
+      // Terminou com valor em aberto: abre o Financeiro já sugerindo "Receber agora".
+      if (action === 'finish' && r.openCents && r.openCents > 0) {
+        setSugereReceber(true);
+        setAba('financeiro');
+      }
     });
   }
 
@@ -139,7 +148,11 @@ export function AppointmentDetailModal({ open, appointmentId, labels, onClose, o
     const quem = detail?.patient.name ? ` de ${detail.patient.name}` : '';
     if (!confirm(`Excluir o agendamento${quem}? Ele some da agenda e não dá para desfazer.`)) return;
     start(async () => {
-      await deleteAppointment(appointmentId);
+      const r = await deleteAppointment(appointmentId);
+      if (!r.success && 'message' in r && r.message) {
+        setAba('detalhes');
+        return setErro(r.message);
+      }
       onChanged();
       onClose();
     });
@@ -147,7 +160,7 @@ export function AppointmentDetailModal({ open, appointmentId, labels, onClose, o
 
   const abas = [
     { id: 'detalhes' as const, label: 'Detalhes' },
-    ...(detail?.financial ? [{ id: 'financeiro' as const, label: 'Financeiro' }] : []),
+    ...(detail?.financial || detail?.newFinance ? [{ id: 'financeiro' as const, label: 'Financeiro' }] : []),
     { id: 'historico' as const, label: 'Histórico na clínica' },
   ];
 
@@ -341,7 +354,11 @@ export function AppointmentDetailModal({ open, appointmentId, labels, onClose, o
                     </div>
                   )}
 
-                  {aba === 'financeiro' && detail.financial && (
+                  {aba === 'financeiro' && detail.newFinance && appointmentId && (
+                    <AppointmentFinanceTab key={appointmentId} appointmentId={appointmentId} today={clinicToday()} suggestReceive={sugereReceber} onChanged={onChanged} />
+                  )}
+
+                  {aba === 'financeiro' && !detail.newFinance && detail.financial && (
                     <div className="space-y-4">
                       <div className="grid gap-3 sm:grid-cols-3">
                         <Numero label="Contratado" valor={brl(detail.financial.contracted)} />

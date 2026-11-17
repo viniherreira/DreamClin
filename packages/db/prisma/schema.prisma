@@ -175,6 +175,34 @@ model Tenant {
   chatbotFlows         ChatbotFlow[]
   captureRules         CaptureRule[]
 
+  // Financeiro completo
+  financialAccounts     FinancialAccount[]
+  financialCategories   FinancialCategory[]
+  costCenters           CostCenter[]
+  finContacts           FinContact[]
+  finPaymentMethods     FinPaymentMethod[]
+  finPaymentMethodFees  FinPaymentMethodFee[]
+  financialTitles       FinancialTitle[]
+  financialAllocations  FinancialTitleAllocation[]
+  financialTransactions FinancialTransaction[]
+  cardReceivables       CardReceivable[]
+  cashSessions          CashSession[]
+  cashSessionCounts     CashSessionCount[]
+  walletEntries         WalletEntry[]
+  renegotiations        Renegotiation[]
+  renegotiationTitles   RenegotiationTitle[]
+  recurrenceRules       RecurrenceRule[]
+  appointmentItems      AppointmentItem[]
+  financialPermissions  FinancialPermission[]
+  financialAttachments  FinancialAttachment[]
+  financialReleases     FinancialRelease[]
+  commissionExceptions  CommissionException[]
+  transferTypes         TransferType[]
+  commissionEntries     CommissionEntry[]
+  bankStatementImports  BankStatementImport[]
+  bankStatementLines    BankStatementLine[]
+  collectionDispatches  CollectionDispatch[]
+
   @@map("tenants")
 }
 
@@ -231,6 +259,7 @@ model User {
   assignedTasks         LeadTask[]     @relation("LeadTaskAssignee")
   chatMessagesSent      ChatMessage[]
   assignedConversations Conversation[] @relation("ConversationAssignee")
+  cashSessions          CashSession[]
 
   @@index([tenantId])
   @@index([tenantId, deactivatedAt])
@@ -296,6 +325,8 @@ model Patient {
   campaignRecipients CampaignRecipient[]
   leads              Lead[]
   conversations      Conversation[]
+  financialTitles    FinancialTitle[]
+  walletEntries      WalletEntry[]
 
   @@unique([tenantId, controlNumber])
   @@index([tenantId])
@@ -400,6 +431,8 @@ model Procedure {
   materials          String?
   allowsDiscount     Boolean  @default(false)
   maxDiscountPercent Decimal? @db.Decimal(5, 2)
+  /// Custo de material do procedimento (financeiro completo): pode ser descontado da base da comissão.
+  costPrice          Decimal? @db.Decimal(10, 2)
 
   /// De quantos em quantos dias este procedimento se repete.
   ///
@@ -418,13 +451,14 @@ model Procedure {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  tenant          Tenant             @relation(fields: [tenantId], references: [id])
-  category        ProcedureCategory? @relation(fields: [categoryId], references: [id])
-  professionals   Professional[]     @relation("ProcedureProfessionals")
-  appointments    Appointment[]
-  quoteItems      QuoteItem[]
-  interestedLeads Lead[]
-  toothFindings   ToothFinding[]
+  tenant           Tenant             @relation(fields: [tenantId], references: [id])
+  category         ProcedureCategory? @relation(fields: [categoryId], references: [id])
+  professionals    Professional[]     @relation("ProcedureProfessionals")
+  appointments     Appointment[]
+  quoteItems       QuoteItem[]
+  interestedLeads  Lead[]
+  toothFindings    ToothFinding[]
+  appointmentItems AppointmentItem[]
 
   @@unique([tenantId, name])
   @@index([tenantId])
@@ -434,31 +468,39 @@ model Procedure {
 }
 
 model Appointment {
-  id             String            @id @default(cuid())
-  tenantId       String
-  patientId      String
-  professionalId String
-  procedureId    String?
-  startTime      DateTime
-  endTime        DateTime
-  status         AppointmentStatus @default(SCHEDULED)
-  type           AppointmentType   @default(PARTICULAR)
-  notes          String?
-  cancelReason   String?
+  id                 String            @id @default(cuid())
+  tenantId           String
+  patientId          String
+  professionalId     String
+  procedureId        String?
+  startTime          DateTime
+  endTime            DateTime
+  status             AppointmentStatus @default(SCHEDULED)
+  type               AppointmentType   @default(PARTICULAR)
+  notes              String?
+  cancelReason       String?
   /// Rótulo colorido do horário (atraso, débito, primeira vez…), escolhido pela clínica.
-  labelId        String?
+  labelId            String?
   /// Chegou na clínica: entra na sala de espera.
-  arrivedAt      DateTime?
+  arrivedAt          DateTime?
   /// Entrou para o atendimento.
-  startedAt      DateTime?
+  startedAt          DateTime?
   /// Terminou o atendimento (junto com status ATTENDED).
-  finishedAt     DateTime?
+  finishedAt         DateTime?
   /// Unidade onde acontece. Nulo = a principal (agendamentos de antes das unidades).
-  unitId         String?
-  createdById    String?
-  updatedById    String?
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  unitId             String?
+  /// Situação financeira (financeiro completo). Nulo = agendamento de antes dos itens.
+  billingStatus      BillingStatus?
+  /// "Não cobrar": motivo, quando e quem.
+  noChargeReason     String?
+  noChargeAt         DateTime?
+  noChargeById       String?
+  /// Convênio que paga este agendamento (cadastro de clientes e fornecedores). Só no tipo convênio.
+  insuranceContactId String?
+  createdById        String?
+  updatedById        String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
 
   tenant       Tenant            @relation(fields: [tenantId], references: [id])
   patient      Patient           @relation(fields: [patientId], references: [id])
@@ -467,8 +509,10 @@ model Appointment {
   label        AppointmentLabel? @relation(fields: [labelId], references: [id], onDelete: SetNull)
   unit         ClinicUnit?       @relation(fields: [unitId], references: [id], onDelete: SetNull)
   messages     WhatsAppMessage[]
+  items        AppointmentItem[]
 
   @@index([tenantId, professionalId, startTime])
+  @@index([tenantId, billingStatus, startTime])
   @@index([tenantId, unitId, startTime])
   @@index([tenantId, startTime])
   @@index([tenantId, status])
@@ -1843,4 +1887,867 @@ model RateLimit {
 
   @@index([resetAt])
   @@map("rate_limits")
+}
+
+// ─── Financeiro completo ─────────────────────────────────
+// Spec: docs/specs/2026-11-16-financeiro-completo.md
+// Dinheiro em Decimal(12,2); datas sem hora em DATE; competência "AAAA-MM".
+
+enum FinDirection {
+  RECEIVABLE
+  PAYABLE
+}
+
+enum FinTitleStatus {
+  OPEN
+  PARTIAL
+  PAID
+  CANCELLED
+  RENEGOTIATED
+}
+
+/// De onde nasceu um título ou um movimento.
+enum FinOrigin {
+  MANUAL
+  APPOINTMENT
+  QUOTE
+  COMMISSION
+  CARD_FEE
+  RENEGOTIATION
+  WALLET
+  RECURRENCE
+  TRANSFER
+}
+
+enum FinAccountKind {
+  CASH
+  BANK
+  DIGITAL
+}
+
+/// O "documento" de uma forma de recebimento ou pagamento.
+enum FinMethodKind {
+  CASH
+  PIX
+  CREDIT_CARD
+  DEBIT_CARD
+  BOLETO
+  TRANSFER
+  CHECK
+  WALLET
+  INSURANCE
+  OTHER
+}
+
+enum FinTxKind {
+  RECEIPT
+  PAYMENT
+  REINFORCEMENT
+  WITHDRAWAL
+  TRANSFER_IN
+  TRANSFER_OUT
+  REVERSAL
+  FEE
+}
+
+enum FinContactKind {
+  SUPPLIER
+  INSURANCE
+  CARD_OPERATOR
+  THIRD_PARTY
+  OTHER
+}
+
+/// Linhas da DRE. A ordem e os sinais ficam em `lib/financeiro/dre.ts`.
+enum DreLine {
+  RECEITA_BRUTA
+  IMPOSTOS
+  DEDUCOES_RECEITA
+  OUTRAS_RECEITAS
+  OUTRAS_DEDUCOES
+  CUSTO_SERVICOS
+  CUSTO_PRODUTOS
+  OUTROS_CUSTOS
+  DESPESAS_VARIAVEIS
+  RECUPERACAO_VARIAVEIS
+  DESPESAS_PESSOAL
+  DESPESAS_ADMINISTRATIVAS
+  DESPESAS_FINANCEIRAS
+  RECUPERACAO_FIXAS
+  OUTROS_TRIBUTOS
+  INVESTIMENTOS_ATIVOS
+  INVESTIMENTOS_SERVICOS
+  PROVISAO_IR_CSLL
+  PARTICIPACOES
+}
+
+enum CashSessionStatus {
+  OPEN
+  CLOSED
+}
+
+enum WalletReason {
+  ADVANCE
+  CHANGE
+  REVERSAL
+  RENEGOTIATION
+  USE
+  REFUND
+}
+
+/// Situação financeira de um agendamento (guardada para filtrar rápido).
+enum BillingStatus {
+  NONE
+  TO_RECEIVE
+  BILLED
+  PARTIAL
+  PAID
+  NO_CHARGE
+}
+
+/// Onde o dinheiro está: caixa da recepção, banco ou conta digital.
+/// O saldo não é guardado: é o saldo inicial mais a soma dos movimentos.
+model FinancialAccount {
+  id             String         @id @default(cuid())
+  tenantId       String
+  name           String
+  kind           FinAccountKind @default(CASH)
+  bankName       String?
+  agency         String?
+  number         String?
+  openingBalance Decimal        @default(0) @db.Decimal(12, 2)
+  openingDate    DateTime       @db.Date
+  /// Unidade dona da conta. Nulo = a clínica toda.
+  unitId         String?
+  active         Boolean        @default(true)
+  isDefault      Boolean        @default(false)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  tenant       Tenant                 @relation(fields: [tenantId], references: [id])
+  transactions FinancialTransaction[]
+  methods      FinPaymentMethod[]
+  cashSessions CashSession[]
+
+  @@index([tenantId, active])
+  @@map("financial_accounts")
+}
+
+/// Plano de contas em dois níveis. A linha da DRE fica na subcategoria.
+model FinancialCategory {
+  id        String       @id @default(cuid())
+  tenantId  String
+  parentId  String?
+  name      String
+  direction FinDirection
+  dreLine   DreLine?
+  comment   String?
+  active    Boolean      @default(true)
+  /// Criada pelo sistema (plano padrão). `systemKey` identifica as que o código usa.
+  isSystem  Boolean      @default(false)
+  systemKey String?
+  order     Int          @default(0)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  tenant   Tenant              @relation(fields: [tenantId], references: [id])
+  parent   FinancialCategory?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children FinancialCategory[] @relation("CategoryTree")
+  titles   FinancialTitle[]
+
+  @@unique([tenantId, systemKey])
+  @@index([tenantId, direction, active])
+  @@index([tenantId, parentId])
+  @@map("financial_categories")
+}
+
+model CostCenter {
+  id        String   @id @default(cuid())
+  tenantId  String
+  parentId  String?
+  name      String
+  active    Boolean  @default(true)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant   Tenant       @relation(fields: [tenantId], references: [id])
+  parent   CostCenter?  @relation("CostCenterTree", fields: [parentId], references: [id])
+  children CostCenter[] @relation("CostCenterTree")
+
+  @@index([tenantId, parentId])
+  @@map("cost_centers")
+}
+
+/// Cliente ou fornecedor que não é paciente: fornecedor, convênio, operadora
+/// de cartão, profissional terceiro. O documento é cifrado como o CPF do paciente.
+model FinContact {
+  id                String         @id @default(cuid())
+  tenantId          String
+  name              String
+  /// "PF" ou "PJ".
+  personType        String         @default("PJ")
+  documentEncrypted String?        @map("document")
+  documentHash      String?
+  phone             String?
+  email             String?
+  zipCode           String?
+  street            String?
+  addressNumber     String?
+  complement        String?
+  neighborhood      String?
+  city              String?
+  state             String?
+  kind              FinContactKind @default(SUPPLIER)
+  notes             String?
+  active            Boolean        @default(true)
+  createdById       String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  tenant Tenant           @relation(fields: [tenantId], references: [id])
+  titles FinancialTitle[]
+
+  @@index([tenantId, name])
+  @@index([tenantId, kind, active])
+  @@index([tenantId, documentHash])
+  @@map("fin_contacts")
+}
+
+/// Forma de recebimento ou pagamento.
+model FinPaymentMethod {
+  id                String        @id @default(cuid())
+  tenantId          String
+  name              String
+  kind              FinMethodKind
+  active            Boolean       @default(true)
+  /// "RECEIVE", "PAY" ou "BOTH".
+  usage             String        @default("BOTH")
+  /// Conta de destino sugerida ao escolher a forma.
+  accountId         String?
+  requireDocNumber  Boolean       @default(false)
+  /// Compensação: "SAME_DAY", "DAYS" (D+N) ou "DAY_OF_MONTH" (dia fixo).
+  settlementType    String        @default("SAME_DAY")
+  settlementValue   Int?
+  /// Cartão: operadora (um contato), máximo de parcelas e para onde vai a taxa.
+  operatorContactId String?
+  maxInstallments   Int           @default(1)
+  feeCategoryId     String?
+  feeCostCenterId   String?
+  /// Antecipação do cartão (F7): { mode, percent, categoryId, businessDays }.
+  anticipation      Json?
+  isSystem          Boolean       @default(false)
+  order             Int           @default(0)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  tenant  Tenant                @relation(fields: [tenantId], references: [id])
+  account FinancialAccount?     @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  fees    FinPaymentMethodFee[]
+
+  @@index([tenantId, active, order])
+  @@map("fin_payment_methods")
+}
+
+/// Taxa do cartão por faixa de parcelas ("até 1x: 3,2%", "até 6x: 4,5%").
+model FinPaymentMethodFee {
+  id               String   @id @default(cuid())
+  tenantId         String
+  methodId         String
+  upToInstallments Int
+  percent          Decimal? @db.Decimal(6, 3)
+  fixed            Decimal? @db.Decimal(12, 2)
+  createdAt        DateTime @default(now())
+
+  tenant Tenant           @relation(fields: [tenantId], references: [id])
+  method FinPaymentMethod @relation(fields: [methodId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, methodId])
+  @@map("fin_payment_method_fees")
+}
+
+/// Título: uma conta a receber ou a pagar. É o "faturar".
+model FinancialTitle {
+  id                String         @id @default(cuid())
+  tenantId          String
+  /// Número de exibição, sequencial por clínica.
+  code              Int
+  direction         FinDirection
+  origin            FinOrigin      @default(MANUAL)
+  /// Id do agendamento, orçamento, renegociação… conforme a origem.
+  originId          String?
+  patientId         String?
+  contactId         String?
+  professionalId    String?
+  unitId            String?
+  appointmentId     String?
+  quoteId           String?
+  categoryId        String
+  costCenterId      String?
+  accountId         String?
+  methodId          String?
+  issueDate         DateTime       @db.Date
+  dueDate           DateTime       @db.Date
+  /// Mês de competência, "AAAA-MM".
+  competence        String
+  amount            Decimal        @db.Decimal(12, 2)
+  /// Quanto do valor já foi quitado (soma do `principal` dos movimentos vivos).
+  paidAmount        Decimal        @default(0) @db.Decimal(12, 2)
+  status            FinTitleStatus @default(OPEN)
+  installmentNumber Int            @default(1)
+  installmentTotal  Int            @default(1)
+  /// Liga as parcelas do mesmo parcelamento.
+  groupId           String?
+  recurrenceId      String?
+  renegotiationId   String?
+  document          String?
+  documentNumber    String?
+  description       String?
+  cancelReason      String?
+  cancelledAt       DateTime?
+  cancelledById     String?
+  createdById       String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  tenant       Tenant                     @relation(fields: [tenantId], references: [id])
+  patient      Patient?                   @relation(fields: [patientId], references: [id])
+  contact      FinContact?                @relation(fields: [contactId], references: [id])
+  category     FinancialCategory          @relation(fields: [categoryId], references: [id])
+  transactions FinancialTransaction[]
+  allocations  FinancialTitleAllocation[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, direction, status, dueDate])
+  @@index([tenantId, patientId, status])
+  @@index([tenantId, contactId])
+  @@index([tenantId, origin, originId])
+  @@index([tenantId, appointmentId])
+  @@index([tenantId, quoteId])
+  @@index([tenantId, competence])
+  @@index([tenantId, groupId])
+  @@map("financial_titles")
+}
+
+/// Rateio do título entre categorias e centros de custo. A soma bate com o valor.
+model FinancialTitleAllocation {
+  id           String   @id @default(cuid())
+  tenantId     String
+  titleId      String
+  categoryId   String
+  costCenterId String?
+  amount       Decimal  @db.Decimal(12, 2)
+  createdAt    DateTime @default(now())
+
+  tenant Tenant         @relation(fields: [tenantId], references: [id])
+  title  FinancialTitle @relation(fields: [titleId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, titleId])
+  @@map("financial_title_allocations")
+}
+
+/// Movimento: dinheiro que entrou ou saiu de verdade. É o "baixar".
+/// Estorno nunca apaga: cria um movimento REVERSAL ligado ao original.
+model FinancialTransaction {
+  id              String         @id @default(cuid())
+  tenantId        String
+  code            Int
+  kind            FinTxKind
+  origin          FinOrigin      @default(MANUAL)
+  originId        String?
+  titleId         String?
+  /// Nulo quando o meio é a carteira do paciente (não movimenta conta).
+  accountId       String?
+  cashSessionId   String?
+  methodId        String?
+  methodKind      FinMethodKind?
+  patientId       String?
+  contactId       String?
+  /// Categoria dos movimentos sem título (reforço, sangria, taxa).
+  categoryId      String?
+  costCenterId    String?
+  document        String?
+  documentNumber  String?
+  /// Dinheiro que andou (sempre positivo).
+  amount          Decimal        @db.Decimal(12, 2)
+  /// Efeito no saldo da conta: positivo entra, negativo sai, zero na carteira.
+  signedAmount    Decimal        @db.Decimal(12, 2)
+  /// Quanto do título este movimento quita.
+  principal       Decimal        @default(0) @db.Decimal(12, 2)
+  discount        Decimal        @default(0) @db.Decimal(12, 2)
+  surcharge       Decimal        @default(0) @db.Decimal(12, 2)
+  interest        Decimal        @default(0) @db.Decimal(12, 2)
+  fine            Decimal        @default(0) @db.Decimal(12, 2)
+  installments    Int            @default(1)
+  cardBrand       String?
+  nsu             String?
+  checkBank       String?
+  checkNumber     String?
+  checkHolder     String?
+  checkDate       DateTime?      @db.Date
+  paidOn          DateTime       @db.Date
+  competence      String
+  /// Quando o dinheiro cai na conta (cartão, boleto). Nulo = no dia.
+  settlementDate  DateTime?      @db.Date
+  /// Vários meios do mesmo recebimento compartilham este id (um recibo só).
+  receiptGroupId  String?
+  /// As duas pontas de uma transferência compartilham este id.
+  transferId      String?
+  /// Este movimento é o estorno de outro.
+  reversalOfId    String?        @unique
+  /// Preenchido no original quando ele foi estornado.
+  reversedAt      DateTime?
+  reverseReason   String?
+  reconciledAt    DateTime?
+  statementLineId String?
+  /// `Payment` antigo copiado para cá na migração (um para um).
+  legacyPaymentId String?        @unique
+  /// `Payment` espelho mantido para as telas antigas.
+  mirrorPaymentId String?
+  description     String?
+  createdById     String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  tenant      Tenant                @relation(fields: [tenantId], references: [id])
+  title       FinancialTitle?       @relation(fields: [titleId], references: [id])
+  account     FinancialAccount?     @relation(fields: [accountId], references: [id])
+  cashSession CashSession?          @relation(fields: [cashSessionId], references: [id])
+  reversalOf  FinancialTransaction? @relation("TxReversal", fields: [reversalOfId], references: [id])
+  reversal    FinancialTransaction? @relation("TxReversal")
+  receivables CardReceivable[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, paidOn])
+  @@index([tenantId, accountId, paidOn])
+  @@index([tenantId, titleId])
+  @@index([tenantId, cashSessionId])
+  @@index([tenantId, patientId, paidOn])
+  @@index([tenantId, receiptGroupId])
+  @@index([tenantId, competence])
+  @@index([tenantId, mirrorPaymentId])
+  @@map("financial_transactions")
+}
+
+/// Uma linha por parcela de cartão (ou por cheque) a compensar.
+model CardReceivable {
+  id                String    @id @default(cuid())
+  tenantId          String
+  transactionId     String
+  methodId          String?
+  operatorContactId String?
+  /// "CARD" ou "CHECK".
+  kind              String    @default("CARD")
+  installmentNumber Int       @default(1)
+  installmentTotal  Int       @default(1)
+  grossAmount       Decimal   @db.Decimal(12, 2)
+  feeAmount         Decimal   @default(0) @db.Decimal(12, 2)
+  netAmount         Decimal   @db.Decimal(12, 2)
+  expectedDate      DateTime  @db.Date
+  /// "OPEN", "RECONCILED", "CANCELLED" ou "RETURNED" (cheque devolvido).
+  status            String    @default("OPEN")
+  reconciledAt      DateTime?
+  anticipatedAt     DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  tenant      Tenant               @relation(fields: [tenantId], references: [id])
+  transaction FinancialTransaction @relation(fields: [transactionId], references: [id])
+
+  @@index([tenantId, status, expectedDate])
+  @@index([tenantId, transactionId])
+  @@map("card_receivables")
+}
+
+/// Sessão de caixa de um usuário numa unidade.
+model CashSession {
+  id            String            @id @default(cuid())
+  tenantId      String
+  code          Int
+  userId        String
+  unitId        String?
+  /// A conta de caixa interno que esta sessão movimenta.
+  accountId     String
+  status        CashSessionStatus @default(OPEN)
+  openedAt      DateTime          @default(now())
+  openingAmount Decimal           @default(0) @db.Decimal(12, 2)
+  closedAt      DateTime?
+  closedById    String?
+  /// Conferência cega: o contado foi digitado antes de ver o esperado.
+  blind         Boolean           @default(false)
+  difference    Decimal?          @db.Decimal(12, 2)
+  closingNote   String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  tenant       Tenant                 @relation(fields: [tenantId], references: [id])
+  user         User                   @relation(fields: [userId], references: [id])
+  account      FinancialAccount       @relation(fields: [accountId], references: [id])
+  transactions FinancialTransaction[]
+  counts       CashSessionCount[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, status])
+  @@index([tenantId, userId, status])
+  @@map("cash_sessions")
+}
+
+/// Conferência do fechamento, por meio: esperado × contado.
+model CashSessionCount {
+  id            String        @id @default(cuid())
+  tenantId      String
+  sessionId     String
+  methodKind    FinMethodKind
+  expected      Decimal       @db.Decimal(12, 2)
+  counted       Decimal       @db.Decimal(12, 2)
+  justification String?
+  createdAt     DateTime      @default(now())
+
+  tenant  Tenant      @relation(fields: [tenantId], references: [id])
+  session CashSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, sessionId])
+  @@map("cash_session_counts")
+}
+
+/// Carteira do paciente: crédito positivo, uso negativo. Saldo = soma.
+model WalletEntry {
+  id            String       @id @default(cuid())
+  tenantId      String
+  patientId     String
+  amount        Decimal      @db.Decimal(12, 2)
+  reason        WalletReason
+  titleId       String?
+  transactionId String?
+  description   String?
+  createdById   String?
+  createdAt     DateTime     @default(now())
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  patient Patient @relation(fields: [patientId], references: [id])
+
+  @@index([tenantId, patientId, createdAt])
+  @@map("wallet_entries")
+}
+
+model Renegotiation {
+  id              String    @id @default(cuid())
+  tenantId        String
+  code            Int
+  patientId       String?
+  contactId       String?
+  originalTotal   Decimal   @db.Decimal(12, 2)
+  correctedTotal  Decimal   @db.Decimal(12, 2)
+  discount        Decimal   @default(0) @db.Decimal(12, 2)
+  downPayment     Decimal   @default(0) @db.Decimal(12, 2)
+  installments    Int       @default(1)
+  /// Juros do parcelamento, % ao mês, e o modo: "SIMPLE" ou "PRICE".
+  interestPercent Decimal   @default(0) @db.Decimal(6, 3)
+  interestMode    String    @default("SIMPLE")
+  undoneAt        DateTime?
+  undoneById      String?
+  createdById     String?
+  createdAt       DateTime  @default(now())
+
+  tenant Tenant               @relation(fields: [tenantId], references: [id])
+  titles RenegotiationTitle[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, patientId])
+  @@map("renegotiations")
+}
+
+/// Títulos de uma renegociação: os antigos (com a situação que tinham) e os novos.
+model RenegotiationTitle {
+  id              String          @id @default(cuid())
+  tenantId        String
+  renegotiationId String
+  titleId         String
+  /// "OLD" ou "NEW".
+  role            String
+  previousStatus  FinTitleStatus?
+  createdAt       DateTime        @default(now())
+
+  tenant        Tenant        @relation(fields: [tenantId], references: [id])
+  renegotiation Renegotiation @relation(fields: [renegotiationId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, renegotiationId])
+  @@index([tenantId, titleId])
+  @@map("renegotiation_titles")
+}
+
+/// Lançamento recorrente: o molde do título e de quanto em quanto tempo repete.
+model RecurrenceRule {
+  id             String    @id @default(cuid())
+  tenantId       String
+  every          Int       @default(1)
+  /// "DAY", "WEEK", "MONTH" ou "YEAR".
+  unit           String    @default("MONTH")
+  startDate      DateTime  @db.Date
+  endDate        DateTime? @db.Date
+  occurrences    Int?
+  /// Campos do título a repetir (direção, categoria, valor, descrição…).
+  template       Json
+  /// Último vencimento já gerado.
+  generatedUntil DateTime? @db.Date
+  active         Boolean   @default(true)
+  createdById    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, active])
+  @@map("recurrence_rules")
+}
+
+/// Itens do agendamento: o que foi feito e quanto custa.
+model AppointmentItem {
+  id            String   @id @default(cuid())
+  tenantId      String
+  appointmentId String
+  procedureId   String?
+  name          String
+  quantity      Int      @default(1)
+  unitPrice     Decimal  @db.Decimal(12, 2)
+  discount      Decimal  @default(0) @db.Decimal(12, 2)
+  total         Decimal  @db.Decimal(12, 2)
+  /// Veio de um orçamento aprovado: não gera cobrança nova.
+  quoteItemId   String?
+  order         Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  procedure   Procedure?  @relation(fields: [procedureId], references: [id])
+
+  @@index([tenantId, appointmentId])
+  @@index([tenantId, quoteItemId])
+  @@map("appointment_items")
+}
+
+/// Permissões financeiras de um usuário, por cima do perfil.
+model FinancialPermission {
+  id                 String   @id @default(cuid())
+  tenantId           String
+  userId             String   @unique
+  /// Limite de desconto em %. Nulo = o padrão da clínica.
+  maxDiscountPercent Decimal? @db.Decimal(5, 2)
+  /// "RECEIVE", "PAY" ou "BOTH".
+  operation          String   @default("BOTH")
+  /// Contas liberadas. Vazio = todas.
+  accountIds         String[] @default([])
+  /// Nulo = o que o perfil diz.
+  canReverse         Boolean?
+  canSeeReports      Boolean?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@map("financial_permissions")
+}
+
+/// Comprovante, nota ou boleto anexado a um título ou movimento.
+model FinancialAttachment {
+  id            String   @id @default(cuid())
+  tenantId      String
+  titleId       String?
+  transactionId String?
+  bucketPath    String
+  filename      String
+  mimeType      String
+  sizeBytes     Int
+  createdById   String?
+  createdAt     DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, titleId])
+  @@index([tenantId, transactionId])
+  @@map("financial_attachments")
+}
+
+/// Pedido de liberação: alguém precisa passar do próprio limite (desconto,
+/// tirar juros) e um dono ou administrador autoriza na tela dele. Vale uma vez
+/// e por pouco tempo; no lugar de senha compartilhada.
+model FinancialRelease {
+  id            String    @id @default(cuid())
+  tenantId      String
+  /// "DISCOUNT" (desconto acima do limite) ou "WAIVE_LATE" (tirar juros e multa).
+  kind          String
+  titleId       String?
+  /// O que foi pedido: { percent, amountCents, note }.
+  payload       Json
+  /// "PENDING", "APPROVED", "DENIED".
+  status        String    @default("PENDING")
+  requestedById String
+  decidedById   String?
+  decidedAt     DateTime?
+  usedAt        DateTime?
+  expiresAt     DateTime
+  createdAt     DateTime  @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, requestedById])
+  @@map("financial_releases")
+}
+
+/// Exceção de comissão: % ou valor fixo diferente para um profissional (e, se quiser, só num procedimento).
+model CommissionException {
+  id             String   @id @default(cuid())
+  tenantId       String
+  professionalId String
+  /// Nulo = vale para todos os procedimentos deste profissional.
+  procedureId    String?
+  /// "PERCENT" ou "FIXED" (valor por item).
+  mode           String   @default("PERCENT")
+  value          Decimal  @db.Decimal(12, 2)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, professionalId])
+  @@map("commission_exceptions")
+}
+
+/// Tipo de repasse (laboratório, anestesista, profissional terceiro): valor padrão e os procedimentos em que entra.
+model TransferType {
+  id           String   @id @default(cuid())
+  tenantId     String
+  name         String
+  mode         String   @default("FIXED")
+  value        Decimal  @db.Decimal(12, 2)
+  /// Quem recebe por padrão (cadastro de clientes e fornecedores). Nulo = o profissional do atendimento.
+  contactId    String?
+  procedureIds String[] @default([])
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, active])
+  @@map("transfer_types")
+}
+
+/// Uma linha de comissão ou repasse, nascida de um item atendido, faturado ou recebido.
+model CommissionEntry {
+  id                   String    @id @default(cuid())
+  tenantId             String
+  /// "COMMISSION" ou "TRANSFER" (repasse).
+  kind                 String    @default("COMMISSION")
+  professionalId       String?
+  contactId            String?
+  transferTypeId       String?
+  appointmentId        String?
+  appointmentItemId    String?
+  procedureId          String?
+  /// O que fez nascer a linha: "EXECUTION", "BILLING" ou "RECEIPT".
+  trigger              String
+  /// No recebimento: o movimento que gerou esta parte (o estorno dele estorna a linha).
+  triggerTransactionId String?
+  description          String
+  base                 Decimal   @db.Decimal(12, 2)
+  /// Como foi calculado, para a tela ("12% da regra do profissional").
+  ruleLabel            String
+  amount               Decimal   @db.Decimal(12, 2)
+  /// Ajuste feito na conferência (positivo ou negativo), com o motivo.
+  adjustment           Decimal   @default(0) @db.Decimal(12, 2)
+  adjustmentReason     String?
+  /// "PENDING", "APPROVED" ou "REVERSED". Paga sai da conta a pagar gerada.
+  status               String    @default("PENDING")
+  occurredOn           DateTime  @db.Date
+  competence           String
+  payableTitleId       String?
+  approvedAt           DateTime?
+  approvedById         String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, professionalId, occurredOn])
+  @@index([tenantId, appointmentId])
+  @@index([tenantId, triggerTransactionId])
+  @@index([tenantId, payableTitleId])
+  @@map("commission_entries")
+}
+
+/// Um extrato bancário importado (OFX ou CSV) para conciliar com os movimentos de uma conta.
+model BankStatementImport {
+  id          String    @id @default(cuid())
+  tenantId    String
+  accountId   String
+  filename    String
+  /// "OFX" ou "CSV".
+  format      String
+  periodFrom  DateTime? @db.Date
+  periodTo    DateTime? @db.Date
+  lineCount   Int       @default(0)
+  createdById String?
+  createdAt   DateTime  @default(now())
+
+  tenant Tenant              @relation(fields: [tenantId], references: [id])
+  lines  BankStatementLine[]
+
+  @@index([tenantId, accountId, createdAt])
+  @@map("bank_statement_imports")
+}
+
+/// Uma linha do extrato: casada com um movimento, virou movimento novo, transferência, ou foi descartada.
+model BankStatementLine {
+  id            String    @id @default(cuid())
+  tenantId      String
+  importId      String
+  accountId     String
+  date          DateTime  @db.Date
+  /// Com sinal: positivo entrou, negativo saiu.
+  amount        Decimal   @db.Decimal(12, 2)
+  description   String
+  /// Identificador da linha no banco (FITID do OFX); evita importar a mesma linha duas vezes.
+  externalId    String?
+  /// "PENDING", "MATCHED", "CREATED", "TRANSFER" ou "DISCARDED".
+  status        String    @default("PENDING")
+  transactionId String?
+  resolvedAt    DateTime?
+  resolvedById  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  tenant          Tenant              @relation(fields: [tenantId], references: [id])
+  statementImport BankStatementImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, accountId, externalId])
+  @@index([tenantId, accountId, status, date])
+  @@index([tenantId, transactionId])
+  @@map("bank_statement_lines")
+}
+
+/// Um aviso da régua de cobrança para uma conta: um por passo (3 dias antes, no dia, 5 dias depois…), nunca repetido.
+model CollectionDispatch {
+  id        String   @id @default(cuid())
+  tenantId  String
+  titleId   String
+  patientId String
+  /// "B3" (3 dias antes), "D0" (no dia), "A5" (5 dias depois).
+  step      String
+  /// "SENT", "SKIPPED" ou "FAILED".
+  status    String
+  reason    String?
+  /// A linha do histórico do WhatsApp (entregue, lida, falhou).
+  messageId String?
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, titleId, step])
+  @@index([tenantId, createdAt])
+  @@map("collection_dispatches")
 }

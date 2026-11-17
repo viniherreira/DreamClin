@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation';
 import { useLiveUnread } from './crm-chat/unread';
 import {
   LayoutDashboard, CalendarDays, Users, Stethoscope, FileText, Wallet,
-  MessageCircle, Megaphone, Settings, PhoneCall, KanbanSquare, List, ListChecks, Smartphone, BarChart3, Zap, TrendingUp,
+  MessageCircle, Megaphone, Settings, PhoneCall, KanbanSquare, List, ListChecks, Smartphone, BarChart3, Zap, TrendingUp, Receipt, Banknote, ClipboardList, Percent,
 } from 'lucide-react';
 import { CrmRail } from './crm-rail';
 import { ClinicSidebar } from './clinic-sidebar';
@@ -47,6 +47,18 @@ export const CLINIC_NAV: NavItem[] = [
 ];
 
 /**
+ * Os itens do financeiro completo: entram no grupo Financeiro só na clínica com
+ * a bandeira ligada (`fin/flag.ts`). As outras telas do financeiro ficam nas
+ * abas do topo de cada uma (`components/fin/fin-nav.tsx`).
+ */
+export const FINANCE_NAV: NavItem[] = [
+  { href: '/financeiro/caixa', label: 'Caixa', icon: Banknote, capability: 'fin_caixa', group: 'Financeiro' },
+  { href: '/financeiro/a-faturar', label: 'A faturar', icon: ClipboardList, capability: 'fin_ver', group: 'Financeiro' },
+  { href: '/financeiro/contas', label: 'Contas', icon: Receipt, capability: 'fin_ver', group: 'Financeiro' },
+  { href: '/financeiro/comissoes', label: 'Comissões', icon: Percent, capability: 'fin_comissoes', group: 'Financeiro' },
+];
+
+/**
  * O menu do espaço CRM. Transmissões e Chatbot entram nas próximas etapas. O
  * próprio espaço só abre para quem tem `crm` (ver `crm/guard.ts`).
  */
@@ -68,8 +80,10 @@ export const CRM_NAV: NavItem[] = [
  * do cargo no CRM (`crmManager`), não do perfil da clínica; sem ele informado,
  * vale o padrão do perfil.
  */
-export function navFor(role: string | null | undefined, space: Space = 'clinic', crmOnly = false, crmManager?: boolean) {
-  const nav = space === 'crm' ? CRM_NAV : CLINIC_NAV.filter((item) => !crmOnly || item.href === '/configuracoes');
+export function navFor(role: string | null | undefined, space: Space = 'clinic', crmOnly = false, crmManager?: boolean, finance = false) {
+  // Os itens do financeiro novo entram logo depois de "Financeiro".
+  const clinica = finance ? CLINIC_NAV.flatMap((item) => (item.href === '/financeiro' ? [item, ...FINANCE_NAV] : [item])) : CLINIC_NAV;
+  const nav = space === 'crm' ? CRM_NAV : clinica.filter((item) => !crmOnly || item.href === '/configuracoes');
   return nav.filter((item) => {
     if (!item.capability) return true;
     if (item.capability === 'crm_config' && crmManager !== undefined) return can(role, 'crm') && crmManager;
@@ -95,8 +109,11 @@ export function AppSidebar({
   counts = {},
   crmOnly = false,
   crmManager,
+  finance = false,
 }: {
   clinicName: string;
+  /** Financeiro completo ligado nesta clínica. */
+  finance?: boolean;
   /** É Gestor no CRM (mostra Equipe, WhatsApp e Configurações do CRM). */
   crmManager?: boolean;
   role: string;
@@ -109,7 +126,7 @@ export function AppSidebar({
   counts?: Record<string, number>;
 }) {
   const pathname = usePathname();
-  const itens = navFor(role, space, crmOnly, crmManager);
+  const itens = navFor(role, space, crmOnly, crmManager, finance);
   const unread = useLiveUnread(counts['/crm/conversas'] ?? 0);
   const contagem: Record<string, number> = { ...counts, '/crm/conversas': unread };
   const ativo = activeHref(itens, pathname);

@@ -18,6 +18,8 @@ export const E2E_RECEPTIONIST_EMAIL = 'recepcao-e2e@teste.local';
 /** Orçamento "enviado" para testar a página pública: a tela da clínica não
  *  tem mais o "copiar link" (commit 4d2e66d), então ele nasce direto no banco. */
 export const E2E_PUBLIC_QUOTE_TOKEN = 'e2e-orcamento-publico';
+/** Conta bancária da clínica de teste (transferências do financeiro). */
+export const E2E_BANK_ACCOUNT = 'Banco E2E';
 
 /**
  * Trava contra rodar a semeadura no lugar errado. Ela grava no banco apontado
@@ -144,6 +146,12 @@ export async function seedE2EClinic() {
     await prisma.procedure.create({
       data: { tenantId: tenant.id, name: E2E_PROCEDURE, basePrice: 150, durationMinutes: 30, active: true },
     });
+  }
+
+  // Uma conta bancária, para os testes de transferência do financeiro completo.
+  const banco = await prisma.financialAccount.findFirst({ where: { tenantId: tenant.id, name: E2E_BANK_ACCOUNT } });
+  if (!banco) {
+    await prisma.financialAccount.create({ data: { tenantId: tenant.id, name: E2E_BANK_ACCOUNT, kind: 'BANK', openingDate: new Date('2026-01-01T00:00:00.000Z') } });
   }
 
   await seedPublicQuote(tenant.id, masterKey);

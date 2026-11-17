@@ -72,6 +72,16 @@ pnpm --filter @clinicaiq/web test:e2e
 O Playwright sobe o `pnpm dev` sozinho se nada estiver rodando na porta 3000.
 O relatório abre com `pnpm --filter @clinicaiq/web exec playwright show-report`.
 
+Se o servidor já está de pé em outra porta, aponte os testes para ele com
+`E2E_BASE_URL` (ex.: `E2E_BASE_URL=http://localhost:3200`).
+
+### Financeiro completo
+
+`regressao/financeiro.spec.ts` só roda com o financeiro novo ligado. Crie
+`apps/web/.env.development.local` com `FINANCEIRO_COMPLETO=todos` e reinicie o
+servidor. Sem isso, os testes do financeiro são pulados e os de orçamento
+testam o financeiro antigo. Vale rodar a suíte dos dois jeitos.
+
 ## O que a preparação faz
 
 `global.setup.ts` roda antes do grupo logado e:

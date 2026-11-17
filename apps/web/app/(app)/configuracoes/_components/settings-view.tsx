@@ -16,6 +16,10 @@ import { ScheduleModal } from './schedule-modal';
 import { SettingsLayout, type SettingsSection } from './settings-layout';
 import { AgendaRulesPanel } from './agenda-rules-panel';
 import { PaymentMethodsPanel } from './payment-methods-panel';
+import { CostCentersPanel, FinanceAccountsPanel, FinanceCategoriesPanel } from './finance-structure-panels';
+import { FinanceContactsPanel, FinanceMethodsPanel, FinancePermissionsPanel, FinanceRulesPanel } from './finance-rules-panels';
+import { FinanceCommissionPanel } from './finance-commission-panel';
+import { FinanceCollectionPanel } from './finance-collection-panel';
 import type { AgendaRules } from '@/lib/agenda-rules';
 import { TeamPanel } from './team-panel';
 import { PrivacyPanel } from './privacy-panel';
@@ -91,6 +95,8 @@ interface Props {
   podePrivacidade: boolean;
   /** A clínica tem a agenda. Só com o CRM, sobram dados, aparência, equipe, plano e privacidade. */
   agenda?: boolean;
+  /** Financeiro completo ligado nesta clínica, para quem pode configurar. */
+  finance?: { advanced: boolean } | null;
 }
 
 const SO_CRM = ['clinica', 'aparencia', 'equipe', 'plano', 'privacidade'];
@@ -116,6 +122,7 @@ export function SettingsView({
   podePlano,
   podePrivacidade,
   agenda = true,
+  finance = null,
 }: Props) {
   const unidadesAtivas = units.filter((u) => u.active).map((u) => ({ id: u.id, name: u.name }));
   // Os grupos e as seções do menu lateral, na ordem do dia a dia da clínica.
@@ -179,7 +186,21 @@ export function SettingsView({
       ),
     },
     { id: 'documentos', group: 'Atendimento', label: 'Documentos', panel: <DocumentsPanel settings={documents} /> },
-    { id: 'pagamentos', group: 'Financeiro', label: 'Formas de recebimento', panel: <PaymentMethodsPanel methods={rules.paymentMethods} /> },
+    { id: 'pagamentos', group: 'Financeiro', label: finance ? 'Formas (financeiro antigo)' : 'Formas de recebimento', panel: <PaymentMethodsPanel methods={rules.paymentMethods} /> },
+    // Financeiro completo: só com a bandeira da clínica ligada e para quem configura.
+    ...(finance
+      ? [
+          { id: 'fin-contas', group: 'Financeiro', label: 'Contas', panel: <FinanceAccountsPanel units={unidadesAtivas} /> },
+          { id: 'fin-categorias', group: 'Financeiro', label: 'Categorias', panel: <FinanceCategoriesPanel /> },
+          { id: 'fin-centros', group: 'Financeiro', label: 'Centros de custo', panel: <CostCentersPanel advanced={finance.advanced} /> },
+          { id: 'fin-formas', group: 'Financeiro', label: 'Formas de recebimento e pagamento', panel: <FinanceMethodsPanel /> },
+          { id: 'fin-contatos', group: 'Financeiro', label: 'Clientes e fornecedores', panel: <FinanceContactsPanel /> },
+          { id: 'fin-regras', group: 'Financeiro', label: 'Regras do financeiro', panel: <FinanceRulesPanel /> },
+          { id: 'fin-comissoes', group: 'Financeiro', label: 'Comissões e repasses', panel: <FinanceCommissionPanel /> },
+          { id: 'fin-regua', group: 'Financeiro', label: 'Régua de cobrança', panel: <FinanceCollectionPanel /> },
+          { id: 'fin-permissoes', group: 'Financeiro', label: 'Permissões financeiras', panel: <FinancePermissionsPanel /> },
+        ]
+      : []),
     {
       id: 'comunicacao',
       group: 'Comunicação',

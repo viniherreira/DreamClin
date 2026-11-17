@@ -52,6 +52,7 @@ export function QuotePayments({ quoteId, quoteLabel, total, payments, methods = 
   const [preselect, setPreselect] = useState<string | null>(null);
   const [apagando, setApagando] = useState<string | null>(null);
   const [isDeleting, startDelete] = useTransition();
+  const [erroExcluir, setErroExcluir] = useState('');
 
   const paid = Math.round(payments.reduce((s, p) => s + p.amount, 0) * 100) / 100;
   const remaining = Math.max(0, Math.round((total - paid) * 100) / 100);
@@ -178,6 +179,11 @@ export function QuotePayments({ quoteId, quoteLabel, total, payments, methods = 
       {/* Recebimentos */}
       <div className="border-t border-border">
         <h3 className="px-4 pt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:px-5">Recebimentos</h3>
+        {erroExcluir && (
+          <p role="alert" className="px-4 pt-2 text-sm text-destructive sm:px-5">
+            {erroExcluir}
+          </p>
+        )}
         {payments.length === 0 ? (
           <p className="px-4 pb-4 pt-1 text-sm text-muted-foreground sm:px-5">Nenhum pagamento registrado ainda.</p>
         ) : (
@@ -203,7 +209,8 @@ export function QuotePayments({ quoteId, quoteLabel, total, payments, methods = 
                       disabled={isDeleting}
                       onClick={() =>
                         startDelete(async () => {
-                          await deleteQuotePayment(p.id, quoteId);
+                          const r = await deleteQuotePayment(p.id, quoteId);
+                          setErroExcluir(r?.message ?? '');
                           setApagando(null);
                           router.refresh();
                         })
