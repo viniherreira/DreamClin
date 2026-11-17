@@ -12,6 +12,7 @@ import { fromCents, toCents } from '@/lib/financeiro/money';
 import type { FinanceSettings } from '@/lib/financeiro/settings';
 import { discountPercent, planSettlement } from '@/lib/financeiro/settlement';
 import { settledStatus } from '@/lib/financeiro/title-status';
+import { refreshBillingTx } from './billing-sync';
 import { openCashOf } from './cash';
 import { nextCode } from './codes';
 import { categoryId, defaultAccountId } from './setup';
@@ -400,6 +401,8 @@ export async function settleTitleTx(tx: Tx, env: SettleEnv, input: SettleInput):
   const titleStatus = settledStatus(toCents(title.amount), pago, title.status);
   await tx.financialTitle.update({ where: { id: title.id }, data: { paidAmount: fromCents(pago), status: titleStatus } });
   if (liberacao) await tx.financialRelease.update({ where: { id: liberacao.id }, data: { usedAt: new Date() } });
+  // Título de agendamento: a situação financeira dele na agenda acompanha.
+  if (title.appointmentId) await refreshBillingTx(tx, tenantId, title.appointmentId);
 
   return { ok: true, receiptGroupId, transactionIds, changeCents: plano.change, walletCreditCents: plano.walletCredit, titleStatus, remainingCents: plano.remaining };
 }

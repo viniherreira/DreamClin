@@ -7,6 +7,7 @@ import { addMonths, competenceOf, dayToDate, isCompetence, isDay, type Day } fro
 import { MAX_RECURRENCE_DATES, recurrenceDates, simulateInstallments, type InstallmentInterval, type RecurrenceSpec } from '@/lib/financeiro/installments';
 import { fromCents, toCents } from '@/lib/financeiro/money';
 import { clinicToday } from '@/lib/tz';
+import { refreshBillingTx } from './billing-sync';
 import { nextCode } from './codes';
 
 /**
@@ -318,6 +319,7 @@ export async function updateTitle(actor: FinActor, id: string, edit: TitleEdit, 
     await tx.financialTitle.updateMany({ where: { tenantId: actor.tenantId, id }, data: soEste });
     // Rateio antigo deixa de bater se a categoria ou o valor mudou: volta para a categoria do título.
     if (edit.categoryId || edit.amountCents != null) await tx.financialTitleAllocation.deleteMany({ where: { tenantId: actor.tenantId, titleId: id } });
+    if (t.appointmentId && edit.amountCents != null) await refreshBillingTx(tx, actor.tenantId, t.appointmentId);
 
     if (scope === 'following' && t.recurrenceId) {
       // Os próximos, ainda sem pagamento: mesmos dados e, se mudou, o mesmo valor. Cada um mantém o seu vencimento.
@@ -358,6 +360,7 @@ export async function cancelTitle(actor: FinActor, id: string, reason: string, s
       cancelled += (await tx.financialTitle.updateMany({ where: { tenantId: actor.tenantId, recurrenceId: t.recurrenceId, dueDate: { gt: t.dueDate }, status: 'OPEN' }, data: dados })).count;
       await tx.recurrenceRule.updateMany({ where: { tenantId: actor.tenantId, id: t.recurrenceId }, data: { active: false } });
     }
+    if (t.appointmentId) await refreshBillingTx(tx, actor.tenantId, t.appointmentId);
     return { ok: true as const, data: { cancelled } };
   });
   if (r.ok) await actor.db.auditLog.create({ data: { tenantId: actor.tenantId, userId: actor.userId, action: 'CANCEL', entity: 'FinancialTitle', entityId: id, metadata: { motivo, scope } } });

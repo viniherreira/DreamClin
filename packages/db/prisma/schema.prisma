@@ -460,37 +460,39 @@ model Procedure {
 }
 
 model Appointment {
-  id             String            @id @default(cuid())
-  tenantId       String
-  patientId      String
-  professionalId String
-  procedureId    String?
-  startTime      DateTime
-  endTime        DateTime
-  status         AppointmentStatus @default(SCHEDULED)
-  type           AppointmentType   @default(PARTICULAR)
-  notes          String?
-  cancelReason   String?
+  id                 String            @id @default(cuid())
+  tenantId           String
+  patientId          String
+  professionalId     String
+  procedureId        String?
+  startTime          DateTime
+  endTime            DateTime
+  status             AppointmentStatus @default(SCHEDULED)
+  type               AppointmentType   @default(PARTICULAR)
+  notes              String?
+  cancelReason       String?
   /// Rótulo colorido do horário (atraso, débito, primeira vez…), escolhido pela clínica.
-  labelId        String?
+  labelId            String?
   /// Chegou na clínica: entra na sala de espera.
-  arrivedAt      DateTime?
+  arrivedAt          DateTime?
   /// Entrou para o atendimento.
-  startedAt      DateTime?
+  startedAt          DateTime?
   /// Terminou o atendimento (junto com status ATTENDED).
-  finishedAt     DateTime?
+  finishedAt         DateTime?
   /// Unidade onde acontece. Nulo = a principal (agendamentos de antes das unidades).
-  unitId         String?
+  unitId             String?
   /// Situação financeira (financeiro completo). Nulo = agendamento de antes dos itens.
-  billingStatus  BillingStatus?
+  billingStatus      BillingStatus?
   /// "Não cobrar": motivo, quando e quem.
-  noChargeReason String?
-  noChargeAt     DateTime?
-  noChargeById   String?
-  createdById    String?
-  updatedById    String?
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  noChargeReason     String?
+  noChargeAt         DateTime?
+  noChargeById       String?
+  /// Convênio que paga este agendamento (cadastro de clientes e fornecedores). Só no tipo convênio.
+  insuranceContactId String?
+  createdById        String?
+  updatedById        String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
 
   tenant       Tenant            @relation(fields: [tenantId], references: [id])
   patient      Patient           @relation(fields: [patientId], references: [id])

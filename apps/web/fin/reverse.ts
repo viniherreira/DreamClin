@@ -4,6 +4,7 @@ import { Prisma } from '@clinicaiq/db';
 import { competenceOf, dayToDate, type Day } from '@/lib/financeiro/dates';
 import { fromCents, toCents } from '@/lib/financeiro/money';
 import { settledStatus } from '@/lib/financeiro/title-status';
+import { refreshBillingOfTitlesTx } from './billing-sync';
 import { openCashOf } from './cash';
 import { nextCode } from './codes';
 import type { Tx } from './titles';
@@ -173,6 +174,7 @@ export async function reverseTransactionTx(tx: Tx, env: ReverseEnv, input: Rever
     await tx.financialTitle.update({ where: { id: titleId }, data: { paidAmount: fromCents(pago), status: settledStatus(toCents(t.amount), pago, t.status) } });
     reopenedTitleIds.push(titleId);
   }
+  await refreshBillingOfTitlesTx(tx, tenantId, reopenedTitleIds);
 
   return { ok: true, reversedIds: movimentos.map((m) => m.id), reopenedTitleIds };
 }
