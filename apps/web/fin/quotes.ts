@@ -176,7 +176,7 @@ export async function legacyPending(tenantId: string): Promise<boolean> {
       OR EXISTS (
         SELECT 1 FROM "quotes" q
         WHERE q."tenantId" = ${tenantId} AND q."status" = 'ACCEPTED' AND q."total" > 0
-          AND NOT EXISTS (SELECT 1 FROM "financial_titles" ft WHERE ft."tenantId" = ${tenantId} AND ft."quoteId" = q."id")
+          AND COALESCE((SELECT sum(ft."amount") FROM "financial_titles" ft WHERE ft."tenantId" = ${tenantId} AND ft."quoteId" = q."id" AND ft."status" <> 'CANCELLED'), 0) < q."total"
       )
     ) AS pendente`);
   return Boolean(rows[0]?.pendente);

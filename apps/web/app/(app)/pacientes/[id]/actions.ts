@@ -12,6 +12,7 @@ import { anonymizePatient } from '@/lib/patient-lgpd';
 import { deleteChatMedia } from '@/crm/media-store';
 import { ANAMNESIS_KEYS, type AnamnesisAnswers } from './_components/anamnesis-questions';
 import { refOutsideTenant, refErrorMessage } from '@/lib/owns';
+import { bridge, bridgeDeletePayment, bridgePayment } from '@/fin/bridge';
 import { findingText, isFace, isKind, KINDS, VALID_TEETH, type FindingKind, type FindingStatus } from '@/lib/odontogram';
 
 // ─── Auth ──────────────────────────────────────────────────────────────────────
@@ -437,6 +438,16 @@ export async function addPayment(
   const foreign = await refOutsideTenant(tenantId, { quoteId });
   if (foreign) return { success: false, errors: { amount: [refErrorMessage(foreign)] } };
 
+  // Financeiro completo ligado: o pagamento entra como título e movimento.
+  const fin = await bridge(tenantId);
+  if (fin) {
+    const r = await bridgePayment(fin, { patientId, quoteId: quoteId || null, amountCents: Math.round(amount * 100), methodName: method, notes });
+    if (!r.ok) return { success: false, errors: { amount: [r.message] } };
+    revalidatePath(`/pacientes/${patientId}`);
+    revalidatePath('/financeiro', 'layout');
+    return { success: true };
+  }
+
   const payment = await prisma.payment.create({
     data: {
       tenantId,
@@ -457,7 +468,7 @@ export async function addPayment(
   return { success: true };
 }
 
-export async function deletePayment(paymentId: string, patientId: string) {
+export async function deletePayment(paymentId: string, patientId: string): Promise<{ message: string } | void> {
   const { tenantId, userId } = await requireTenant();
 
   const bloqueio = await writeBlocked(tenantId);
@@ -465,6 +476,15 @@ export async function deletePayment(paymentId: string, patientId: string) {
 
   const semAcesso = await capabilityBlocked(tenantId, 'financeiro');
   if (semAcesso) return;
+  // Financeiro completo ligado: excluir é estornar (nada some do financeiro).
+  const fin = await bridge(tenantId);
+  if (fin) {
+    const r = await bridgeDeletePayment(fin, paymentId);
+    if (!r.ok) return { message: r.message };
+    revalidatePath(`/pacientes/${patientId}`);
+    revalidatePath('/financeiro', 'layout');
+    return;
+  }
   await prisma.payment.deleteMany({ where: { id: paymentId, tenantId } });
   await prisma.auditLog.create({
     data: { tenantId, userId, action: 'DELETE', entity: 'Payment', entityId: paymentId },

@@ -13,6 +13,7 @@ import { capabilityBlocked, writeBlocked } from '@/lib/access';
 import { requireCapability } from '@/lib/guard';
 import { refOutsideTenant, refErrorMessage } from '@/lib/owns';
 import { notifyCrm } from '@/crm/notify';
+import { bridge, bridgeDeletePayment, bridgePayment, bridgeQuoteAccepted, bridgeQuoteDeleting, bridgeQuoteReopened } from '@/fin/bridge';
 import { describePayment, isPaymentMethod, MAX_INSTALLMENTS } from '@/lib/payment-terms';
 import { loadClinicInfo, loadPatientDocData } from '@/lib/documents';
 import {
@@ -640,6 +641,18 @@ export async function addQuotePayment(
   const paidAt = paidAtFor(parsed.data.paidOn || undefined, clinicToday());
   if (paidAt === 'futuro') return { success: false, errors: { paidOn: ['A data do pagamento não pode ser no futuro.'] } };
 
+  // Financeiro completo ligado: o pagamento entra como título e movimento (o recibo sai pelo recebimento).
+  const fin = await bridge(tenantId);
+  if (fin) {
+    const r = await bridgePayment(fin, { patientId: quote.patientId, quoteId: quote.id, amountCents: Math.round(parsed.data.amount * 100), methodName: parsed.data.method, notes: parsed.data.notes, paidOn: parsed.data.paidOn || null });
+    if (!r.ok) return { success: false, errors: { amount: [r.message] } };
+    revalidatePath(`/orcamentos/${quoteId}`);
+    revalidatePath('/orcamentos');
+    revalidatePath(`/pacientes/${quote.patientId}`);
+    revalidatePath('/financeiro', 'layout');
+    return { success: true, paymentId: r.receiptGroupId };
+  }
+
   const payment = await prisma.payment.create({
     data: {
       tenantId,
@@ -666,7 +679,7 @@ export async function addQuotePayment(
 
 const formatBRLText = (n: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
 
-export async function deleteQuotePayment(paymentId: string, quoteId: string) {
+export async function deleteQuotePayment(paymentId: string, quoteId: string): Promise<{ message: string } | void> {
   const { tenantId, userId } = await requireTenant();
 
   const bloqueio = await writeBlocked(tenantId);
@@ -674,6 +687,16 @@ export async function deleteQuotePayment(paymentId: string, quoteId: string) {
 
   const semAcesso = await capabilityBlocked(tenantId, 'financeiro');
   if (semAcesso) return;
+  // Financeiro completo ligado: excluir é estornar (nada some do financeiro).
+  const fin = await bridge(tenantId);
+  if (fin) {
+    const r = await bridgeDeletePayment(fin, paymentId);
+    if (!r.ok) return { message: r.message };
+    revalidatePath(`/orcamentos/${quoteId}`);
+    revalidatePath('/orcamentos');
+    revalidatePath('/financeiro', 'layout');
+    return;
+  }
   await prisma.payment.deleteMany({ where: { id: paymentId, tenantId, quoteId } });
   await prisma.auditLog.create({
     data: { tenantId, userId, action: 'DELETE', entity: 'Payment', entityId: paymentId },
@@ -706,6 +729,9 @@ export async function acceptQuote(id: string): Promise<{ ok: boolean; message?: 
   await prisma.auditLog.create({
     data: { tenantId, userId, action: 'ACCEPT', entity: 'Quote', entityId: id },
   });
+  // Financeiro completo: o plano de pagamento vira títulos a receber.
+  const fin = await bridge(tenantId);
+  if (fin) await bridgeQuoteAccepted(fin, id);
   after(() => notifyCrm(tenantId, { type: 'quote.accepted', patientId: quote.patientId, quoteId: id }));
 
   revalidatePath('/orcamentos');
@@ -739,6 +765,9 @@ export async function reopenQuote(id: string): Promise<{ ok: boolean }> {
   await prisma.auditLog.create({
     data: { tenantId, userId, action: 'REOPEN', entity: 'Quote', entityId: id },
   });
+  // Financeiro completo: as parcelas que ainda não receberam nada são canceladas.
+  const fin = await bridge(tenantId);
+  if (fin) await bridgeQuoteReopened(fin, id);
   after(() => notifyCrm(tenantId, { type: 'quote.reopened', patientId: quote.patientId, quoteId: id }));
 
   revalidatePath('/orcamentos');
@@ -762,6 +791,11 @@ export async function deleteQuote(id: string) {
     select: { patientId: true },
   });
   if (!quote) return;
+
+  // Financeiro completo: orçamento com pagamento não se exclui (estorna primeiro);
+  // sem pagamento, os títulos em aberto são cancelados junto.
+  const fin = await bridge(tenantId);
+  if (fin && (await bridgeQuoteDeleting(fin, id))) return;
 
   // Payments reference the quote with SetNull, so a bare delete would leave them
   // orphaned and still counted in the financial totals. Remove them together.
