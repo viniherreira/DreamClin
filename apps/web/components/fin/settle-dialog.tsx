@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { CheckCircle2, FileDown, MessageCircle, Plus, Printer, ShieldQuestion, Trash2 } from 'lucide-react';
 import { receiptShare } from '@/app/(app)/financeiro/fin-extra-actions';
 import { requestRelease, releaseStatus, settleAction, settleContext, type SettleContext } from '@/app/(app)/financeiro/fin-actions';
+import { openCashAction } from '@/app/(app)/financeiro/caixa/cash-actions';
 import { cardReceivables, settlementRule, totalFee, totalNet } from '@/lib/financeiro/card';
 import { dayBR } from '@/lib/financeiro/dates';
 import { METHOD_KIND_LABEL, type MethodKind } from '@/lib/financeiro/defaults';
@@ -63,6 +64,7 @@ export function SettleDialog({ titleId, open, onOpenChange, onDone }: { titleId:
   const [erro, setErro] = useState('');
   const [pending, start] = useTransition();
   const [feito, setFeito] = useState<SettleDone | null>(null);
+  const [troco, setTroco] = useState(0);
   const [liberacao, setLiberacao] = useState<{ id: string | null; kind: 'DISCOUNT' | 'WAIVE_LATE'; status: 'ASK' | 'PENDING' | 'APPROVED' | 'DENIED' | 'EXPIRED' } | null>(null);
   const seq = useRef(1);
   const [zap, setZap] = useState('');
@@ -118,6 +120,18 @@ export function SettleDialog({ titleId, open, onOpenChange, onDone }: { titleId:
   }, [open, titleId]);
 
   const formaDe = (id: string): Method | undefined => ctx?.methods.find((m) => m.id === id);
+  // Dinheiro com o caixa fechado: a pessoa abre o caixa aqui mesmo e segue recebendo.
+  const precisaCaixa = Boolean(ctx && receber && ctx.requireOpenCashForCash && !ctx.cashSession && lines.some((l) => formaDe(l.methodId)?.kind === 'CASH' && l.amountCents > 0));
+  const abrirCaixa = () =>
+    start(async () => {
+      setErro('');
+      const r = await openCashAction({ openingCents: troco });
+      if (!r.ok) return setErro(r.message);
+      const c = titleId ? await settleContext(titleId) : null;
+      if (!c) return;
+      setCtx(c);
+      setLines((ls) => ls.map((l) => (c.methods.find((m) => m.id === l.methodId)?.kind === 'CASH' ? { ...l, accountId: contaDe(c, c.methods.find((m) => m.id === l.methodId)) } : l)));
+    });
   const interest = ctx?.late && cobraAtraso ? ctx.late.interest : 0;
   const fine = ctx?.late && cobraAtraso ? ctx.late.fine : 0;
 
@@ -381,7 +395,19 @@ export function SettleDialog({ titleId, open, onOpenChange, onDone }: { titleId:
                       {l.amountCents > ctx.walletCents ? '. O valor passa do saldo.' : ''}
                     </p>
                   )}
-                  {k === 'CASH' && receber && !ctx.cashSession && ctx.requireOpenCashForCash && <p className="mt-2 text-xs text-muted-foreground">Seu caixa não está aberto.</p>}
+                  {k === 'CASH' && receber && !ctx.cashSession && ctx.requireOpenCashForCash && (
+                    <div className="mt-3 rounded-lg border border-amber-300/60 bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                      <p className="font-medium">Abra o caixa para receber em dinheiro.</p>
+                      <div className="mt-2 flex flex-wrap items-end gap-2">
+                        <Field label="Troco inicial" className="w-40">
+                          {(id) => <MoneyInput id={id} value={troco} onChange={setTroco} />}
+                        </Field>
+                        <button type="button" onClick={abrirCaixa} disabled={pending} className="btn-primary btn-md">
+                          Abrir caixa
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   {previa.length > 0 && totalFee(previa) > 0 && (
                     <p className="mt-2 text-xs text-muted-foreground">
                       Taxa de {formatCents(totalFee(previa))} · líquido previsto de {formatCents(totalNet(previa))} · {previa.length > 1 ? `de ${dayBR(previa[0].expectedDate)} a ${dayBR(previa[previa.length - 1].expectedDate)}` : `cai em ${dayBR(previa[0].expectedDate)}`}
@@ -454,7 +480,7 @@ export function SettleDialog({ titleId, open, onOpenChange, onDone }: { titleId:
             <button type="button" onClick={() => onOpenChange(false)} className="btn-outline btn-md">
               Cancelar
             </button>
-            <button type="submit" disabled={pending || !plano?.ok || liberacao?.status === 'PENDING'} className="btn-primary btn-md">
+            <button type="submit" disabled={pending || !plano?.ok || liberacao?.status === 'PENDING' || precisaCaixa} className="btn-primary btn-md">
               {pending ? 'Salvando…' : `${verbo} ${formatCents(Math.min(recebido, Math.max(totalDue, 0)))}`}
             </button>
           </div>

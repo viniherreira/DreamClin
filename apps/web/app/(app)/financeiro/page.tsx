@@ -42,7 +42,7 @@ export default async function FinanceiroPage({ searchParams }: PageProps) {
   await requireCapability('financeiro');
   // Financeiro completo ligado: as abas das telas novas aparecem aqui em cima.
   const fin = await finContext();
-  const abas = fin?.can('fin_ver') ? { reverse: fin.can('fin_estornar') } : null;
+  const abas = fin?.can('fin_ver') ? { reverse: fin.can('fin_estornar'), cash: fin.can('fin_caixa') } : null;
 
   const sp = await searchParams;
   const one = (k: string) => (typeof sp[k] === 'string' ? (sp[k] as string) : undefined);

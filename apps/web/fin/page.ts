@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { cashAlertCount } from './cash-read';
 import { financeAdvanced } from './flag';
 import { requireFinance, type FinContext } from './guard';
 import { ensureLegacyMigrated } from './quotes';
@@ -14,15 +15,17 @@ import type { FinCapability } from '@/lib/financeiro/access';
 export async function finPage(capability: FinCapability): Promise<{
   ctx: FinContext;
   advanced: boolean;
-  nav: { reverse: boolean; pendingReleases: number };
+  nav: { reverse: boolean; pendingReleases: number; cash: boolean; cashAlerts: number };
 }> {
   const ctx = await requireFinance(capability);
   await ensureFinanceSetup(ctx.tenantId);
   await ensureLegacyMigrated(ctx.tenantId);
   const reverse = ctx.can('fin_estornar');
-  const [advanced, pendingReleases] = await Promise.all([
+  const cash = ctx.can('fin_caixa');
+  const [advanced, pendingReleases, cashAlerts] = await Promise.all([
     financeAdvanced(ctx.tenantId),
     reverse && (ctx.role === 'OWNER' || ctx.role === 'ADMIN') ? ctx.db.financialRelease.count({ where: { status: 'PENDING', expiresAt: { gt: new Date() } } }) : 0,
+    cash ? cashAlertCount(ctx) : 0,
   ]);
-  return { ctx, advanced, nav: { reverse, pendingReleases } };
+  return { ctx, advanced, nav: { reverse, pendingReleases, cash, cashAlerts } };
 }

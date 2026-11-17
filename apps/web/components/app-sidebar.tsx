@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation';
 import { useLiveUnread } from './crm-chat/unread';
 import {
   LayoutDashboard, CalendarDays, Users, Stethoscope, FileText, Wallet,
-  MessageCircle, Megaphone, Settings, PhoneCall, KanbanSquare, List, ListChecks, Smartphone, BarChart3, Zap, TrendingUp, Receipt,
+  MessageCircle, Megaphone, Settings, PhoneCall, KanbanSquare, List, ListChecks, Smartphone, BarChart3, Zap, TrendingUp, Receipt, Banknote,
 } from 'lucide-react';
 import { CrmRail } from './crm-rail';
 import { ClinicSidebar } from './clinic-sidebar';
@@ -51,7 +51,10 @@ export const CLINIC_NAV: NavItem[] = [
  * a bandeira ligada (`fin/flag.ts`). As outras telas do financeiro ficam nas
  * abas do topo de cada uma (`components/fin/fin-nav.tsx`).
  */
-export const FINANCE_NAV: NavItem[] = [{ href: '/financeiro/contas', label: 'Contas', icon: Receipt, capability: 'fin_ver', group: 'Financeiro' }];
+export const FINANCE_NAV: NavItem[] = [
+  { href: '/financeiro/caixa', label: 'Caixa', icon: Banknote, capability: 'fin_caixa', group: 'Financeiro' },
+  { href: '/financeiro/contas', label: 'Contas', icon: Receipt, capability: 'fin_ver', group: 'Financeiro' },
+];
 
 /**
  * O menu do espaço CRM. Transmissões e Chatbot entram nas próximas etapas. O
