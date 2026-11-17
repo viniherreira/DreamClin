@@ -205,8 +205,8 @@ export function ToBillView({ today, options, canReceive }: { today: Day; options
               <th scope="col" className="px-3 py-2.5">Data e hora</th>
               <th scope="col" className="px-3 py-2.5">Profissional</th>
               <th scope="col" className="px-3 py-2.5">Procedimentos</th>
-              <th scope="col" className="px-3 py-2.5 text-right">Paciente</th>
-              <th scope="col" className="px-3 py-2.5 text-right">Convênio</th>
+              <th scope="col" className="px-3 py-2.5 text-right">Valor do paciente</th>
+              <th scope="col" className="px-3 py-2.5 text-right">Valor do convênio</th>
               <th scope="col" className="px-3 py-2.5">
                 <span className="sr-only">Ações</span>
               </th>

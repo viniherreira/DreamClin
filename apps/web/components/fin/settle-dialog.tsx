@@ -112,11 +112,18 @@ export function SettleDialog({ titleId, open, onOpenChange, onDone }: { titleId:
     setChange('RETURN');
     setNota('');
     setCarregando(true);
+    // Só vale a resposta deste pedido: uma resposta atrasada de antes não pode
+    // apagar o que a pessoa já digitou.
+    let vivo = true;
     void settleContext(titleId).then((c) => {
+      if (!vivo) return;
       setCarregando(false);
       setCtx(c);
       if (c) setLines([novaLinha(c, c.title.openCents + (c.late ? c.late.fine + c.late.interest : 0))]);
     });
+    return () => {
+      vivo = false;
+    };
   }, [open, titleId]);
 
   const formaDe = (id: string): Method | undefined => ctx?.methods.find((m) => m.id === id);

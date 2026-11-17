@@ -29,7 +29,13 @@ export function ReverseDialog({ transactionId, open, onOpenChange, onDone }: { t
     setJunto([]);
     setForaDeOrdem(false);
     setErro('');
-    void reverseContext(transactionId).then(setCtx);
+    let vivo = true;
+    void reverseContext(transactionId).then((c) => {
+      if (vivo) setCtx(c);
+    });
+    return () => {
+      vivo = false;
+    };
   }, [open, transactionId]);
 
   const salvar = () =>
