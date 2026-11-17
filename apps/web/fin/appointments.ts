@@ -8,6 +8,7 @@ import type { InstallmentInterval } from '@/lib/financeiro/installments';
 import { fromCents, toCents } from '@/lib/financeiro/money';
 import type { FinanceSettings } from '@/lib/financeiro/settings';
 import { billingFor, ensureItemsTx, refreshBillingTx } from './billing-sync';
+import { generateCommissionsTx, refreshPendingCommissionsTx } from './commission';
 import { categoryId } from './setup';
 import { createTitlesTx, type Tx } from './titles';
 
@@ -125,6 +126,8 @@ export async function saveItemsTx(tx: Tx, env: ApptEnv, appointmentId: string, i
     await tx.auditLog.create({ data: { tenantId: env.tenantId, userId: env.userId, action: 'ITEMS_CHANGED', entity: 'Appointment', entityId: a.id, metadata: { itens: items.length, depoisDeAtendido: true } } });
   }
   const billing = await refreshBillingTx(tx, env.tenantId, a.id);
+  // Itens mudaram: as comissões ainda pendentes são refeitas.
+  await refreshPendingCommissionsTx(tx, env.tenantId, a.id, env.settings, env.today);
   return { ok: true, billing: billing! };
 }
 
@@ -187,6 +190,7 @@ export async function billAppointmentTx(tx: Tx, env: ApptEnv, input: BillInput):
     interval: input.interval,
   });
   if (!r.ok) return r;
+  await generateCommissionsTx(tx, env.tenantId, a.id, 'BILLING', env.settings, env.today);
   // Parcelado: todas as parcelas são receita do mês do atendimento (o padrão seria o mês de cada vencimento).
   if (r.data.ids.length > 1) await tx.financialTitle.updateMany({ where: { tenantId: env.tenantId, id: { in: r.data.ids } }, data: { competence: competenceOf(dia) } });
   await refreshBillingTx(tx, env.tenantId, a.id);
@@ -250,6 +254,7 @@ export async function startBlockReason(db: Db, env: ApptEnv, appointmentId: stri
 export async function onAttendedTx(tx: Tx, env: ApptEnv, appointmentId: string): Promise<{ openCents: number }> {
   let b = await refreshBillingTx(tx, env.tenantId, appointmentId);
   if (!b) return { openCents: 0 };
+  await generateCommissionsTx(tx, env.tenantId, appointmentId, 'EXECUTION', env.settings, env.today);
   if (env.settings.autoBillOnFinish && b.unbilled > 0) {
     const a = await tx.appointment.findFirst({ where: { tenantId: env.tenantId, id: appointmentId }, select: { type: true, insuranceContactId: true } });
     // Convênio sem o convênio escolhido não dá para faturar sozinho: fica em "A faturar".

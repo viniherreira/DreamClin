@@ -13,6 +13,7 @@ import type { FinanceSettings } from '@/lib/financeiro/settings';
 import { discountPercent, planSettlement } from '@/lib/financeiro/settlement';
 import { settledStatus } from '@/lib/financeiro/title-status';
 import { refreshBillingTx } from './billing-sync';
+import { commissionsOnReceiptTx } from './commission';
 import { openCashOf } from './cash';
 import { nextCode } from './codes';
 import { categoryId, defaultAccountId } from './setup';
@@ -403,6 +404,9 @@ export async function settleTitleTx(tx: Tx, env: SettleEnv, input: SettleInput):
   if (liberacao) await tx.financialRelease.update({ where: { id: liberacao.id }, data: { usedAt: new Date() } });
   // Título de agendamento: a situação financeira dele na agenda acompanha.
   if (title.appointmentId) await refreshBillingTx(tx, tenantId, title.appointmentId);
+
+  // Regra "comissão no recebimento": nasce a parte proporcional ao que entrou.
+  if (receber && title.appointmentId) await commissionsOnReceiptTx(tx, tenantId, transactionIds, env.settings);
 
   return { ok: true, receiptGroupId, transactionIds, changeCents: plano.change, walletCreditCents: plano.walletCredit, titleStatus, remainingCents: plano.remaining };
 }

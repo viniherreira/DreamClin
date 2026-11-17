@@ -196,6 +196,9 @@ model Tenant {
   financialPermissions  FinancialPermission[]
   financialAttachments  FinancialAttachment[]
   financialReleases     FinancialRelease[]
+  commissionExceptions  CommissionException[]
+  transferTypes         TransferType[]
+  commissionEntries     CommissionEntry[]
 
   @@map("tenants")
 }
@@ -425,6 +428,8 @@ model Procedure {
   materials          String?
   allowsDiscount     Boolean  @default(false)
   maxDiscountPercent Decimal? @db.Decimal(5, 2)
+  /// Custo de material do procedimento (financeiro completo): pode ser descontado da base da comissão.
+  costPrice          Decimal? @db.Decimal(10, 2)
 
   /// De quantos em quantos dias este procedimento se repete.
   ///
@@ -2587,4 +2592,87 @@ model FinancialRelease {
   @@index([tenantId, status, createdAt])
   @@index([tenantId, requestedById])
   @@map("financial_releases")
+}
+
+/// Exceção de comissão: % ou valor fixo diferente para um profissional (e, se quiser, só num procedimento).
+model CommissionException {
+  id             String   @id @default(cuid())
+  tenantId       String
+  professionalId String
+  /// Nulo = vale para todos os procedimentos deste profissional.
+  procedureId    String?
+  /// "PERCENT" ou "FIXED" (valor por item).
+  mode           String   @default("PERCENT")
+  value          Decimal  @db.Decimal(12, 2)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, professionalId])
+  @@map("commission_exceptions")
+}
+
+/// Tipo de repasse (laboratório, anestesista, profissional terceiro): valor padrão e os procedimentos em que entra.
+model TransferType {
+  id           String   @id @default(cuid())
+  tenantId     String
+  name         String
+  mode         String   @default("FIXED")
+  value        Decimal  @db.Decimal(12, 2)
+  /// Quem recebe por padrão (cadastro de clientes e fornecedores). Nulo = o profissional do atendimento.
+  contactId    String?
+  procedureIds String[] @default([])
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, active])
+  @@map("transfer_types")
+}
+
+/// Uma linha de comissão ou repasse, nascida de um item atendido, faturado ou recebido.
+model CommissionEntry {
+  id                   String    @id @default(cuid())
+  tenantId             String
+  /// "COMMISSION" ou "TRANSFER" (repasse).
+  kind                 String    @default("COMMISSION")
+  professionalId       String?
+  contactId            String?
+  transferTypeId       String?
+  appointmentId        String?
+  appointmentItemId    String?
+  procedureId          String?
+  /// O que fez nascer a linha: "EXECUTION", "BILLING" ou "RECEIPT".
+  trigger              String
+  /// No recebimento: o movimento que gerou esta parte (o estorno dele estorna a linha).
+  triggerTransactionId String?
+  description          String
+  base                 Decimal   @db.Decimal(12, 2)
+  /// Como foi calculado, para a tela ("12% da regra do profissional").
+  ruleLabel            String
+  amount               Decimal   @db.Decimal(12, 2)
+  /// Ajuste feito na conferência (positivo ou negativo), com o motivo.
+  adjustment           Decimal   @default(0) @db.Decimal(12, 2)
+  adjustmentReason     String?
+  /// "PENDING", "APPROVED" ou "REVERSED". Paga sai da conta a pagar gerada.
+  status               String    @default("PENDING")
+  occurredOn           DateTime  @db.Date
+  competence           String
+  payableTitleId       String?
+  approvedAt           DateTime?
+  approvedById         String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, professionalId, occurredOn])
+  @@index([tenantId, appointmentId])
+  @@index([tenantId, triggerTransactionId])
+  @@index([tenantId, payableTitleId])
+  @@map("commission_entries")
 }

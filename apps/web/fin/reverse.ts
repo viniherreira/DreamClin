@@ -5,6 +5,7 @@ import { competenceOf, dayToDate, type Day } from '@/lib/financeiro/dates';
 import { fromCents, toCents } from '@/lib/financeiro/money';
 import { settledStatus } from '@/lib/financeiro/title-status';
 import { refreshBillingOfTitlesTx } from './billing-sync';
+import { commissionsOnReversalTx } from './commission';
 import { openCashOf } from './cash';
 import { lockWallet } from './settle';
 import { nextCode } from './codes';
@@ -187,6 +188,7 @@ export async function reverseTransactionTx(tx: Tx, env: ReverseEnv, input: Rever
     reopenedTitleIds.push(titleId);
   }
   await refreshBillingOfTitlesTx(tx, tenantId, reopenedTitleIds);
+  await commissionsOnReversalTx(tx, tenantId, movimentos.map((m) => m.id), env.today);
 
   return { ok: true, reversedIds: movimentos.map((m) => m.id), reopenedTitleIds };
 }

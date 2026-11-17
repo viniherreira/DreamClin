@@ -361,6 +361,8 @@ export async function cancelTitle(actor: FinActor, id: string, reason: string, s
       await tx.recurrenceRule.updateMany({ where: { tenantId: actor.tenantId, id: t.recurrenceId }, data: { active: false } });
     }
     if (t.appointmentId) await refreshBillingTx(tx, actor.tenantId, t.appointmentId);
+    // Conta de comissão cancelada: as linhas voltam a ficar prontas para faturar.
+    if (t.origin === 'COMMISSION') await tx.commissionEntry.updateMany({ where: { tenantId: actor.tenantId, payableTitleId: id }, data: { payableTitleId: null } });
     return { ok: true as const, data: { cancelled } };
   });
   if (r.ok) await actor.db.auditLog.create({ data: { tenantId: actor.tenantId, userId: actor.userId, action: 'CANCEL', entity: 'FinancialTitle', entityId: id, metadata: { motivo, scope } } });

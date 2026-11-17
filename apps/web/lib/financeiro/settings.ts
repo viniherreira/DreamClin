@@ -43,6 +43,26 @@ export interface FinanceSettings {
   alertCashDifference: boolean;
   /** O profissional vê as próprias comissões. */
   professionalSeesCommissions: boolean;
+  /** Comissões ligadas (sem exceção nem % no profissional, a regra padrão é 0: nada nasce). */
+  commissionEnabled: boolean;
+  /** Regra padrão da clínica para particular e convênio. */
+  commissionParticular: CommissionDefault;
+  commissionConvenio: CommissionDefault;
+  /** Base: o preço da tabela do procedimento ou o valor cobrado (já com desconto). */
+  commissionBase: 'CHARGED' | 'TABLE';
+  /** Descontar o custo de material do procedimento da base. */
+  commissionDeductCost: boolean;
+  /** Quando a comissão nasce: no atendimento, no faturamento ou no recebimento (proporcional). */
+  commissionWhen: 'EXECUTION' | 'BILLING' | 'RECEIPT';
+  /** Categoria e conta da conta a pagar gerada ao faturar as comissões. */
+  commissionCategoryId: string | null;
+  commissionAccountId: string | null;
+}
+
+export interface CommissionDefault {
+  mode: 'PERCENT' | 'FIXED';
+  /** % ou reais (por item), conforme o modo. */
+  value: number;
 }
 
 export const DEFAULT_FINANCE_SETTINGS: FinanceSettings = {
@@ -67,11 +87,25 @@ export const DEFAULT_FINANCE_SETTINGS: FinanceSettings = {
   openCashAlertDays: 1,
   alertCashDifference: true,
   professionalSeesCommissions: false,
+  commissionEnabled: true,
+  commissionParticular: { mode: 'PERCENT', value: 0 },
+  commissionConvenio: { mode: 'PERCENT', value: 0 },
+  commissionBase: 'CHARGED',
+  commissionDeductCost: false,
+  commissionWhen: 'EXECUTION',
+  commissionCategoryId: null,
+  commissionAccountId: null,
 };
 
 const bool = (v: unknown, d: boolean) => (typeof v === 'boolean' ? v : d);
 const num = (v: unknown, d: number, min: number, max: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : d);
 const pick = <T extends string>(v: unknown, options: readonly T[], d: T): T => (typeof v === 'string' && (options as readonly string[]).includes(v) ? (v as T) : d);
+
+function commissionDefault(v: unknown, d: CommissionDefault): CommissionDefault {
+  const o = v && typeof v === 'object' ? (v as Record<string, unknown>) : {};
+  const mode = pick(o.mode, ['PERCENT', 'FIXED'] as const, d.mode);
+  return { mode, value: num(o.value, d.value, 0, mode === 'PERCENT' ? 100 : 100_000) };
+}
 
 export function cleanFinanceSettings(raw: unknown): FinanceSettings {
   const r = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
@@ -98,6 +132,14 @@ export function cleanFinanceSettings(raw: unknown): FinanceSettings {
     openCashAlertDays: Math.round(num(r.openCashAlertDays, d.openCashAlertDays, 0, 60)),
     alertCashDifference: bool(r.alertCashDifference, d.alertCashDifference),
     professionalSeesCommissions: bool(r.professionalSeesCommissions, d.professionalSeesCommissions),
+    commissionEnabled: bool(r.commissionEnabled, d.commissionEnabled),
+    commissionParticular: commissionDefault(r.commissionParticular, d.commissionParticular),
+    commissionConvenio: commissionDefault(r.commissionConvenio, d.commissionConvenio),
+    commissionBase: pick(r.commissionBase, ['CHARGED', 'TABLE'] as const, d.commissionBase),
+    commissionDeductCost: bool(r.commissionDeductCost, d.commissionDeductCost),
+    commissionWhen: pick(r.commissionWhen, ['EXECUTION', 'BILLING', 'RECEIPT'] as const, d.commissionWhen),
+    commissionCategoryId: typeof r.commissionCategoryId === 'string' && r.commissionCategoryId ? r.commissionCategoryId.slice(0, 64) : null,
+    commissionAccountId: typeof r.commissionAccountId === 'string' && r.commissionAccountId ? r.commissionAccountId.slice(0, 64) : null,
   };
 }
 
