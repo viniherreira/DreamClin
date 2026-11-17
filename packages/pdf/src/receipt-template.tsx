@@ -41,22 +41,28 @@ export interface ReceiptDocumentProps {
     services?: string[];
     generatedAt: string;
   };
+  /** Papel timbrado: sem o cabeçalho da clínica e com margem em cima (em mm) para o timbre. */
+  plain?: { topMarginMm: number };
 }
 
-export function ReceiptDocument({ clinic, signer, receipt }: ReceiptDocumentProps) {
+export function ReceiptDocument({ clinic, signer, receipt, plain }: ReceiptDocumentProps) {
   const quemRecebe = signer ?? (clinic.technicalResponsible
     ? { name: clinic.technicalResponsible, registration: clinic.technicalRegistration }
     : undefined);
 
   return (
     <Document title={`Recibo ${receipt.number} · ${receipt.payer.name}`} author={clinic.name} language="pt-BR">
-      <Page size="A4" style={s.page}>
-        <DocHeader
-          clinic={clinic}
-          kind="Recibo"
-          code={receipt.number}
-          meta={[{ label: 'Pagamento', value: receipt.paidAt }]}
-        />
+      <Page size="A4" style={plain ? { ...s.page, paddingTop: 34 + plain.topMarginMm * 2.8346 } : s.page}>
+        {plain ? (
+          <View style={{ marginBottom: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+            <Text style={{ fontSize: 15, fontFamily: 'Helvetica-Bold', color: color.ink }}>Recibo</Text>
+            <Text style={{ fontSize: 9, color: color.muted }}>
+              {receipt.number}  ·  {receipt.paidAt}
+            </Text>
+          </View>
+        ) : (
+          <DocHeader clinic={clinic} kind="Recibo" code={receipt.number} meta={[{ label: 'Pagamento', value: receipt.paidAt }]} />
+        )}
 
         <View
           style={{
