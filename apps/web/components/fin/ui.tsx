@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useId, useState } from 'react';
-import { Lock } from 'lucide-react';
+import * as Dialog from '@radix-ui/react-dialog';
+import { Lock, X } from 'lucide-react';
 import { formatCents, parseMoney } from '@/lib/financeiro/money';
 
 /**
@@ -69,7 +70,6 @@ export function MoneyInput({
   const [foco, setFoco] = useState(false);
   useEffect(() => {
     if (!foco) setTexto(mostra(value));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, foco]);
   return (
     <div className={`relative ${className}`}>
@@ -203,4 +203,45 @@ export function useLoader<T>(load: () => Promise<T>, empty: T) {
     void reload();
   }, [reload]);
   return { data, loaded, reload };
+}
+
+/** Janela do financeiro (Radix Dialog), no mesmo desenho das outras janelas do sistema. */
+export function Modal({
+  open,
+  onOpenChange,
+  title,
+  description,
+  size = 'md',
+  children,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  description?: string;
+  size?: 'md' | 'lg' | 'xl';
+  children: React.ReactNode;
+}) {
+  const largura = { md: 'max-w-lg', lg: 'max-w-2xl', xl: 'max-w-4xl' }[size];
+  return (
+    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-40 bg-foreground/40 backdrop-blur-sm" />
+        <Dialog.Content
+          className={`fixed left-1/2 top-1/2 z-50 max-h-[92dvh] w-[calc(100vw-1.5rem)] ${largura} -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-border bg-surface shadow-2xl focus:outline-none`}
+          {...(description ? {} : { 'aria-describedby': undefined })}
+        >
+          <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
+            <div className="min-w-0">
+              <Dialog.Title className="text-base font-semibold">{title}</Dialog.Title>
+              {description && <Dialog.Description className="mt-0.5 text-sm text-muted-foreground">{description}</Dialog.Description>}
+            </div>
+            <Dialog.Close aria-label="Fechar" className="rounded-lg p-1.5 text-muted-foreground hover:bg-surface-alt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+              <X className="h-4 w-4" aria-hidden="true" />
+            </Dialog.Close>
+          </div>
+          <div className="px-5 py-4">{children}</div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
 }

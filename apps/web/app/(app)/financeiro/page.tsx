@@ -9,6 +9,8 @@ import { FinanceFilters } from './_components/finance-filters';
 import { FinancialDetail } from './_components/financial-detail';
 
 import { requireCapability } from '@/lib/guard';
+import { FinNav } from '@/components/fin/fin-nav';
+import { finContext } from '@/fin/guard';
 export const metadata = { title: 'Financeiro' };
 
 const TYPES: ReportType[] = ['recebimentos', 'orcamentos', 'agendamentos'];
@@ -38,6 +40,9 @@ interface PageProps {
  */
 export default async function FinanceiroPage({ searchParams }: PageProps) {
   await requireCapability('financeiro');
+  // Financeiro completo ligado: as abas das telas novas aparecem aqui em cima.
+  const fin = await finContext();
+  const abas = fin?.can('fin_ver') ? { reverse: fin.can('fin_estornar') } : null;
 
   const sp = await searchParams;
   const one = (k: string) => (typeof sp[k] === 'string' ? (sp[k] as string) : undefined);
@@ -76,6 +81,11 @@ export default async function FinanceiroPage({ searchParams }: PageProps) {
           <span className="print:hidden"> · resumo, recebimentos, orçamentos e agendamentos do período</span>
         </p>
       </header>
+      {abas && (
+        <div className="print:hidden">
+          <FinNav access={abas} />
+        </div>
+      )}
 
       <div className="print:hidden">
         <FinanceFilters
