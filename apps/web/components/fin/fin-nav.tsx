@@ -27,6 +27,9 @@ export function FinNav({ access }: { access: FinNavAccess }) {
     { href: '/financeiro/a-faturar', label: 'A faturar' },
     { href: '/financeiro/contas', label: 'Contas a receber e a pagar' },
     { href: '/financeiro/movimentacoes', label: 'Movimentações' },
+    { href: '/financeiro/carteiras', label: 'Carteiras' },
+    { href: '/financeiro/renegociacoes', label: 'Renegociações' },
+    { href: '/financeiro/transferencias', label: 'Transferências' },
     ...(access.reverse ? [{ href: '/financeiro/estornos', label: 'Estornos' }, { href: '/financeiro/liberacoes', label: 'Liberações', badge: access.pendingReleases }] : []),
   ];
   const ativo = itens.filter((i) => pathname === i.href || pathname.startsWith(`${i.href}/`)).sort((a, b) => b.href.length - a.href.length)[0]?.href;

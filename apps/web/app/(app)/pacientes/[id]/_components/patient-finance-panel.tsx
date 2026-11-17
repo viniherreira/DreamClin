@@ -12,6 +12,9 @@ import { dayBR, type Day } from '@/lib/financeiro/dates';
 import { formatCents } from '@/lib/financeiro/money';
 import { TITLE_STATUS_LABEL } from '@/lib/financeiro/title-status';
 import { patientFinance, type PatientFinance } from '../finance-actions';
+import { WalletDialog } from '@/components/fin/wallet-dialog';
+import { WalletStatementList } from '@/app/(app)/financeiro/carteiras/_components/wallets-view';
+import { walletStatementAction } from '@/app/(app)/financeiro/f5-actions';
 
 /**
  * Ficha do paciente › Financeiro (financeiro completo): devendo, vencido e
@@ -24,8 +27,14 @@ export function PatientFinancePanel({ patient, options, today, advanced }: { pat
   const [novo, setNovo] = useState(false);
   const [estornar, setEstornar] = useState<string | null>(null);
   const [aviso, setAviso] = useState('');
+  const [carteira, setCarteira] = useState<'credit' | 'refund' | null>(null);
+  const [extrato, setExtrato] = useState<Awaited<ReturnType<typeof walletStatementAction>>>(null);
 
-  const carregar = useCallback(async () => setD(await patientFinance(patient.id)), [patient.id]);
+  const carregar = useCallback(async () => {
+    const [f, e] = await Promise.all([patientFinance(patient.id), walletStatementAction(patient.id)]);
+    setD(f);
+    setExtrato(e);
+  }, [patient.id]);
   useEffect(() => {
     void carregar();
   }, [carregar]);
@@ -50,6 +59,21 @@ export function PatientFinancePanel({ patient, options, today, advanced }: { pat
           <button type="button" onClick={() => setNovo(true)} className="btn-outline btn-sm inline-flex items-center gap-1.5">
             <Plus className="h-3.5 w-3.5" aria-hidden="true" /> Nova conta
           </button>
+        )}
+        {d.can.receive && options && (
+          <button type="button" onClick={() => setCarteira('credit')} className="btn-outline btn-sm">
+            Adicionar crédito
+          </button>
+        )}
+        {d.walletCents > 0 && options && (
+          <button type="button" onClick={() => setCarteira('refund')} className="btn-ghost btn-sm">
+            Devolver crédito
+          </button>
+        )}
+        {d.owingCents > 0 && (
+          <Link href={`/financeiro/renegociacoes?paciente=${patient.id}`} className="btn-ghost btn-sm">
+            Renegociar
+          </Link>
         )}
         <Link href={`/orcamentos/novo?patientId=${patient.id}`} className="btn-ghost btn-sm">
           Novo orçamento
@@ -136,6 +160,25 @@ export function PatientFinancePanel({ patient, options, today, advanced }: { pat
             ))}
           </ul>
         </section>
+      )}
+
+      {extrato && extrato.lines.length > 0 && (
+        <section aria-label="Carteira do paciente">
+          <h3 className="mb-2 text-sm font-semibold">Carteira</h3>
+          <WalletStatementList data={extrato} />
+        </section>
+      )}
+
+      {carteira && options && (
+        <WalletDialog
+          mode={carteira}
+          patient={patient}
+          balanceCents={d.walletCents}
+          options={options}
+          today={today}
+          onClose={() => setCarteira(null)}
+          onDone={() => void carregar()}
+        />
       )}
 
       <SettleDialog
