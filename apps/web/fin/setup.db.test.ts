@@ -57,6 +57,7 @@ describe.skipIf(!process.env.DATABASE_URL)('financeiro: fundação (banco)', asy
       await prisma.auditLog.deleteMany({ where: t });
       await prisma.user.deleteMany({ where: t });
       await prisma.subscription.deleteMany({ where: t });
+      await prisma.clinicUnit.deleteMany({ where: t });
       await prisma.tenant.deleteMany({ where: { id } });
     }
   });

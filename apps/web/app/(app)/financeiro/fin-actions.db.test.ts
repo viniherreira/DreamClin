@@ -62,6 +62,7 @@ describe.skipIf(!process.env.DATABASE_URL)('financeiro: ações com perfil, libe
     await prisma.patient.deleteMany({ where: w });
     await prisma.user.deleteMany({ where: w });
     await prisma.subscription.deleteMany({ where: w });
+    await prisma.clinicUnit.deleteMany({ where: w });
     await prisma.tenant.deleteMany({ where: { id: t.id } });
   });
 

@@ -37,6 +37,7 @@ const env = (ctx: FinContext): SettleEnv => ({
   access: { role: ctx.role, permission: ctx.permission },
   settings: ctx.settings,
   today: clinicToday(),
+  unitId: ctx.unitId,
 });
 
 /** A forma do financeiro novo para um nome digitado nas telas antigas ("PIX", "Cartão de crédito"). */
@@ -115,7 +116,7 @@ export async function bridgeDeletePayment(ctx: FinContext, paymentId: string): P
   if (movimentos.length === 0) return { ok: false, message: 'Pagamento não encontrado.' };
   for (const m of movimentos) {
     const r = await ctx.db.$transaction((tx) =>
-      reverseTransactionTx(tx, { tenantId: ctx.tenantId, userId: ctx.userId, today: clinicToday() }, { transactionId: m.id, reason: 'Pagamento excluído na tela do orçamento ou do paciente', confirmOutOfOrder: true }),
+      reverseTransactionTx(tx, { tenantId: ctx.tenantId, userId: ctx.userId, today: clinicToday(), unitId: ctx.unitId }, { transactionId: m.id, reason: 'Pagamento excluído na tela do orçamento ou do paciente', confirmOutOfOrder: true }),
     );
     if (!r.ok) return { ok: false, message: r.message };
   }

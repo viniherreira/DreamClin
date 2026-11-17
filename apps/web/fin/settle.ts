@@ -12,6 +12,7 @@ import { fromCents, toCents } from '@/lib/financeiro/money';
 import type { FinanceSettings } from '@/lib/financeiro/settings';
 import { discountPercent, planSettlement } from '@/lib/financeiro/settlement';
 import { settledStatus } from '@/lib/financeiro/title-status';
+import { openCashOf } from './cash';
 import { nextCode } from './codes';
 import { categoryId, defaultAccountId } from './setup';
 import type { Tx } from './titles';
@@ -23,9 +24,6 @@ import type { Tx } from './titles';
  * (`FOR UPDATE`): duas pessoas baixando a mesma conta ao mesmo tempo entram em
  * fila, e a segunda encontra o valor em aberto já mudado e é recusada.
  */
-
-/** O caixa (F3) passa a exigir sessão aberta para dinheiro. */
-export const CASH_ENFORCED = false;
 
 export interface SettleLine {
   methodId: string;
@@ -65,6 +63,8 @@ export interface SettleEnv {
   access: FinAccessInput;
   settings: FinanceSettings;
   today: Day;
+  /** A unidade em que a pessoa está: escolhe o caixa aberto dela nessa unidade. */
+  unitId?: string | null;
   /** Migração e rotinas internas: não confere limite de desconto, caixa nem data futura. */
   system?: boolean;
 }
@@ -189,7 +189,7 @@ export async function settleTitleTx(tx: Tx, env: SettleEnv, input: SettleInput):
   // 5. Contas, caixa e carteira.
   const contaPadrao = (await tx.financialAccount.findFirst({ where: { tenantId, isDefault: true, active: true }, select: { id: true } }))?.id ?? defaultAccountId(tenantId);
   const contas = new Map((await tx.financialAccount.findMany({ where: { tenantId }, select: { id: true, active: true } })).map((c) => [c.id, c]));
-  const caixa = env.userId ? await tx.cashSession.findFirst({ where: { tenantId, userId: env.userId, status: 'OPEN' }, select: { id: true, accountId: true } }) : null;
+  const caixa = await openCashOf(tx, tenantId, env.userId, env.unitId, true);
 
   const linhas = [] as { line: SettleLine; forma: (typeof formas)[number]; accountId: string | null; cashSessionId: string | null }[];
   for (const l of input.lines) {
@@ -209,7 +209,7 @@ export async function settleTitleTx(tx: Tx, env: SettleEnv, input: SettleInput):
       if (!conta) return no('Conta não encontrada.');
       if (!conta.active && !env.system) return no('A conta escolhida está desativada.');
       if (!env.system && !accountAllowed(env.access, accountId)) return no('Seu acesso não permite movimentar esta conta.');
-      if (forma.kind === 'CASH' && !caixa && CASH_ENFORCED && env.settings.requireOpenCashForCash && !env.system) {
+      if (forma.kind === 'CASH' && receber && !caixa && env.settings.requireOpenCashForCash && !env.system) {
         return no('Abra o caixa para receber em dinheiro.', 'CASH_CLOSED');
       }
     }

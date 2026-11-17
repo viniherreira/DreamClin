@@ -8,6 +8,7 @@ import { currentAccess } from '@/lib/guard';
 import type { Role } from '@/lib/permissions';
 import { finCan, finDeniedMessage, NO_USER_PERMISSION, type FinCapability, type FinUserPermission } from '@/lib/financeiro/access';
 import { readFinanceSettings, type FinanceSettings } from '@/lib/financeiro/settings';
+import { getUnitContext } from '@/lib/units';
 import { financeEnabled } from './flag';
 
 /**
@@ -20,6 +21,8 @@ export interface FinContext {
   tenantId: string;
   userId: string;
   role: Role;
+  /** A unidade escolhida no topo da tela (nulo fora de uma página, como nas rotinas). */
+  unitId: string | null;
   db: TenantPrismaClient;
   permission: FinUserPermission;
   settings: FinanceSettings;
@@ -50,8 +53,11 @@ export async function finContext(): Promise<FinContext | null> {
   if (!(await financeEnabled(acesso.tenantId))) return null;
   const { permission, settings } = await loadExtras(acesso.tenantId, acesso.userId);
   const input = { role: acesso.role, permission, professionalSeesCommissions: settings.professionalSeesCommissions };
+  // A unidade vem do cookie; fora de uma requisição (rotina, teste) não há cookie.
+  const unitId = await getUnitContext(acesso.tenantId, acesso.userId).then((u) => u.current.id, () => null);
   return {
     ...acesso,
+    unitId,
     db: getTenantClient(acesso.tenantId),
     permission,
     settings,

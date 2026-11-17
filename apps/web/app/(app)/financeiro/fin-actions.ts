@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import type { Prisma } from '@clinicaiq/db';
+import { openCashOf } from '@/fin/cash';
 import { finRead, finWrite, type FinContext } from '@/fin/guard';
 import { ensureLegacyMigrated } from '@/fin/quotes';
 import { relatedTransactions, reverseTransactionTx } from '@/fin/reverse';
@@ -38,6 +39,7 @@ const env = (ctx: FinContext) => ({
   access: { role: ctx.role, permission: ctx.permission, professionalSeesCommissions: ctx.settings.professionalSeesCommissions },
   settings: ctx.settings,
   today: clinicToday(),
+  unitId: ctx.unitId,
 });
 
 function refresh(patientId?: string | null) {
@@ -476,7 +478,7 @@ export async function settleContext(titleId: string) {
     db.finPaymentMethod.findMany({ where: { active: true, usage: { in: receber ? ['RECEIVE', 'BOTH'] : ['PAY', 'BOTH'] } }, orderBy: [{ order: 'asc' }, { name: 'asc' }], include: { fees: { orderBy: { upToInstallments: 'asc' } } } }),
     db.financialAccount.findMany({ where: { active: true }, orderBy: [{ isDefault: 'desc' }, { name: 'asc' }], select: { id: true, name: true, isDefault: true, kind: true } }),
     receber && t.patientId ? db.walletEntry.aggregate({ where: { patientId: t.patientId }, _sum: { amount: true } }) : null,
-    db.cashSession.findFirst({ where: { userId: ctx.userId, status: 'OPEN' }, select: { id: true, accountId: true } }),
+    openCashOf(db, ctx.tenantId, ctx.userId, ctx.unitId),
   ]);
   const acesso = { role: ctx.role, permission: ctx.permission };
   const atraso = receber && settings.lateChargesEnabled ? lateCharges(openCents, dueDate, today, { finePercent: settings.finePercent, dailyInterestPercent: settings.dailyInterestPercent }) : null;
@@ -845,7 +847,7 @@ export async function reverseAction(input: z.input<typeof reverseSchema>): Promi
   const gate = await finWrite('fin_estornar');
   if (!gate.ok) return gate;
   const { ctx } = gate;
-  const r = await ctx.db.$transaction((tx) => reverseTransactionTx(tx, { tenantId: ctx.tenantId, userId: ctx.userId, today: clinicToday() }, parsed.data));
+  const r = await ctx.db.$transaction((tx) => reverseTransactionTx(tx, { tenantId: ctx.tenantId, userId: ctx.userId, today: clinicToday(), unitId: ctx.unitId }, parsed.data));
   if (!r.ok) return fail(r.message, r.code);
   await ctx.db.auditLog.create({ data: { tenantId: ctx.tenantId, userId: ctx.userId, action: 'REVERSE', entity: 'FinancialTransaction', entityId: parsed.data.transactionId, metadata: { motivo: parsed.data.reason, movimentos: r.reversedIds.length } } });
   const titulo = r.reopenedTitleIds[0] ? await ctx.db.financialTitle.findFirst({ where: { id: r.reopenedTitleIds[0] }, select: { patientId: true } }) : null;

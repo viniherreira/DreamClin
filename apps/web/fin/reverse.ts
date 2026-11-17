@@ -4,6 +4,7 @@ import { Prisma } from '@clinicaiq/db';
 import { competenceOf, dayToDate, type Day } from '@/lib/financeiro/dates';
 import { fromCents, toCents } from '@/lib/financeiro/money';
 import { settledStatus } from '@/lib/financeiro/title-status';
+import { openCashOf } from './cash';
 import { nextCode } from './codes';
 import type { Tx } from './titles';
 
@@ -17,6 +18,8 @@ export interface ReverseEnv {
   tenantId: string;
   userId: string | null;
   today: Day;
+  /** A unidade em que a pessoa está: escolhe o caixa aberto dela nessa unidade. */
+  unitId?: string | null;
 }
 
 export interface ReverseInput {
@@ -68,7 +71,9 @@ export async function reverseTransactionTx(tx: Tx, env: ReverseEnv, input: Rever
   const escolhidos = new Set(input.alsoIds ?? []);
   const idsEscolhidos = new Set([alvo.id, ...relacionados.filter((r) => escolhidos.has(r.id)).map((r) => r.id)]);
   const taxas = relacionados.filter((r) => r.origin === 'CARD_FEE' && r.originId && idsEscolhidos.has(r.originId)).map((r) => r.id);
-  const ids = [...new Set([...idsEscolhidos, ...taxas])];
+  // Reforço ou sangria que virou transferência: a outra ponta (cofre, banco) é desfeita junto.
+  const outraPonta = alvo.transferId && (alvo.kind === 'REINFORCEMENT' || alvo.kind === 'WITHDRAWAL') ? (await tx.financialTransaction.findMany({ where: { tenantId, transferId: alvo.transferId, id: { not: alvo.id } }, select: { id: true } })).map((r) => r.id) : [];
+  const ids = [...new Set([...idsEscolhidos, ...taxas, ...outraPonta])];
   const movimentos = await tx.financialTransaction.findMany({ where: { tenantId, id: { in: ids }, reversedAt: null, kind: { not: 'REVERSAL' } }, orderBy: { code: 'asc' } });
 
   // Trava os títulos envolvidos, sempre na mesma ordem (evita espera cruzada).
@@ -86,7 +91,20 @@ export async function reverseTransactionTx(tx: Tx, env: ReverseEnv, input: Rever
     }
   }
 
-  const caixa = env.userId ? await tx.cashSession.findFirst({ where: { tenantId, userId: env.userId, status: 'OPEN' }, select: { id: true } }) : null;
+  // Em que caixa o estorno entra: no do movimento original, se ainda estiver aberto (o dinheiro sai da
+  // mesma gaveta); senão, no caixa aberto de quem estorna. Um caixa fechado nunca é alterado.
+  const caixa = await openCashOf(tx, tenantId, env.userId, env.unitId, true);
+  const sessoesOriginais = [...new Set(movimentos.map((m) => m.cashSessionId).filter((x): x is string => Boolean(x)))];
+  const aindaAbertas = new Set(
+    sessoesOriginais.length
+      ? (await tx.$queryRaw<{ id: string }[]>(Prisma.sql`SELECT "id" FROM "cash_sessions" WHERE "tenantId" = ${tenantId} AND "id" IN (${Prisma.join(sessoesOriginais)}) AND "status" = 'OPEN' FOR SHARE`)).map((r) => r.id)
+      : [],
+  );
+  const caixaDoEstorno = (m: { cashSessionId: string | null; methodKind: string | null; accountId: string | null; kind: string }): string | null => {
+    if (!m.accountId || m.kind === 'FEE') return null;
+    if (m.cashSessionId && aindaAbertas.has(m.cashSessionId)) return m.cashSessionId;
+    return m.cashSessionId || m.methodKind === 'CASH' ? (caixa?.id ?? null) : null;
+  };
   let code = await nextCode(tx, tenantId, 'transaction');
   const agora = new Date();
   const baixa = new Map<string, number>();
@@ -101,8 +119,7 @@ export async function reverseTransactionTx(tx: Tx, env: ReverseEnv, input: Rever
         originId: m.originId,
         titleId: m.titleId,
         accountId: m.accountId,
-        // Nunca o caixa do movimento original (pode estar fechado): o caixa aberto de quem estorna.
-        cashSessionId: m.accountId ? (caixa?.id ?? null) : null,
+        cashSessionId: caixaDoEstorno(m),
         methodId: m.methodId,
         methodKind: m.methodKind,
         patientId: m.patientId,

@@ -14,6 +14,7 @@ describe.skipIf(!process.env.DATABASE_URL)('financeiro: títulos, recebimento e 
   const { createTitles, createRecurrence, extendRecurrences, updateTitle, cancelTitle } = await import('./titles');
   const { settleTitleTx } = await import('./settle');
   const { reverseTransactionTx } = await import('./reverse');
+  const { openCashTx } = await import('./cash');
   const { migrateLegacy, legacyPending, syncQuoteTitlesTx, cancelQuoteTitlesTx, receiveInOrderTx } = await import('./quotes');
   const { DEFAULT_FINANCE_SETTINGS } = await import('../lib/financeiro/settings');
   const { toCents } = await import('../lib/financeiro/money');
@@ -34,6 +35,8 @@ describe.skipIf(!process.env.DATABASE_URL)('financeiro: títulos, recebimento e 
   };
   const A = await novaClinica('a');
   const B = await novaClinica('b');
+  // Dinheiro só entra com o caixa aberto: o dono da clínica A trabalha com o dele aberto.
+  await A.db.$transaction((tx) => openCashTx(tx, { tenantId: A.id, userId: A.dono.id, unitId: null, today: '2026-11-16', manageOthers: true }, { openingCents: 0 }));
 
   const env = (c: typeof A, role: 'OWNER' | 'RECEPTIONIST' = 'OWNER', settings = {}) => ({
     tenantId: c.id,
@@ -62,6 +65,7 @@ describe.skipIf(!process.env.DATABASE_URL)('financeiro: títulos, recebimento e 
       await prisma.cardReceivable.deleteMany({ where: t });
       await prisma.financialTransaction.deleteMany({ where: { ...t, reversalOfId: { not: null } } });
       await prisma.financialTransaction.deleteMany({ where: t });
+      await prisma.cashSession.deleteMany({ where: t });
       await prisma.financialTitleAllocation.deleteMany({ where: t });
       await prisma.financialTitle.deleteMany({ where: t });
       await prisma.recurrenceRule.deleteMany({ where: t });
