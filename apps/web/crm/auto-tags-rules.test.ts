@@ -17,6 +17,16 @@ describe('tags de procedimento', () => {
     expect(tags(texto).sort()).toEqual([...esperado].sort());
   });
 
+  it('a mesma frase vira uma tag só, a mais precisa', () => {
+    expect(tags('Vim das redes sociais e quero saber sobre Prótese Protocolo em Suzano!')).toEqual(['protocolo']);
+    expect(tags('quero implante com carga imediata')).toEqual(['carga imediata']);
+    expect(tags('IMPLANTES COM CARGA IMEDIATA')).toEqual(['carga imediata']);
+    expect(tags('quero dentadura fixa')).toEqual(['protocolo']);
+    // Duas coisas diferentes na mesma mensagem continuam duas tags.
+    expect(tags('quero protocolo e também clareamento').sort()).toEqual(['clareamento', 'protocolo']);
+    expect(tags('tenho prótese e quero um implante').sort()).toEqual(['implante', 'prótese']);
+  });
+
   it('não acha palavra pela metade nem conversa sem procedimento', () => {
     expect(tags('Oi, bom dia! Qual o horário de vocês?')).toEqual([]);
     expect(tags('meu canal no youtube')).toEqual([]);

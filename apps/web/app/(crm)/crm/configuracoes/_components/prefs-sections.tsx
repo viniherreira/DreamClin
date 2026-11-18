@@ -96,9 +96,8 @@ export function GeneralSection({ initial }: { initial: CrmPrefs }) {
         <span>
           <span className="block text-sm font-semibold">Tags automáticas</span>
           <span className="block text-xs text-muted-foreground">
-            Todo negócio ganha a tag do canal de onde veio (whatsapp, instagram, facebook, site, indicação) e dos procedimentos que a
-            pessoa citou na conversa ou no anúncio (implante, clareamento, aparelho…). O primeiro procedimento cadastrado na clínica vira o
-            interesse do negócio.
+            O negócio ganha a tag dos procedimentos que a pessoa citou na conversa ou no anúncio (implante, clareamento, aparelho…). O
+            primeiro procedimento cadastrado na clínica vira o interesse do negócio. De qual anúncio veio fica na origem do lead, não em tag.
           </span>
         </span>
       </label>
