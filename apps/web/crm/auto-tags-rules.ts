@@ -27,7 +27,7 @@ export const CHANNEL_TAG_NAMES = Object.values(CHANNEL_TAG).map((t) => t!.name);
  */
 export const PROCEDURE_DICTIONARY: readonly { tag: string; words: readonly string[] }[] = [
   // Antes de implante: "implante com carga imediata" é carga imediata.
-  { tag: 'carga imediata', words: ['carga imediata', 'dente no mesmo dia', 'dentes no mesmo dia'] },
+  { tag: 'carga imediata', words: ['implante com carga imediata', 'implantes com carga imediata', 'implante de carga imediata', 'carga imediata', 'dente no mesmo dia', 'dentes no mesmo dia'] },
   { tag: 'implante', words: ['implante', 'implante dentario', 'implantodontia'] },
   { tag: 'protocolo', words: ['protocolo', 'protese protocolo', 'dentadura fixa'] },
   { tag: 'prótese', words: ['protese', 'dentadura', 'ponte movel', 'ponte fixa'] },
@@ -71,25 +71,40 @@ function clinicProcedureFor(words: readonly string[], procedures: readonly Proce
  * cada procedimento da clínica que não está no dicionário (até 4 palavras,
  * para "Ozonioterapia" valer e "Consulta de avaliação inicial completa" não
  * virar ruído). Sem repetir tag.
+ *
+ * O que já virou tag sai do texto: "prótese protocolo" é só protocolo (não
+ * protocolo e prótese), "implante com carga imediata" é só carga imediata.
  */
 export function matchProcedures(text: string, procedures: readonly ProcedureLite[]): ProcedureMatch[] {
-  if (!normalize(text)) return [];
+  let resto = normalize(text);
+  if (!resto) return [];
   const out: ProcedureMatch[] = [];
   const usados = new Set<string>();
   for (const item of PROCEDURE_DICTIONARY) {
-    const word = item.words.find((w) => hasKeyword(text, w));
+    // A frase mais comprida primeiro: "protese protocolo" antes de "protocolo".
+    const palavras = [...item.words].sort((a, b) => b.length - a.length);
+    const word = palavras.find((w) => hasKeyword(resto, w));
     if (!word) continue;
     out.push({ tag: item.tag, procedureId: clinicProcedureFor(item.words, procedures), word });
     usados.add(normalize(item.tag));
+    for (const w of palavras) resto = semPalavra(resto, w);
   }
   for (const p of procedures) {
     const nome = normalize(p.name);
     if (!nome || nome.length < 4 || nome.split(' ').length > 4) continue;
     // Já coberto pelo dicionário (o nome tem uma das palavras de lá)?
     if (PROCEDURE_DICTIONARY.some((item) => item.words.some((w) => hasKeyword(p.name, w)))) continue;
-    if (usados.has(nome) || !hasKeyword(text, p.name)) continue;
+    if (usados.has(nome) || !hasKeyword(resto, p.name)) continue;
     out.push({ tag: p.name.trim().toLowerCase().slice(0, 40), procedureId: p.id, word: p.name.trim() });
     usados.add(nome);
   }
   return out;
+}
+
+/** O texto (já normalizado) sem a palavra inteira, com o plural, como em `hasKeyword`. */
+function semPalavra(texto: string, palavra: string): string {
+  // `normalize` só deixa letra, número e espaço: nada a escapar na expressão.
+  const k = normalize(palavra);
+  if (!k) return texto;
+  return texto.replace(new RegExp(`(^| )${k}(s|es)?(?= |$)`, 'g'), ' ').replace(/ +/g, ' ').trim();
 }

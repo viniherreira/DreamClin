@@ -85,9 +85,9 @@ describe.skipIf(!process.env.DATABASE_URL)('origem do anúncio (banco)', async (
     const id = await chega('11 95555-0001', 'Diminuir as mamas um sonho meu', anuncio('https://fb.me/4YAcPbZJ2'));
     expect(await leadDa(id)).toEqual({
       source: 'FACEBOOK',
-      // "Prótese" no anúncio também vira tag de procedimento (tags automáticas).
-      tags: ['prótese'],
-      notas: ['Veio do anúncio “Prótese de Mama” (Facebook).', 'Tags automáticas: a pessoa falou em “protese”.'],
+      // O texto do anúncio não vira tag: o assunto (Prótese) fica na origem do lead.
+      tags: [],
+      notas: ['Veio do anúncio “Prótese de Mama” (Facebook).'],
     });
     expect(await db.leadTag.count({ where: { name: 'facebook' } })).toBe(0);
     const c = await db.conversation.findFirst({ where: { id }, select: { leadId: true } });
@@ -106,7 +106,7 @@ describe.skipIf(!process.env.DATABASE_URL)('origem do anúncio (banco)', async (
       url: 'https://www.instagram.com/p/C1abc/',
       imageUrl: 'https://scontent.xx.fbcdn.net/v/t45.abc',
     });
-    expect(await leadDa(id)).toMatchObject({ source: 'INSTAGRAM', tags: ['prótese'] });
+    expect(await leadDa(id)).toMatchObject({ source: 'INSTAGRAM', tags: [] });
   });
 
   it('a origem fica: outra mensagem, outro anúncio ou outro assunto na conversa não trocam', async () => {
@@ -133,7 +133,7 @@ describe.skipIf(!process.env.DATABASE_URL)('origem do anúncio (banco)', async (
     const id = await chega('11 95555-0006', 'Vi o anúncio', anuncio('https://fb.me/abc'));
     const c = await db.conversation.findFirst({ where: { id }, select: { leadId: true } });
     expect(c?.leadId).toBe(r.leadId);
-    expect(await leadDa(id)).toMatchObject({ source: 'FACEBOOK', tags: ['prótese'] });
+    expect(await leadDa(id)).toMatchObject({ source: 'FACEBOOK', tags: [] });
     expect(await db.lead.findFirst({ where: { id: r.leadId }, select: { originAdId: true } })).toEqual({ originAdId: '120210000000001' });
   });
 

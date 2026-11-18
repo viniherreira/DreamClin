@@ -106,8 +106,10 @@ export async function afterInbound(
     }
   }
 
-  // Tags de procedimento: o que a pessoa escreveu (e o texto do anúncio) vira
-  // tag do negócio aberto: implante, clareamento, aparelho…
+  // Tags de procedimento: o que a pessoa escreveu vira tag do negócio aberto
+  // (implante, clareamento, aparelho…). O texto do anúncio não entra: ele fala
+  // de tudo ("implantes com carga imediata… prótese") e o assunto do anúncio já
+  // fica na origem do lead (`crm/origin.ts`).
   if (prefs.autoTags) {
     try {
       const c = await db.conversation.findFirst({
@@ -115,8 +117,7 @@ export async function afterInbound(
         select: { lead: { select: { id: true, wonAt: true, lostAt: true, deletedAt: true } } },
       });
       const lead = c?.lead && !c.lead.wonAt && !c.lead.lostAt && !c.lead.deletedAt ? c.lead : null;
-      const doAnuncio = ad ? [ad.headline, ad.body].filter(Boolean).join(' ') : '';
-      if (lead) await applyProcedureTags(db, tenantId, lead.id, [text, doAnuncio].filter(Boolean).join(' '));
+      if (lead) await applyProcedureTags(db, tenantId, lead.id, text);
     } catch (e) {
       console.error('[crm] tags de procedimento falharam', e instanceof Error ? e.message : e);
     }
