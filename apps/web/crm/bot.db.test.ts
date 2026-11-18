@@ -354,12 +354,17 @@ describe.skipIf(!process.env.DATABASE_URL)('robô (banco)', async () => {
     await wakeBots(new Date(Date.now() + 1000));
     expect((await saidas(c1)).at(-1)).toBe('Você agora é VIP!');
 
-    // Sem resposta: a equipe falou por último há 25 horas.
+    // Sem resposta: a pessoa escreveu há 26 h e a equipe respondeu há 25 h. A
+    // janela de 24 h do WhatsApp fechou: o robô (só texto livre) não começa.
     const c2 = await escreve('11 96666-0051', 'Quanto custa?');
     await db.conversation.updateMany({ where: { id: c2 }, data: { status: 'ACTIVE', botFlowId: null, botStepId: null, botWakeAt: null } });
-    // A pergunta da pessoa veio antes (26 h), a resposta da equipe depois (25 h).
     await db.chatMessage.updateMany({ where: { conversationId: c2, direction: 'INBOUND' }, data: { at: new Date(Date.now() - 26 * 3_600_000) } });
+    await db.conversation.updateMany({ where: { id: c2 }, data: { lastInboundAt: new Date(Date.now() - 26 * 3_600_000) } });
     await writeChatMessage(db, actor, c2, 'Custa R$ 900. Quer agendar?', new Date(Date.now() - 25 * 3_600_000));
+    expect(await startNoReplyBots(new Date())).toBe(0);
+    expect(await saidas(c2)).not.toContain('Ainda tem interesse?');
+    // A pessoa tinha escrito há 23 h (janela aberta): começa.
+    await db.conversation.updateMany({ where: { id: c2 }, data: { lastInboundAt: new Date(Date.now() - 23 * 3_600_000) } });
     expect(await startNoReplyBots(new Date())).toBeGreaterThanOrEqual(1);
     expect((await saidas(c2)).at(-1)).toBe('Ainda tem interesse?');
     // A última agora é do robô: não começa de novo.

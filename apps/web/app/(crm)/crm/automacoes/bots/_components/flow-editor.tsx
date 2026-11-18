@@ -817,7 +817,21 @@ function Configuracao({
             <label htmlFor={`${id}-h`} className="block text-xs font-medium text-muted-foreground">
               Começa depois de quantas horas sem resposta
             </label>
-            <input id={`${id}-h`} type="number" min={1} max={720} value={cfg.hours ?? 24} onChange={(e) => setCfg({ hours: Math.min(720, Math.max(1, Number(e.target.value) || 1)) })} className={`${inputCls} mt-1 w-28`} />
+            <input
+              id={`${id}-h`}
+              type="number"
+              min={1}
+              max={720}
+              value={cfg.hours ?? 24}
+              onChange={(e) => setCfg({ hours: Math.min(720, Math.max(1, Number(e.target.value) || 1)) })}
+              aria-describedby={`${id}-h-dica`}
+              className={`${inputCls} mt-1 w-28`}
+            />
+            <p id={`${id}-h-dica`} className={`mt-1 text-xs ${(cfg.hours ?? 24) > 20 ? 'font-medium text-amber-700 dark:text-amber-400' : 'text-muted-foreground'}`}>
+              {(cfg.hours ?? 24) > 20
+                ? 'Acima de 20 horas, use as Automações das etapas com um modelo aprovado. O WhatsApp só deixa o robô escrever até 24 horas depois da última mensagem da pessoa; depois disso ele não começa.'
+                : 'O robô só começa se a pessoa escreveu nas últimas 24 horas (regra do WhatsApp).'}
+            </p>
           </div>
         )}
 

@@ -3,6 +3,7 @@ import { assignLead, pickAssignee } from './assignment';
 import { DISTRIBUTE } from './distribution-rules';
 import { BOT_IDLE_MS, DEFAULT_HOURS, fitsAudience, isOpenAt, pickBot, shouldStart } from './bot-engine';
 import { START_PENDING } from './bot-queue';
+import { WINDOW_MS } from './cloud';
 import { dispatchChat } from './chat-dispatch';
 import { writeChatMessage } from './conversations';
 import { runFlow, type FlowContext, type FlowDoc, type FlowEffect, type FlowEvent, type FlowResult, type FlowState } from './flow-engine';
@@ -389,6 +390,11 @@ export async function wakeBots(now: Date = new Date(), limit = 100): Promise<num
  * mensagem foi da equipe (não de robô, para não virar laço) e a pessoa não
  * responde há as horas do robô. Só olha as conversas que passaram da hora nas
  * últimas 6 horas: ligar o robô não dispara para todo o histórico.
+ *
+ * Só começa com a janela de 24 h aberta (a última mensagem da pessoa tem menos
+ * de 24 h): o robô só manda texto livre, e a API oficial recusa texto livre
+ * depois disso. Mais tarde que isso, o follow-up é a automação da etapa com um
+ * modelo aprovado.
  */
 export async function startNoReplyBots(now: Date = new Date(), limit = 50): Promise<number> {
   const flows = await prisma.chatbotFlow.findMany({ where: { active: true, trigger: 'NO_REPLY' }, select: { id: true, tenantId: true, steps: true } });
@@ -400,7 +406,12 @@ export async function startNoReplyBots(now: Date = new Date(), limit = 50): Prom
     const limite = new Date(now.getTime() - horas * 3_600_000);
     const db = getTenantClient(f.tenantId);
     const candidatas = await db.conversation.findMany({
-      where: { status: 'ACTIVE', botFlowId: null, lastMessageAt: { lte: limite, gt: new Date(limite.getTime() - 6 * 3_600_000) } },
+      where: {
+        status: 'ACTIVE',
+        botFlowId: null,
+        lastMessageAt: { lte: limite, gt: new Date(limite.getTime() - 6 * 3_600_000) },
+        lastInboundAt: { gt: new Date(now.getTime() - WINDOW_MS) },
+      },
       select: { ...CONV_SELECT, messages: { orderBy: [{ at: 'desc' }, { createdAt: 'desc' }], take: 1, select: { direction: true, origin: true } } },
       take: limit,
     });

@@ -317,6 +317,8 @@ export const FLOW_TEMPLATES: FlowTemplate[] = [
         version: 2,
         start: 'pergunta',
         hours: { ...DEFAULT_HOURS, mode: 'inside' },
+        // Bem dentro das 24 h do WhatsApp (o robô só manda texto livre).
+        trigger: { hours: 4 },
         steps: {
           pergunta: msg('pergunta', 'Oi, {{primeiro_nome}}! Ainda tem interesse em agendar sua avaliação?', { 'b:sim': 'equipe', 'b:nao': 'perdido', timeout: 'tarefa' }, {
             buttons: [btn('sim', 'Sim, quero', ['sim', 'quero', 'pode']), btn('nao', 'Não, obrigado', ['nao', 'não'])],
