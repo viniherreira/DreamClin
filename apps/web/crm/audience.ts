@@ -4,7 +4,7 @@ import { anyFieldWhere, parseFieldFilters, type FieldFilter } from './custom-fie
 
 /**
  * Quem recebe uma transmissão: os mesmos filtros da busca de leads (funil,
- * etapa, tags, período, situação, origem, responsável, tarefas, valor e nome).
+ * etapa, tags, período, situação, origem, anúncio, responsável, tarefas, valor e nome).
  * Puro — a tela monta, o servidor confere de novo com `parseAudience`.
  *
  * Lista vazia = não filtra por aquilo.
@@ -21,6 +21,10 @@ export interface Audience {
   /** Não recebe quem tem alguma destas tags. */
   excludeTagIds: string[];
   sources: LeadSource[];
+  /** O anúncio de onde o lead veio (`crm/origin.ts`): assunto, campanha e anúncio da Meta. */
+  topics: string[];
+  campaignIds: string[];
+  adIds: string[];
   assignedToIds: string[];
   /** Qual data conta no período: entrada do lead ou fechamento (ganho/perdido). */
   dateField: PeriodField;
@@ -47,6 +51,9 @@ export const EMPTY_AUDIENCE: Audience = {
   tagMode: 'any',
   excludeTagIds: [],
   sources: [],
+  topics: [],
+  campaignIds: [],
+  adIds: [],
   assignedToIds: [],
   dateField: 'criado',
   dateFrom: '',
@@ -78,6 +85,9 @@ export function parseAudience(raw: unknown): Audience {
     tagMode: a.tagMode === 'all' ? 'all' : 'any',
     excludeTagIds: ids(a.excludeTagIds),
     sources: ids(a.sources).filter((s): s is LeadSource => (SOURCES as readonly string[]).includes(s)),
+    topics: ids(a.topics).map((t) => t.replace(/\s+/g, ' ').trim().slice(0, 60)).filter(Boolean),
+    campaignIds: ids(a.campaignIds).filter((x) => /^\d{5,25}$/.test(x)),
+    adIds: ids(a.adIds).filter((x) => /^\d{5,25}$/.test(x)),
     assignedToIds: ids(a.assignedToIds),
     dateField: a.dateField === 'fechado' && (de || ate) ? 'fechado' : 'criado',
     dateFrom: de,
@@ -111,6 +121,9 @@ export function audienceWhere(a: Audience, now: Date = new Date()): Prisma.LeadW
   }
   if (a.excludeTagIds.length) and.push({ tags: { none: { tagId: { in: a.excludeTagIds } } } });
   if (a.sources.length) and.push({ source: { in: a.sources } });
+  if (a.topics.length) and.push({ originTopic: { in: a.topics } });
+  if (a.campaignIds.length) and.push({ originCampaignId: { in: a.campaignIds } });
+  if (a.adIds.length) and.push({ originAdId: { in: a.adIds } });
   if (a.assignedToIds.length) and.push({ assignedToId: { in: a.assignedToIds } });
   const periodo = rangeWhere(a.dateField, a.dateFrom, a.dateTo);
   if (periodo) and.push(periodo);
@@ -163,6 +176,9 @@ export function audienceFromSearch(
     stageIds: one('etapa') ? [one('etapa')] : [],
     tagIds: lista('tag'),
     sources: one('origem') ? [one('origem')] : [],
+    topics: one('assunto') ? [one('assunto')] : [],
+    campaignIds: one('campanha') ? [one('campanha')] : [],
+    adIds: one('anuncio') ? [one('anuncio')] : [],
     assignedToIds: resp === 'me' ? (meId ? [meId] : []) : resp && resp !== 'all' ? [resp] : [],
     dateField: periodo.field,
     dateFrom: dias?.from ?? '',
