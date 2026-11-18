@@ -504,7 +504,7 @@ export function BroadcastForm({
                 onChange={(e) => setTexto(e.target.value)}
                 rows={4}
                 maxLength={1000}
-                placeholder="Oi {nome}! Em outubro o clareamento está com 20% de desconto. Quer agendar uma avaliação? Responda SAIR para não receber mais."
+                placeholder="Oi {nome}! Em outubro o clareamento está com 20% de desconto. Quer agendar uma avaliação?"
                 className="w-full rounded-lg border border-border bg-background p-2.5 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               />
               <p className="text-xs text-muted-foreground">Sem a API oficial, as mensagens são só simuladas (desenvolvimento).</p>
@@ -554,7 +554,7 @@ export function BroadcastForm({
             )}
           </p>
           {preview && preview.optedOut > 0 && (
-            <p className="mt-1 text-xs text-muted-foreground">{preview.optedOut} do filtro pediram para não receber (SAIR) e ficam de fora.</p>
+            <p className="mt-1 text-xs text-muted-foreground">{preview.optedOut} do filtro pediram para não receber mensagens e ficam de fora.</p>
           )}
 
           <dl className="mt-3 space-y-1 border-t border-border pt-3 text-xs">

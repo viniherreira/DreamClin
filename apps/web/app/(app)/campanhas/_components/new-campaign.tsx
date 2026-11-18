@@ -302,9 +302,6 @@ export function NewCampaign({ onClose }: { onClose: () => void }) {
                     </p>
                     <div className="whitespace-pre-wrap rounded-lg bg-[#dcf8c6] p-3 text-sm text-slate-900 dark:bg-emerald-900/40 dark:text-emerald-50">
                       {preview}
-                      <span className="mt-2 block text-xs italic opacity-70">
-                        Para não receber mais, responda SAIR.
-                      </span>
                     </div>
                   </div>
                 )}
