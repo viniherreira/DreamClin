@@ -71,9 +71,7 @@ export function CampaignsView({ data }: { data: Data }) {
         <strong className="font-medium text-foreground">Como o envio é feito:</strong> as mensagens
         saem espaçadas (uma a cada 12 a 28 segundos, com pausas maiores a cada 20), porque disparo em
         massa é o que faz o WhatsApp bloquear um número. Uma campanha de 100 pessoas leva cerca de
-        40 minutos. Pode fechar a tela, o envio continua. Toda mensagem já vai com a opção de
-        responder <strong className="font-medium text-foreground">SAIR</strong>, e quem responde
-        isso para de receber automaticamente.
+        40 minutos. Pode fechar a tela, o envio continua.
       </div>
 
       {/* History */}

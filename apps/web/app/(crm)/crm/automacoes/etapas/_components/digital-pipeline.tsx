@@ -188,7 +188,7 @@ export function DigitalPipeline({
         )}
         <p className="min-w-0 flex-1 text-xs text-muted-foreground">
           Cada coluna é uma etapa. O gatilho roda sozinho quando o lead é criado ou movido para a etapa e as condições batem. Se o lead sair antes
-          da hora, a ação com atraso não acontece. Mensagens e bots não vão para quem respondeu SAIR.
+          da hora, a ação com atraso não acontece. Mensagens e bots não vão para quem pediu para não receber mensagens.
         </p>
         <Link href={`/crm?funil=${currentId}`} className="btn-outline btn-sm">
           Voltar ao funil

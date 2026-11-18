@@ -23,7 +23,7 @@ export default async function TransmissoesPage() {
       <div className="flex flex-wrap items-center gap-3">
         <div className="mr-auto">
           <h2 className="text-xl font-semibold tracking-tight">Transmissões</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Uma mensagem para um grupo de leads. Quem respondeu SAIR não recebe.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Uma mensagem para um grupo de leads.</p>
         </div>
         {pode && (
           <Link href="/crm/automacoes/transmissoes/nova" className="btn-primary btn-md">

@@ -193,7 +193,7 @@ export function PrivacyPanel({
             <p className="mt-1 text-sm text-muted-foreground">
               Se a sua clínica já tem o aceite dessas pessoas (no papel, no balcão ou na ficha
               antiga), registre aqui de uma vez. Fica gravado no registro de atividades com o seu
-              nome e a data, e quem já respondeu <strong>SAIR</strong> continua de fora.
+              nome e a data, e quem já pediu para não receber mensagens continua de fora.
             </p>
 
             {!confirmando ? (
