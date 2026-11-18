@@ -61,6 +61,12 @@ export function EmbeddedSignup({
 }) {
   const [coexistence, setCoexistence] = useState(true);
   const [estado, setEstado] = useState<'parado' | 'aberto' | 'salvando'>('parado');
+  // No navegador do celular a janela da Meta quebra no meio ("ID do app inválido"):
+  // a conexão é pelo computador, o celular só confirma no WhatsApp Business.
+  const [celular, setCelular] = useState(false);
+  useEffect(() => {
+    setCelular(/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent));
+  }, []);
   const sessao = useRef<{ wabaId?: string; phoneNumberId?: string; code?: string }>({});
   // Chegou o código mas a conta não: em vez de ficar parado em silêncio, avisa.
   const espera = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -176,6 +182,13 @@ export function EmbeddedSignup({
 
   return (
     <div className="mt-4 space-y-3">
+      {celular && (
+        <p role="note" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+          <strong className="font-semibold">Faça pelo computador.</strong> Pelo navegador do celular, a janela da Meta costuma dar
+          &ldquo;ID do app inválido&rdquo; depois que você coloca o número. Abra o DreamClin no computador e use o celular só para
+          confirmar no WhatsApp Business.
+        </p>
+      )}
       <label htmlFor={`${id}-coex`} className="flex items-start gap-2 text-sm">
         <input id={`${id}-coex`} type="checkbox" checked={coexistence} onChange={(e) => setCoexistence(e.target.checked)} className="mt-0.5 h-4 w-4 accent-primary" />
         <span>
