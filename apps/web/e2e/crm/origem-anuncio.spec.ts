@@ -38,6 +38,16 @@ test('lead de anúncio: card, ficha, filtro e assunto na tela Anúncios', async 
     const card = page.getByRole('region', { name: 'Novo' }).getByRole('article').filter({ hasText: title });
     await expect(card).toContainText('Implante · Instagram');
 
+    // Transmissão para estes leads: o público leva o anúncio, e só quem veio dele recebe.
+    await page.getByRole('button', { name: /abrir filtros/ }).click();
+    await page.getByRole('dialog', { name: 'Filtros' }).getByRole('button', { name: 'Transmissão para estes leads' }).click();
+    await expect(page).toHaveURL(/\/crm\/automacoes\/transmissoes\/nova\?.*anuncio=/);
+    const resumo = page.getByRole('complementary', { name: 'Resumo do público' });
+    await expect(resumo.getByRole('status')).toContainText('1 pessoa recebe', { timeout: 20_000 });
+    await expect(resumo).toContainText(anuncio);
+    await page.goto(`/crm?anuncio=${adId}`);
+    await page.waitForLoadState('networkidle');
+
     // Ficha do lead.
     await card.getByRole('link', { name: title, exact: true }).click();
     await expect(page.getByText('Campanha: [Leads] Implante novembro')).toBeVisible();

@@ -53,6 +53,26 @@ describe('audienceWhere', () => {
   });
 });
 
+describe('público pelo anúncio', () => {
+  it('assunto, campanha e anúncio filtram pela origem gravada no lead', () => {
+    const w = audienceWhere({ ...EMPTY_AUDIENCE, topics: ['Implante'], campaignIds: ['120200000000777'], adIds: ['120210000000001'] });
+    expect(w.AND).toEqual(
+      expect.arrayContaining([
+        { originTopic: { in: ['Implante'] } },
+        { originCampaignId: { in: ['120200000000777'] } },
+        { originAdId: { in: ['120210000000001'] } },
+      ]),
+    );
+  });
+
+  it('da busca do funil para a transmissão: o anúncio vai junto; id estranho não', () => {
+    const a = audienceFromSearch({ assunto: 'Carga imediata', campanha: '120200000000777', anuncio: 'DROP TABLE' }, '2026-11-18');
+    expect([a.topics, a.campaignIds, a.adIds]).toEqual([['Carga imediata'], ['120200000000777'], []]);
+    // Transmissão antiga, gravada antes do público pelo anúncio: lê sem filtrar por anúncio.
+    expect(parseAudience({ sources: ['FACEBOOK'] })).toMatchObject({ topics: [], campaignIds: [], adIds: [] });
+  });
+});
+
 describe('parseAudience', () => {
   it('transmissão antiga (createdFrom/createdTo) continua com o mesmo período', () => {
     expect(parseAudience({ createdFrom: '2026-10-01', createdTo: '2026-10-13' })).toMatchObject({

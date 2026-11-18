@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Send, Users, X } from 'lucide-react';
 import { colorClasses } from '@/crm/colors';
 import { formatCents, SOURCE_LABEL } from '@/crm/format';
+import type { OriginOptions } from '@/crm/types';
 import { EMPTY_AUDIENCE, type Audience, type AudienceStatus, type AudienceTask } from '@/crm/audience';
 import { FIELD_LABEL, matchingPreset, rangeText, resolvePeriod, type Period } from '@/crm/period';
 import { PeriodPicker } from '@/components/crm-period-picker';
@@ -81,7 +82,10 @@ export function BroadcastForm({
   templates,
   today,
   fromSearch = false,
+  origins = { campaigns: [], ads: [], topics: [] },
 }: {
+  /** Assuntos, campanhas e anúncios que já trouxeram leads (público pelo anúncio). */
+  origins?: OriginOptions;
   initialAudience: Audience;
   pipelines: PipelineOption[];
   tags: TagOption[];
@@ -178,6 +182,9 @@ export function BroadcastForm({
   if (aud.tagIds.length) criterios.push({ label: aud.tagMode === 'all' ? 'Com todas as tags' : 'Com a tag', valor: nomesDe(aud.tagIds, tags) });
   if (aud.excludeTagIds.length) criterios.push({ label: 'Sem a tag', valor: nomesDe(aud.excludeTagIds, tags) });
   if (aud.sources.length) criterios.push({ label: 'Origem', valor: aud.sources.map((s) => SOURCE_LABEL[s]).join(', ') });
+  if (aud.topics.length) criterios.push({ label: 'Assunto do anúncio', valor: aud.topics.join(', ') });
+  if (aud.campaignIds.length) criterios.push({ label: 'Campanha', valor: nomesDe(aud.campaignIds, origins.campaigns) || `${aud.campaignIds.length} campanha(s)` });
+  if (aud.adIds.length) criterios.push({ label: 'Anúncio', valor: nomesDe(aud.adIds, origins.ads) || `${aud.adIds.length} anúncio(s)` });
   if (aud.assignedToIds.length) criterios.push({ label: 'Responsável', valor: nomesDe(aud.assignedToIds, team) });
   if (aud.task) criterios.push({ label: 'Tarefas', valor: TAREFAS.find((x) => x.v === aud.task)?.label ?? '' });
   if (aud.valueMin != null || aud.valueMax != null) {
@@ -347,6 +354,31 @@ export function BroadcastForm({
               </>
             )}
           </fieldset>
+
+          {(origins.topics.length > 0 || origins.campaigns.length > 0 || origins.ads.length > 0 || aud.topics.length + aud.campaignIds.length + aud.adIds.length > 0) && (
+            <fieldset>
+              <legend className={legendCls}>Veio do anúncio</legend>
+              <p className="mt-0.5 text-xs text-muted-foreground">O anúncio gravado no primeiro contato do lead. Marcando mais de um no mesmo grupo, recebe quem veio de qualquer um deles.</p>
+              {[
+                { titulo: 'Assunto', chave: 'topics' as const, opcoes: origins.topics.map((t) => ({ id: t, name: t })) },
+                { titulo: 'Campanha', chave: 'campaignIds' as const, opcoes: origins.campaigns },
+                { titulo: 'Anúncio', chave: 'adIds' as const, opcoes: origins.ads },
+              ]
+                .filter((g) => g.opcoes.length > 0)
+                .map((g) => (
+                  <div key={g.chave} className="mt-2">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{g.titulo}</p>
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {g.opcoes.map((o) => (
+                        <Chip key={o.id} on={aud[g.chave].includes(o.id)} onClick={() => set(g.chave, alterna(aud[g.chave], o.id))}>
+                          {o.name}
+                        </Chip>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+            </fieldset>
+          )}
 
           <div className="grid gap-5 sm:grid-cols-2">
             <fieldset>

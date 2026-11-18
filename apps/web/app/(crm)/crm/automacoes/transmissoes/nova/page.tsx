@@ -5,6 +5,7 @@ import { activeCloudAccount } from '@/crm/cloud';
 import { loadCrmBasics } from '@/crm/page-data';
 import { tagCounts } from '@/crm/board-data';
 import { audienceFromSearch } from '@/crm/audience';
+import { originFilterOptions } from '@/crm/origin';
 import { clinicToday } from '@/lib/tz';
 import { BroadcastForm } from '../_components/broadcast-form';
 
@@ -21,7 +22,7 @@ export default async function NovaTransmissaoPage({
 }) {
   const ctx = await requireCrm('crm_config');
   const sp = await searchParams;
-  const [basics, cloud, templates, counts] = await Promise.all([
+  const [basics, cloud, templates, counts, origins] = await Promise.all([
     loadCrmBasics(ctx),
     activeCloudAccount(ctx.tenantId),
     ctx.db.messageTemplate.findMany({
@@ -30,11 +31,12 @@ export default async function NovaTransmissaoPage({
       select: { id: true, name: true, body: true, variables: true },
     }),
     tagCounts(ctx),
+    originFilterOptions(ctx.db),
   ]);
 
   const today = clinicToday();
   // Veio da busca de leads ("Transmissão para estes leads")? Qualquer filtro na URL diz que sim.
-  const daBusca = Object.keys(sp).some((k) => ['q', 'resp', 'tarefa', 'tag', 'origem', 'funil', 'etapa', 'periodo', 'de', 'ate', 'criado', 'vmin', 'vmax', 'situacao'].includes(k));
+  const daBusca = Object.keys(sp).some((k) => ['q', 'resp', 'tarefa', 'tag', 'origem', 'assunto', 'campanha', 'anuncio', 'funil', 'etapa', 'periodo', 'de', 'ate', 'criado', 'vmin', 'vmax', 'situacao'].includes(k));
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
@@ -49,6 +51,7 @@ export default async function NovaTransmissaoPage({
         pipelines={basics.pipelines.map((p) => ({ id: p.id, name: p.name, stages: p.columns.map((s) => ({ id: s.id, name: s.name })) }))}
         tags={basics.tags.map((t) => ({ id: t.id, name: t.name, color: t.color, count: counts.get(t.id) ?? 0 }))}
         team={basics.team}
+        origins={origins}
         channel={cloud ? 'cloud' : 'none'}
         templates={templates}
       />
