@@ -46,6 +46,12 @@ import { ANAMNESIS_QUESTIONS } from './_components/anamnesis-questions';
 import { CLINIC_TZ, ageFromBirth, clinicToday, wallClockTime } from '@/lib/tz';
 import { CrmPatientDeals } from '@/components/crm-patient-deals';
 import { getReceiptMethods } from '@/lib/clinic-settings';
+import { currentAccess } from '@/lib/guard';
+import { getTenantModules, hasCapability } from '@/lib/access';
+import { can } from '@/lib/permissions';
+import { pacienteAgendaEnabled } from '@/lib/feature-flags';
+import { loadProfileExtras } from './profile-data';
+import { ProfileFull } from './_components/profile-full';
 
 export const metadata = { title: 'Ficha do paciente' };
 
@@ -375,6 +381,74 @@ export default async function PatientPage({
       ? [{ label: 'Em aberto', value: brl(record.financial.balance), hint: `pago ${brl(record.financial.paid)}`, tone: record.financial.balance > 0 ? ('warn' as const) : undefined }]
       : []),
   ];
+
+  // Paciente e agenda novos (spec 2026-11-18, F2): o perfil com abas agrupadas.
+  const acesso = await currentAccess();
+  if (acesso && (await pacienteAgendaEnabled(acesso.tenantId))) {
+    const [extras, modules, podeExportar] = await Promise.all([
+      loadProfileExtras(acesso.tenantId, patient.id),
+      getTenantModules(acesso.tenantId),
+      hasCapability(acesso.tenantId, 'pacientes_exportar'),
+    ]);
+    const travado = <Locked what="ao prontuário" />;
+    const financeiro = fin?.can('fin_ver') ? (
+      <PatientFinancePanel patient={{ id: patient.id, name: patient.name }} options={finOpcoes} today={clinicToday()} advanced={finAvancado} />
+    ) : record.canSeeFinance ? (
+      <FinancialSection
+        patientId={patient.id}
+        contracted={record.financial.contracted}
+        paid={record.financial.paid}
+        balance={record.financial.balance}
+        payments={record.financial.payments}
+        acceptedQuotes={record.financial.acceptedQuotes}
+        quotes={record.financial.quotes}
+        methods={methods}
+      />
+    ) : (
+      <Locked what="ao financeiro" />
+    );
+    return (
+      <ProfileFull
+        tenantId={acesso.tenantId}
+        meId={acesso.userId}
+        role={acesso.role}
+        patient={{
+          id: patient.id,
+          name: patient.name,
+          socialName: patient.socialName,
+          controlNumber: patient.controlNumber,
+          active: patient.active,
+          birthDate: patient.birthDate,
+          email: patient.email,
+          priority: patient.priority,
+          priorityType: patient.priorityType,
+          insurances: patient.insurances,
+        }}
+        extras={extras}
+        aba={aba}
+        anamnesisAlerts={alertas}
+        anamnesisMissing={!record.anamnesis}
+        clinical={{
+          odontograma: record.canSeeRecord ? <Odontogram patientId={patient.id} findings={record.findings} procedures={record.procedures} professionals={record.professionals} /> : travado,
+          anamnese: record.canSeeRecord ? <AnamnesisSection patientId={patient.id} initial={record.anamnesis} /> : travado,
+          evolucoes: record.canSeeRecord ? <EvolutionsSection patientId={patient.id} evolutions={record.evolutions} professionals={record.professionals} /> : travado,
+          imagens: record.canSeeRecord ? <ImagesSection patientId={patient.id} files={record.files} storageEnabled={record.storageEnabled} /> : travado,
+          planBadge: plano.length,
+          evolutions: record.evolutions.length,
+          files: record.files.length,
+        }}
+        finance={financeiro}
+        dados={<div id="lgpd">{dados}</div>}
+        quotes={record.financial.quotes}
+        canExport={podeExportar}
+        canPrivacy={record.canManagePrivacy}
+        canFinance={record.canSeeFinance}
+        canCrm={modules.crm && can(acesso.role, 'crm')}
+        canEdit={can(acesso.role, 'pacientes')}
+        toggleActive={togglePatientActive.bind(null, patient.id)}
+      />
+    );
+  }
 
   return (
     <div className="mx-auto max-w-7xl space-y-5 p-4 sm:p-6 lg:p-8">
