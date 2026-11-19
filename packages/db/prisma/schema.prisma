@@ -208,6 +208,9 @@ model Tenant {
   patientOrigins      PatientOrigin[]
   patientInsurances   PatientInsurance[]
   patientCustomFields PatientCustomField[]
+  patientEvents       PatientEvent[]
+  treatmentPlans      TreatmentPlan[]
+  treatmentPlanItems  TreatmentPlanItem[]
 
   @@map("tenants")
 }
@@ -361,6 +364,8 @@ model Patient {
   tenant             Tenant              @relation(fields: [tenantId], references: [id])
   origin             PatientOrigin?      @relation(fields: [originId], references: [id], onDelete: SetNull)
   insurances         PatientInsurance[]
+  events             PatientEvent[]
+  treatmentPlans     TreatmentPlan[]
   patientNotes       PatientNote[]
   appointments       Appointment[]
   quotes             Quote[]
@@ -383,6 +388,81 @@ model Patient {
   @@index([tenantId, cpfHash])
   @@index([tenantId, financialResponsibleId])
   @@map("patients")
+}
+
+/// Linha do tempo do paciente: um evento por coisa que aconteceu (cadastro, agendamento,
+/// orçamento, pagamento…), gravado nas ações com `after()` (`lib/patient-timeline.ts`).
+model PatientEvent {
+  id        String   @id @default(cuid())
+  tenantId  String
+  patientId String
+  /// Tipo em `lib/patient-events.ts` (ex.: appointment.created, quote.accepted).
+  type      String
+  /// Texto curto já pronto para a tela (sem dado sensível de saúde).
+  summary   String
+  /// Quem fez: usuário da clínica. Nulo = sistema ou o próprio paciente (ver `actorLabel`).
+  actorId   String?
+  actorLabel String?
+  /// Ligação com o que gerou (agendamento, orçamento…), para abrir dali.
+  refType   String?
+  refId     String?
+  data      Json?
+  at        DateTime @default(now())
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  patient Patient @relation(fields: [patientId], references: [id])
+
+  @@index([tenantId, patientId, at(sort: Desc)])
+  @@index([tenantId, refType, refId])
+  @@map("patient_events")
+}
+
+/// Plano de tratamento com registro próprio: nasce do odontograma ou avulso; vira orçamento.
+model TreatmentPlan {
+  id             String    @id @default(cuid())
+  tenantId       String
+  patientId      String
+  number         Int
+  name           String
+  professionalId String?
+  createdById    String?
+  /// IN_PROGRESS, DONE, CANCELLED.
+  status         String    @default("IN_PROGRESS")
+  closedAt       DateTime?
+  quoteId        String?
+  notes          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  tenant  Tenant              @relation(fields: [tenantId], references: [id])
+  patient Patient             @relation(fields: [patientId], references: [id])
+  items   TreatmentPlanItem[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, patientId])
+  @@map("treatment_plans")
+}
+
+model TreatmentPlanItem {
+  id          String    @id @default(cuid())
+  tenantId    String
+  planId      String
+  /// Marcação do odontograma que gerou o item (nulo = avulso).
+  findingId   String?
+  procedureId String?
+  description String
+  teeth       Int[]     @default([])
+  quantity    Int       @default(1)
+  priceCents  Int       @default(0)
+  doneAt      DateTime?
+  order       Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  tenant Tenant        @relation(fields: [tenantId], references: [id])
+  plan   TreatmentPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, planId])
+  @@map("treatment_plan_items")
 }
 
 /// De onde o paciente veio (Instagram, Google, indicação…). Lista da clínica.
@@ -456,6 +536,10 @@ model PatientNote {
   patientId String
   userId    String
   content   String
+  /// Fixada no topo das observações (spec 2026-11-18, F2).
+  pinned       Boolean  @default(false)
+  /// Aparece na janela do agendamento.
+  showInAgenda Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -609,6 +693,8 @@ model Appointment {
   noChargeReason     String?
   noChargeAt         DateTime?
   noChargeById       String?
+  /// Quem cancelou: PATIENT ou CLINIC (spec 2026-11-18). Nulo nos cancelamentos de antes.
+  cancelledBy        String?
   /// Convênio que paga este agendamento (cadastro de clientes e fornecedores). Só no tipo convênio.
   insuranceContactId String?
   createdById        String?
