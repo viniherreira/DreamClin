@@ -119,6 +119,10 @@ export default function ConectarWhatsAppPage() {
       <h2>Se algo der errado</h2>
       <ul>
         <li>
+          <strong>&ldquo;ID do app inválido&rdquo; depois de colocar o número:</strong> isso acontece quando a conexão é feita pelo
+          navegador do celular. Faça pelo computador e use o celular só para confirmar no WhatsApp Business (ou ler o QR code).
+        </li>
+        <li>
           <strong>A janela da Meta não abre:</strong> libere as janelas (pop-up) para o {b} no navegador e desligue bloqueadores de
           anúncio ou VPN.
         </li>
