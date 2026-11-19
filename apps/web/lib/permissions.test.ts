@@ -111,3 +111,15 @@ describe('capabilityDeniedMessage', () => {
     }
   });
 });
+
+describe('can — paciente e agenda', () => {
+  it('exportar, excluir, mexer em massa e apagar anexos são de dono e admin', () => {
+    for (const cap of ['pacientes_exportar', 'agenda_excluir', 'agenda_massa', 'anexos_apagar'] as const) {
+      expect(PAPEIS.filter((r) => can(r, cap))).toEqual(['OWNER', 'ADMIN']);
+    }
+  });
+
+  it('a recepção configura a agenda do dia a dia; o profissional não', () => {
+    expect(PAPEIS.filter((r) => can(r, 'agenda_config'))).toEqual(['OWNER', 'ADMIN', 'RECEPTIONIST']);
+  });
+});

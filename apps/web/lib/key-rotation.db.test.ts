@@ -43,6 +43,8 @@ describe.skipIf(!process.env.DATABASE_URL)('troca da chave mestra (banco)', asyn
       cpfEncrypted: encrypt('52998224725', OLD, tenant.id),
       cpfHash: cpfHash('52998224725', tenant.id),
       phoneEncrypted: encrypt('11987650000', OLD, tenant.id),
+      rgEncrypted: encrypt('12.345.678-9', OLD, tenant.id),
+      otherContactsEncrypted: encrypt('[{"kind":"Recado","number":"1133334444"}]', OLD, tenant.id),
       lgpdConsentAt: new Date(),
     },
   });
@@ -105,6 +107,8 @@ describe.skipIf(!process.env.DATABASE_URL)('troca da chave mestra (banco)', asyn
     expect(keyVersionOf(p.cpfEncrypted!)).toBe(2);
     expect(keyVersionOf(p.phoneEncrypted)).toBe(2);
     expect(p.phone2Encrypted).toBeNull();
+    expect(decrypt(p.rgEncrypted!, NEW, tenant.id)).toBe('12.345.678-9');
+    expect(keyVersionOf(p.otherContactsEncrypted!)).toBe(2);
     expect(p.cpfHash).toBe(cpfHash('52998224725', tenant.id));
     expect(p.updatedAt).toEqual(paciente.updatedAt);
 

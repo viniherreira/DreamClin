@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { decrypt, encrypt, getTenantClient, prisma } from '@clinicaiq/db';
+import { decrypt, encrypt, getTenantClient, prisma, Prisma } from '@clinicaiq/db';
 import { eraseLeadPersonalData, ERASED_NAME } from '@/crm/anonymize';
 
 /**
@@ -94,7 +94,7 @@ export async function exportPatientData(tenantId: string, patientId: string) {
       telefone2: abrir(p.phone2Encrypted, tenantId),
       email: p.email,
       nascimento: dia(p.birthDate),
-      genero: p.gender,
+      sexo: p.gender,
       estadoCivil: p.maritalStatus,
       profissao: p.profession,
       indicadoPor: p.referredBy,
@@ -108,6 +108,23 @@ export async function exportPatientData(tenantId: string, patientId: string) {
         cidade: p.city,
         estado: p.state,
       },
+      nomeSocial: p.socialName,
+      genero: p.genderIdentity,
+      rg: abrir(p.rgEncrypted, tenantId),
+      orgaoExpedidor: p.rgIssuer,
+      nacionalidade: p.nationality,
+      documentoEstrangeiro: abrir(p.foreignDocEncrypted, tenantId),
+      telefoneFixo: abrir(p.landlineEncrypted, tenantId),
+      outrosContatos: abrir(p.otherContactsEncrypted, tenantId),
+      cns: abrir(p.cnsEncrypted, tenantId),
+      tipoSanguineo: p.bloodType,
+      conjuge: p.spouseName,
+      mae: p.motherName,
+      pai: p.fatherName,
+      responsavelLegal: p.legalGuardian,
+      escolaridade: p.education,
+      hobby: p.hobby,
+      informacoesAdicionais: p.customFields,
       aceiteTratamentoEm: dia(p.lgpdConsentAt),
       aceiteCampanhaEm: dia(p.marketingConsentAt),
       cadastradoEm: dia(p.createdAt),
@@ -185,6 +202,7 @@ export async function anonymizePatient(tenantId: string, userId: string, patient
     prisma.chatMessage.deleteMany({ where: { tenantId, conversationId: { in: ids } } }),
     prisma.conversation.deleteMany({ where: { tenantId, id: { in: ids } } }),
     prisma.patientNote.deleteMany({ where: { tenantId, patientId } }),
+    prisma.patientInsurance.updateMany({ where: { tenantId, patientId }, data: { cardNumber: null, active: false } }),
     // Os avisos de consulta levam o nome do paciente no texto.
     prisma.whatsAppMessage.updateMany({ where: { tenantId, patientId }, data: { content: '' } }),
     prisma.patient.update({
@@ -211,6 +229,29 @@ export async function anonymizePatient(tenantId: string, userId: string, patient
         city: null,
         state: null,
         marketingConsentAt: null,
+        // Cadastro completo (2026-11-18): tudo o que identifica a pessoa.
+        socialName: null,
+        genderIdentity: null,
+        rgEncrypted: null,
+        rgIssuer: null,
+        nationality: null,
+        foreignDocEncrypted: null,
+        landlineEncrypted: null,
+        landlineExt: null,
+        otherContactsEncrypted: null,
+        cnsEncrypted: null,
+        bloodType: null,
+        spouseName: null,
+        motherName: null,
+        fatherName: null,
+        legalGuardian: null,
+        financialResponsibleId: null,
+        financialResponsibleText: null,
+        education: null,
+        hobby: null,
+        referredById: null,
+        photoPath: null,
+        customFields: Prisma.DbNull,
         active: false,
         updatedById: userId,
       },

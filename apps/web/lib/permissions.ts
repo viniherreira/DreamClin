@@ -60,7 +60,18 @@ export type Capability =
   /** Relatórios gerenciais: visão geral, fluxo de caixa e DRE. */
   | 'fin_relatorios'
   /** Configurações do financeiro: contas, categorias, formas, regras. */
-  | 'fin_config';
+  | 'fin_config'
+  // ── Paciente e agenda (spec 2026-11-18).
+  /** Exportar a lista de pacientes e a ficha (a recepção, só se a clínica liberar). */
+  | 'pacientes_exportar'
+  /** Excluir agendamento lançado por engano (some da agenda, fica na auditoria). */
+  | 'agenda_excluir'
+  /** Alterações em massa na agenda. */
+  | 'agenda_massa'
+  /** Apagar anexos do paciente (o profissional, só os que ele mesmo subiu). */
+  | 'anexos_apagar'
+  /** Escalas, tipos de atendimento, agendas, motivos de cancelamento e feriados. */
+  | 'agenda_config';
 
 /**
  * O que cada papel alcança.
@@ -108,10 +119,18 @@ const CRM_ADMIN: readonly Capability[] = ['crm', 'crm_config'];
 const FIN_RECEPCAO: readonly Capability[] = ['fin_ver', 'fin_receber', 'fin_pagar', 'fin_caixa', 'fin_renegociar', 'fin_comissoes_proprias'];
 const FIN_GESTAO: readonly Capability[] = [...FIN_RECEPCAO, 'fin_caixas_outros', 'fin_estornar', 'fin_comissoes', 'fin_relatorios', 'fin_config'];
 
+/**
+ * Paciente e agenda: a recepção configura o dia a dia da agenda; exportar,
+ * excluir, mexer em massa e apagar anexos ficam com quem responde pela clínica.
+ * Exportar pela recepção depende da clínica (`Tenant.settings.patients.receptionCanExport`,
+ * conferido em `lib/access.ts`); apagar anexo pelo profissional, só os dele (na action).
+ */
+const PAC_GESTAO: readonly Capability[] = ['pacientes_exportar', 'agenda_excluir', 'agenda_massa', 'anexos_apagar', 'agenda_config'];
+
 const GRANTS: Record<Role, readonly Capability[]> = {
-  OWNER: [...DIA_A_DIA, ...ADMIN_ONLY, ...CRM_ADMIN, ...FIN_GESTAO],
-  ADMIN: [...DIA_A_DIA, ...ADMIN_ONLY, ...CRM_ADMIN, ...FIN_GESTAO],
-  RECEPTIONIST: [...DIA_A_DIA, ...CRM, ...FIN_RECEPCAO],
+  OWNER: [...DIA_A_DIA, ...ADMIN_ONLY, ...CRM_ADMIN, ...FIN_GESTAO, ...PAC_GESTAO],
+  ADMIN: [...DIA_A_DIA, ...ADMIN_ONLY, ...CRM_ADMIN, ...FIN_GESTAO, ...PAC_GESTAO],
+  RECEPTIONIST: [...DIA_A_DIA, ...CRM, ...FIN_RECEPCAO, 'agenda_config'],
   PROFESSIONAL: [...DIA_A_DIA, ...CRM, 'fin_comissoes_proprias'],
 };
 
@@ -157,6 +176,11 @@ const LABEL: Record<Capability, string> = {
   fin_comissoes_proprias: 'as comissões',
   fin_relatorios: 'os relatórios gerenciais do financeiro',
   fin_config: 'as configurações do financeiro',
+  pacientes_exportar: 'exportar pacientes',
+  agenda_excluir: 'excluir agendamentos',
+  agenda_massa: 'as alterações em massa da agenda',
+  anexos_apagar: 'apagar anexos',
+  agenda_config: 'as configurações da agenda',
 };
 
 export function capabilityDeniedMessage(capability: Capability): string {

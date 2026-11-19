@@ -32,7 +32,8 @@ interface Table {
 const TABLES: Table[] = [
   {
     table: 'patients',
-    columns: ['cpf', 'phone', 'phone2'],
+    // RG, documento de estrangeiro, telefone fixo, outros contatos e CNS: cadastro completo (2026-11-18).
+    columns: ['cpf', 'phone', 'phone2', 'rg', 'foreign_doc', 'landline', 'other_contacts', 'cns'],
     hash: { column: 'cpfHash', candidates: (o, r) => (o.cpf ? [cpfHashes(o.cpf, r.tenantId)] : []) },
   },
   {
@@ -90,6 +91,9 @@ export async function reencryptWithCurrentKey(
 
   const current = `k${version}.%`;
   for (const spec of TABLES) {
+    // Tabela que já saiu do sistema (ex.: as chaves do QR code) pode não existir num banco novo.
+    const [existe] = await prisma.$queryRawUnsafe<Array<{ t: string | null }>>(`SELECT to_regclass($1)::text AS t`, `public.${q(spec.table)}`);
+    if (!existe?.t) continue;
     const stale = spec.columns.map((c) => `(${q(c)} IS NOT NULL AND ${q(c)} NOT LIKE $1)`).join(' OR ');
     const cols = [...spec.columns, ...(spec.hash ? [spec.hash.column] : [])].map(q).join(', ');
     const rows = await prisma.$queryRawUnsafe<Array<{ id: string; tenantId: string } & Opened>>(

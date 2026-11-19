@@ -25,6 +25,7 @@ import { can } from '@/lib/permissions';
 import { getTenantModules } from '@/lib/access';
 import { finContext } from '@/fin/guard';
 import { financeAdvanced } from '@/fin/flag';
+import { pacienteAgendaEnabled } from '@/lib/feature-flags';
 export const metadata = { title: 'Configurações' };
 
 export default async function ConfiguracoesPage() {
@@ -85,6 +86,7 @@ export default async function ConfiguracoesPage() {
       podePrivacidade={podePrivacidade}
       agenda={modules.clinic}
       finance={finance}
+      patientAgenda={modules.clinic && (await pacienteAgendaEnabled(tenantId))}
       // Renderizado aqui, no servidor, e entregue pronto para a aba: busca
       // cobranças no Asaas e não pode virar componente de cliente. O Suspense
       // impede que a rede do Asaas segure as outras cinco abas.

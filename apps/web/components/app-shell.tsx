@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@clinicaiq/db';
 import { AppSidebar } from '@/components/app-sidebar';
 import { financeEnabled } from '@/fin/flag';
+import { pacienteAgendaEnabled } from '@/lib/feature-flags';
 import { AppHeader } from '@/components/app-header';
 import { SubscriptionBanner } from '@/components/subscription-banner';
 import type { Space } from '@/components/module-switcher';
@@ -67,6 +68,7 @@ export async function AppShell({
   guard?.({ role, crm: modules.crm, seat, clinic: modules.clinic });
   const crmOnly = !modules.clinic;
   const finance = space === 'clinic' && (await financeEnabled(tenant.id));
+  const patientAgenda = space === 'clinic' && (await pacienteAgendaEnabled(tenant.id));
 
   // O seletor só aparece para quem consegue entrar no CRM.
   const showSwitcher = modules.crm && seat && can(role, 'crm');
@@ -111,6 +113,7 @@ export async function AppShell({
         crmOnly={crmOnly}
         crmManager={crmManager}
         finance={finance}
+        patientAgenda={patientAgenda}
       />
       <div className="flex min-w-0 flex-1 flex-col">
         <AppHeader
@@ -127,6 +130,8 @@ export async function AppShell({
           crmOnly={crmOnly}
           crmManager={crmManager}
           crmAvailable={space === 'crm' && showSwitcher ? (me?.crmAvailable ?? true) : undefined}
+          patientPalette={patientAgenda}
+          finance={finance}
         />
         <SubscriptionBanner access={access} />
         <main id="main-content" className="flex-1 overflow-auto bg-canvas">

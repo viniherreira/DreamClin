@@ -20,6 +20,7 @@ import { CostCentersPanel, FinanceAccountsPanel, FinanceCategoriesPanel } from '
 import { FinanceContactsPanel, FinanceMethodsPanel, FinancePermissionsPanel, FinanceRulesPanel } from './finance-rules-panels';
 import { FinanceCommissionPanel } from './finance-commission-panel';
 import { FinanceCollectionPanel } from './finance-collection-panel';
+import { PatientCustomFieldsPanel, PatientOriginsPanel, PatientRulesPanel } from './patients-panels';
 import type { AgendaRules } from '@/lib/agenda-rules';
 import { TeamPanel } from './team-panel';
 import { PrivacyPanel } from './privacy-panel';
@@ -97,6 +98,8 @@ interface Props {
   agenda?: boolean;
   /** Financeiro completo ligado nesta clínica, para quem pode configurar. */
   finance?: { advanced: boolean } | null;
+  /** Paciente e agenda novos ligados nesta clínica (spec 2026-11-18). */
+  patientAgenda?: boolean;
 }
 
 const SO_CRM = ['clinica', 'aparencia', 'equipe', 'plano', 'privacidade'];
@@ -123,6 +126,7 @@ export function SettingsView({
   podePrivacidade,
   agenda = true,
   finance = null,
+  patientAgenda = false,
 }: Props) {
   const unidadesAtivas = units.filter((u) => u.active).map((u) => ({ id: u.id, name: u.name }));
   // Os grupos e as seções do menu lateral, na ordem do dia a dia da clínica.
@@ -186,6 +190,13 @@ export function SettingsView({
       ),
     },
     { id: 'documentos', group: 'Atendimento', label: 'Documentos', panel: <DocumentsPanel settings={documents} /> },
+    ...(patientAgenda
+      ? [
+          { id: 'pac-campos', group: 'Pacientes', label: 'Campos do cadastro', panel: <PatientRulesPanel /> },
+          { id: 'pac-adicionais', group: 'Pacientes', label: 'Informações adicionais', panel: <PatientCustomFieldsPanel /> },
+          { id: 'pac-origens', group: 'Pacientes', label: 'Origens do paciente', panel: <PatientOriginsPanel /> },
+        ]
+      : []),
     { id: 'pagamentos', group: 'Financeiro', label: finance ? 'Formas (financeiro antigo)' : 'Formas de recebimento', panel: <PaymentMethodsPanel methods={rules.paymentMethods} /> },
     // Financeiro completo: só com a bandeira da clínica ligada e para quem configura.
     ...(finance
