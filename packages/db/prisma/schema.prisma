@@ -212,6 +212,8 @@ model Tenant {
   treatmentPlans      TreatmentPlan[]
   treatmentPlanItems  TreatmentPlanItem[]
   documentTemplates   DocumentTemplate[]
+  cancelReasons       CancelReason[]
+  appointmentReschedules AppointmentReschedule[]
   patientDocuments    PatientDocument[]
   signatureRequests   SignatureRequest[]
   patientFolders      PatientFolder[]
@@ -470,6 +472,49 @@ model TreatmentPlanItem {
 
   @@index([tenantId, planId])
   @@map("treatment_plan_items")
+}
+
+/// Motivos de cancelamento da clínica (Configurações › Agenda › Motivos de cancelamento).
+model CancelReason {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  order     Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, name])
+  @@index([tenantId, order])
+  @@map("cancel_reasons")
+}
+
+/// Remarcação: o mesmo agendamento mudou de dia, hora ou profissional. De onde veio e para onde foi.
+model AppointmentReschedule {
+  id                 String   @id @default(cuid())
+  tenantId           String
+  appointmentId      String
+  patientId          String
+  fromStart          DateTime
+  fromEnd            DateTime
+  fromProfessionalId String?
+  toStart            DateTime
+  toEnd              DateTime
+  toProfessionalId   String?
+  reason             String?
+  /// AGENDA (janela), DRAG (arrastou na agenda), BULK (alteração em massa).
+  source             String   @default("AGENDA")
+  /// O paciente tinha pedido para remarcar (botão do WhatsApp).
+  patientAsked       Boolean  @default(false)
+  byUserId           String?
+  createdAt          DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, appointmentId])
+  @@index([tenantId, patientId])
+  @@map("appointment_reschedules")
 }
 
 /// Modelo de documento da clínica (atestado, receita, TCLE…) com variáveis {paciente}, {data}…
@@ -858,6 +903,10 @@ model Appointment {
   noChargeById       String?
   /// Quem cancelou: PATIENT ou CLINIC (spec 2026-11-18). Nulo nos cancelamentos de antes.
   cancelledBy        String?
+  /// Motivo da lista da clínica (`cancel_reasons`); o texto continua em `cancelReason`.
+  cancelReasonId     String?
+  /// Por onde chegou a confirmação: WHATSAPP, LINK, PHONE, RECEPTION. WHATSAPP e LINK = "confirmado pelo paciente".
+  confirmationSource String?
   /// Convênio que paga este agendamento (cadastro de clientes e fornecedores). Só no tipo convênio.
   insuranceContactId String?
   createdById        String?

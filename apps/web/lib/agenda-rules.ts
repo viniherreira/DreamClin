@@ -16,6 +16,8 @@ export interface AgendaRules {
   defaultDurationMinutes: number;
   /** Encaixe: aceita dois horários do mesmo profissional ao mesmo tempo. */
   allowOverlap: boolean;
+  /** Cancelar pede o motivo (com o paciente e a agenda novos). */
+  cancelReasonRequired: boolean;
 }
 
 export const AGENDA_DEFAULTS: AgendaRules = {
@@ -24,6 +26,7 @@ export const AGENDA_DEFAULTS: AgendaRules = {
   endHour: 21,
   defaultDurationMinutes: 30,
   allowOverlap: false,
+  cancelReasonRequired: true,
 };
 
 const inteiro = (v: unknown, min: number, max: number, padrao: number) =>
@@ -42,6 +45,7 @@ export function readAgendaRules(settings: unknown): AgendaRules {
     endHour,
     defaultDurationMinutes: inteiro(o.defaultDurationMinutes, 5, 240, d.defaultDurationMinutes),
     allowOverlap: o.allowOverlap === true,
+    cancelReasonRequired: o.cancelReasonRequired !== false,
   };
 }
 

@@ -17,6 +17,7 @@ import { advanceAppointment, deleteAppointment, getAppointmentDetail, setAppoint
 import { STATUS_STYLES, TYPE_LABELS } from './constants';
 import { AppointmentFinanceTab } from './appointment-finance-tab';
 import { AppointmentAuditTab } from './appointment-audit-tab';
+import { AppointmentStatusPanel } from './appointment-status-panel';
 import { clinicToday } from '@/lib/tz';
 
 type Detail = NonNullable<Awaited<ReturnType<typeof getAppointmentDetail>>>;
@@ -73,7 +74,7 @@ export function AppointmentDetailModal({ open, appointmentId, labels, onClose, o
   const baseId = useId();
   const [detail, setDetail] = useState<Detail | null>(null);
   const [loading, setLoading] = useState(false);
-  const [aba, setAba] = useState<'detalhes' | 'financeiro' | 'historico' | 'auditoria'>('detalhes');
+  const [aba, setAba] = useState<'detalhes' | 'financeiro' | 'historico' | 'remarcacoes' | 'auditoria'>('detalhes');
   // Muda a cada alteração feita aqui: a aba Auditoria lê de novo.
   const [versao, setVersao] = useState(0);
   const [erro, setErro] = useState('');
@@ -166,6 +167,7 @@ export function AppointmentDetailModal({ open, appointmentId, labels, onClose, o
     { id: 'detalhes' as const, label: 'Detalhes' },
     ...(detail?.financial || detail?.newFinance ? [{ id: 'financeiro' as const, label: 'Financeiro' }] : []),
     { id: 'historico' as const, label: 'Histórico na clínica' },
+    ...(detail?.audit ? [{ id: 'remarcacoes' as const, label: `Remarcações${detail.reschedules.length ? ` (${detail.reschedules.length})` : ''}` }] : []),
     ...(detail?.audit ? [{ id: 'auditoria' as const, label: 'Auditoria' }] : []),
   ];
 
@@ -305,7 +307,7 @@ export function AppointmentDetailModal({ open, appointmentId, labels, onClose, o
                       <Card titulo="Situação do atendimento">
                         <p className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${style.bg} ${style.text}`}>
                           <span className={`h-1.5 w-1.5 rounded-full ${style.dot}`} aria-hidden="true" />
-                          {STAGE_LABELS[stage]}
+                          {detail.audit && (stage === 'SCHEDULED' || stage === 'CONFIRMED' || stage === 'CANCELLED' || stage === 'RESCHEDULED') ? detail.statusText : STAGE_LABELS[stage]}
                         </p>
                         <ol className="mt-3 space-y-2.5 border-l border-border pl-4 text-sm">
                           <Passo icone={CalendarClock} titulo="Agendado" quando={a.createdAt} quem={detail.createdBy} />
@@ -364,10 +366,34 @@ export function AppointmentDetailModal({ open, appointmentId, labels, onClose, o
                             {principal && (
                               <AcaoBotao action={principal} destaque disabled={pending} onClick={() => agir(principal)} />
                             )}
-                            {outras.map((ac) => (
-                              <AcaoBotao key={ac} action={ac} disabled={pending} onClick={() => agir(ac)} />
-                            ))}
+                            {outras
+                              // Agenda nova: cancelar é pela lista Situação, que pede quem cancelou e o motivo.
+                              .filter((ac) => !(detail.audit && ac === 'cancel'))
+                              .map((ac) => (
+                                <AcaoBotao key={ac} action={ac} disabled={pending} onClick={() => agir(ac)} />
+                              ))}
                           </div>
+                        )}
+                        {detail.audit && appointmentId && (
+                          <AppointmentStatusPanel
+                            appointmentId={appointmentId}
+                            status={a.status}
+                            date={new Date(a.startTime).toISOString().slice(0, 10)}
+                            startTime={wallClockTime(a.startTime)}
+                            endTime={wallClockTime(a.endTime)}
+                            professionalId={a.professional.id}
+                            professionals={detail.professionals}
+                            onDone={async (r) => {
+                              setAviso(r.message);
+                              onChanged();
+                              if (r.closed) return onClose();
+                              await carregar(appointmentId);
+                              if (r.openCents && r.openCents > 0) {
+                                setSugereReceber(true);
+                                setAba('financeiro');
+                              }
+                            }}
+                          />
                         )}
                         {erro && (
                           <p role="alert" className="mt-2 text-sm text-destructive">
@@ -411,6 +437,36 @@ export function AppointmentDetailModal({ open, appointmentId, labels, onClose, o
                   )}
 
                   {aba === 'auditoria' && appointmentId && <AppointmentAuditTab appointmentId={appointmentId} version={versao} />}
+
+                  {aba === 'remarcacoes' &&
+                    (detail.reschedules.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">Este agendamento ainda não foi remarcado.</p>
+                    ) : (
+                      <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface" aria-label="Remarcações">
+                        {detail.reschedules.map((r) => (
+                          <li key={r.id} className="space-y-0.5 px-4 py-2.5 text-sm">
+                            <p>
+                              <span className="tabular-nums text-muted-foreground line-through">
+                                {wallDateBR(r.fromStart)} {wallClockTime(r.fromStart)}
+                                {r.fromProfessional ? ` · ${r.fromProfessional}` : ''}
+                              </span>{' '}
+                              <span aria-hidden="true">→</span>
+                              <span className="sr-only">para</span>{' '}
+                              <span className="font-medium tabular-nums">
+                                {wallDateBR(r.toStart)} {wallClockTime(r.toStart)}
+                                {r.toProfessional && r.toProfessional !== r.fromProfessional ? ` · ${r.toProfessional}` : ''}
+                              </span>
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {r.by} · {instantDateBR(r.at)}
+                              {r.source === 'DRAG' && ' · arrastou na agenda'}
+                              {r.patientAsked && ' · o paciente pediu pelo WhatsApp'}
+                              {r.reason && ` · motivo: ${r.reason}`}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    ))}
 
                   {aba === 'historico' &&
                     (detail.history.length === 0 ? (

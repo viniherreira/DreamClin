@@ -14,9 +14,11 @@ describe('regras da agenda', () => {
       endHour: 22,
       defaultDurationMinutes: 45,
       allowOverlap: true,
+      cancelReasonRequired: true,
     });
     const torto = readAgendaRules({ agenda: { slotMinutes: 7, startHour: -3, endHour: 99, defaultDurationMinutes: 1000, allowOverlap: 'sim' } });
-    expect(torto).toEqual({ slotMinutes: 10, startHour: 0, endHour: 24, defaultDurationMinutes: 240, allowOverlap: false });
+    expect(torto).toEqual({ slotMinutes: 10, startHour: 0, endHour: 24, defaultDurationMinutes: 240, allowOverlap: false, cancelReasonRequired: true });
+    expect(readAgendaRules({ agenda: { cancelReasonRequired: false } }).cancelReasonRequired).toBe(false);
   });
 
   it('a grade padrão tem a mesma geometria de antes (16 px a cada 10 min)', () => {

@@ -264,12 +264,13 @@ export async function ProfileFull({
           )}
         </Card>
         <Card title="Comparecimento" icon={<ShieldCheck />}>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
             <Stat label="Atendidos" value={a.attended} />
             <Stat label="Faltas" value={a.missed} tone={a.missed ? 'danger' : undefined} />
             <Stat label="Cancelou (paciente)" value={a.cancelledByPatient} />
             <Stat label="Cancelou (clínica)" value={a.cancelledByClinic} />
             <Stat label="Taxa de falta" value={missRateText(a.missRate)} tone={a.missRate && a.missRate >= 0.2 ? 'warn' : undefined} />
+            <Stat label="Remarcações" value={x.reschedules} />
           </div>
           {a.cancelledUnknown > 0 && <p className="mt-2 text-xs text-muted-foreground">Mais {a.cancelledUnknown} cancelamentos antigos, sem registro de quem cancelou.</p>}
         </Card>

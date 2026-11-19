@@ -36,6 +36,7 @@ import { appointmentSnapshot, auditAppointment, auditAppointmentDeleted, loadApp
 import { pacienteAgendaEnabled } from '@/lib/feature-flags';
 import { displayName } from '@/lib/patient-name';
 import { highlightedAnswers, priorityLabel, readCustomAnswers } from '@/lib/patient-fields';
+import { cancelError, cancelReasonText, DEFAULT_CANCEL_REASONS, directStatusChange, isReschedule, statusLabel } from '@/lib/appointment-status';
 import { recordPatientEvent } from '@/lib/patient-timeline';
 
 // ─── Auth helper ─────────────────────────────────────────────────────────────
@@ -478,6 +479,7 @@ export async function updateAppointment(
   if (!extra.ok) return { success: false, errors: {}, message: extra.message };
   // Auditoria: a foto de antes, para gravar o que mudou.
   const antes = await appointmentSnapshot(tenantId, id);
+  const antesRemarcar = await prisma.appointment.findFirst({ where: { id, tenantId }, select: { startTime: true, endTime: true, professionalId: true, patientId: true, status: true } });
   const dados = {
     patientId,
     professionalId,
@@ -509,6 +511,9 @@ export async function updateAppointment(
   after(() => notifyCrm(tenantId, { type: appointmentStatusEvent(status), patientId, appointmentId: id }));
   // Linha do tempo só quando a situação mudou de verdade (editar a observação não é "confirmou" de novo).
   if (!antes || antes.status !== status) after(() => timelineAppointment(tenantId, id, 'status', userId));
+  if (antesRemarcar && isReschedule(antesRemarcar, { startTime: start, endTime: end, professionalId })) {
+    await recordReschedule(tenantId, userId, id, antesRemarcar, { startTime: start, endTime: end, professionalId }, 'AGENDA', String(formData.get('rescheduleReason') ?? ''));
+  }
   await auditAppointment(tenantId, userId, id, 'APPOINTMENT_UPDATED', antes);
 
   revalidatePath('/agenda');
@@ -547,11 +552,15 @@ export async function moveAppointment(
   }
 
   const antesMover = await appointmentSnapshot(tenantId, id);
+  const antesArrastar = await prisma.appointment.findFirst({ where: { id, tenantId }, select: { startTime: true, endTime: true, professionalId: true, patientId: true, status: true } });
   const movido = await prisma.appointment.update({
     where: { id, tenantId },
     data: { startTime: start, endTime: end, professionalId, updatedById: userId },
   });
   await auditAppointment(tenantId, userId, id, 'APPOINTMENT_MOVED', antesMover);
+  if (antesArrastar && isReschedule(antesArrastar, { startTime: start, endTime: end, professionalId })) {
+    await recordReschedule(tenantId, userId, id, antesArrastar, { startTime: start, endTime: end, professionalId }, 'DRAG');
+  }
   after(() => notifyCrm(tenantId, { type: 'appointment.rescheduled', patientId: movido.patientId, appointmentId: id }));
   after(() => timelineAppointment(tenantId, id, 'rescheduled', userId));
 
@@ -661,6 +670,7 @@ export async function updateAppointmentStatus(
     data: {
       status,
       cancelReason: status === 'CANCELLED' ? (cancelReason ?? null) : null,
+      ...(status === 'CONFIRMED' ? { confirmationSource: 'RECEPTION' } : {}),
       updatedById: userId,
     },
   });
@@ -687,6 +697,10 @@ export async function cancelAppointment(id: string, cancelReason?: string) {
  */
 export async function deleteAppointment(id: string) {
   const { tenantId, userId } = await requireTenant();
+  // Paciente e agenda novos: excluir (lançado por engano) é do dono e do administrador; os outros cancelam.
+  if ((await pacienteAgendaEnabled(tenantId)) && !(await hasCapability(tenantId, 'agenda_excluir'))) {
+    return { success: false as const, error: 'forbidden' as const, message: 'Só o dono ou o administrador exclui agendamento. Para tirar da agenda, use Cancelar.' };
+  }
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { success: false as const, error: 'blocked' as const };
@@ -773,7 +787,9 @@ export async function advanceAppointment(
     data: {
       ...mudanca,
       ...(mudanca.status === 'CANCELLED' ? { cancelReason: cancelReason?.trim() || null } : {}),
-      ...(mudanca.status && mudanca.status !== 'CANCELLED' ? { cancelReason: null } : {}),
+      ...(mudanca.status && mudanca.status !== 'CANCELLED' ? { cancelReason: null, cancelReasonId: null, cancelledBy: null } : {}),
+      ...(mudanca.status === 'CONFIRMED' ? { confirmationSource: 'RECEPTION' } : {}),
+      ...(mudanca.status === 'SCHEDULED' ? { confirmationSource: null } : {}),
       updatedById: userId,
     },
   });
@@ -920,6 +936,10 @@ export async function getAppointmentDetail(id: string) {
     priority: novo && p.priority ? priorityLabel(p.priorityType) : null,
     /** Paciente e agenda novos: a aba Auditoria. */
     audit: novo,
+    /** Rótulo da situação ("Confirmado pelo paciente", "Cancelado pela clínica"). */
+    statusText: statusLabel(appointment.status, { confirmationSource: appointment.confirmationSource, cancelledBy: appointment.cancelledBy }),
+    reschedules: novo ? await loadReschedules(tenantId, id) : [],
+    professionals: novo ? await db.professional.findMany({ where: { active: true }, orderBy: { name: 'asc' }, select: { id: true, name: true } }) : [],
     history: historico,
     financial: financeiro,
     /** Financeiro completo ligado: a aba Financeiro carrega os itens e as contas deste agendamento. */
@@ -976,5 +996,188 @@ export async function deleteAppointmentLabel(id: string): Promise<{ ok: true } |
   else await prisma.appointmentLabel.deleteMany({ where: { id, tenantId } });
   revalidatePath('/agenda');
   revalidatePath('/configuracoes');
+  return { ok: true };
+}
+
+
+// ─── Situação, cancelamento e remarcação (spec 2026-11-18, F4) ──────────────
+
+type Ok = { ok: true } | { ok: false; message: string };
+
+async function novoLigado(tenantId: string) {
+  return pacienteAgendaEnabled(tenantId);
+}
+
+/** Grava a remarcação: de onde veio e para onde foi. Pediu pelo WhatsApp (situação "remarcado") fica marcado. */
+async function recordReschedule(
+  tenantId: string,
+  userId: string | null,
+  appointmentId: string,
+  before: { startTime: Date; endTime: Date; professionalId: string; patientId: string; status: string },
+  after: { startTime: Date; endTime: Date; professionalId: string },
+  source: 'AGENDA' | 'DRAG' | 'BULK',
+  reason?: string,
+) {
+  if (!(await novoLigado(tenantId))) return;
+  await prisma.appointmentReschedule.create({
+    data: {
+      tenantId,
+      appointmentId,
+      patientId: before.patientId,
+      fromStart: before.startTime,
+      fromEnd: before.endTime,
+      fromProfessionalId: before.professionalId,
+      toStart: after.startTime,
+      toEnd: after.endTime,
+      toProfessionalId: after.professionalId,
+      reason: reason?.trim().slice(0, 200) || null,
+      source,
+      patientAsked: before.status === 'RESCHEDULED',
+      byUserId: userId,
+    },
+  });
+  // Quem pediu para remarcar e ganhou horário novo volta a "a confirmar".
+  if (before.status === 'RESCHEDULED') {
+    await prisma.appointment.updateMany({ where: { id: appointmentId, tenantId, status: 'RESCHEDULED' }, data: { status: 'SCHEDULED', confirmationSource: null } });
+  }
+}
+
+async function loadReschedules(tenantId: string, appointmentId: string) {
+  const rows = await prisma.appointmentReschedule.findMany({ where: { tenantId, appointmentId }, orderBy: { createdAt: 'desc' }, take: 50 });
+  const ids = [...new Set(rows.flatMap((r) => [r.fromProfessionalId, r.toProfessionalId, r.byUserId]).filter((x): x is string => !!x))];
+  const [profs, users] = await Promise.all([
+    prisma.professional.findMany({ where: { tenantId, id: { in: ids } }, select: { id: true, name: true } }),
+    prisma.user.findMany({ where: { tenantId, id: { in: ids } }, select: { id: true, name: true } }),
+  ]);
+  const nome = (id: string | null, l: { id: string; name: string }[]) => l.find((x) => x.id === id)?.name ?? null;
+  return rows.map((r) => ({
+    id: r.id,
+    fromStart: r.fromStart,
+    toStart: r.toStart,
+    fromProfessional: nome(r.fromProfessionalId, profs),
+    toProfessional: nome(r.toProfessionalId, profs),
+    reason: r.reason,
+    source: r.source,
+    patientAsked: r.patientAsked,
+    by: nome(r.byUserId, users) ?? 'Sistema',
+    at: r.createdAt,
+  }));
+}
+
+/** Os motivos de cancelamento da clínica (na primeira vez, cria os padrão) e se o motivo é obrigatório. */
+export async function cancelOptionsAction(): Promise<{ reasons: { id: string; name: string }[]; required: boolean } | null> {
+  const { tenantId } = await requireTenant();
+  if (!(await novoLigado(tenantId))) return null;
+  let rows = await prisma.cancelReason.findMany({ where: { tenantId, active: true }, orderBy: [{ order: 'asc' }, { name: 'asc' }], select: { id: true, name: true } });
+  if (!rows.length && !(await prisma.cancelReason.count({ where: { tenantId } }))) {
+    await prisma.cancelReason.createMany({ data: DEFAULT_CANCEL_REASONS.map((name, order) => ({ tenantId, name, order })), skipDuplicates: true });
+    rows = await prisma.cancelReason.findMany({ where: { tenantId, active: true }, orderBy: [{ order: 'asc' }, { name: 'asc' }], select: { id: true, name: true } });
+  }
+  return { reasons: rows, required: (await agendaRules(tenantId)).cancelReasonRequired };
+}
+
+/**
+ * Cancelar com quem cancelou (paciente ou clínica) e o motivo da lista. O
+ * horário fica livre e o agendamento continua no histórico.
+ */
+export async function cancelAppointmentFull(id: string, input: { cancelledBy: string; reasonId?: string | null; reasonText?: string | null }): Promise<Ok> {
+  const { tenantId, userId } = await requireTenant();
+  const bloqueio = (await writeBlocked(tenantId)) ?? (await capabilityBlocked(tenantId, 'agenda'));
+  if (bloqueio) return { ok: false, message: bloqueio };
+  const appt = await prisma.appointment.findFirst({ where: { id, tenantId }, select: { id: true, patientId: true, status: true, arrivedAt: true, startedAt: true } });
+  if (!appt) return { ok: false, message: 'Agendamento não encontrado.' };
+  if (appt.status === 'CANCELLED') return { ok: false, message: 'Este agendamento já está cancelado.' };
+  if (appt.status === 'ATTENDED') return { ok: false, message: 'Atendimento já finalizado não se cancela. Reabra antes, se precisar.' };
+  const motivo = input.reasonId ? await prisma.cancelReason.findFirst({ where: { id: input.reasonId, tenantId }, select: { name: true } }) : null;
+  if (input.reasonId && !motivo) return { ok: false, message: 'Motivo não encontrado.' };
+  const outro = motivo?.name === 'Outro';
+  const erro = cancelError(input, { required: (await agendaRules(tenantId)).cancelReasonRequired, otherSelected: outro });
+  if (erro) return { ok: false, message: erro };
+  const antes = await appointmentSnapshot(tenantId, id);
+  await prisma.appointment.update({
+    where: { id, tenantId },
+    data: {
+      status: 'CANCELLED',
+      cancelledBy: input.cancelledBy,
+      cancelReasonId: input.reasonId || null,
+      cancelReason: cancelReasonText(motivo?.name, input.reasonText, outro),
+      arrivedAt: null,
+      startedAt: null,
+      finishedAt: null,
+      updatedById: userId,
+    },
+  });
+  await auditAppointment(tenantId, userId, id, 'APPOINTMENT_STATUS', antes);
+  after(() => notifyCrm(tenantId, { type: 'appointment.cancelled', patientId: appt.patientId, appointmentId: id }));
+  after(() => timelineAppointment(tenantId, id, 'status', userId));
+  revalidatePath('/agenda');
+  revalidatePath('/dashboard');
+  return { ok: true };
+}
+
+/** Trocar a situação direto pela lista da janela (cancelar usa `cancelAppointmentFull`). */
+export async function setStatusDirectAction(id: string, target: 'SCHEDULED' | 'CONFIRMED' | 'ATTENDED' | 'MISSED'): Promise<Ok & { openCents?: number }> {
+  const { tenantId, userId } = await requireTenant();
+  const bloqueio = (await writeBlocked(tenantId)) ?? (await capabilityBlocked(tenantId, 'agenda'));
+  if (bloqueio) return { ok: false, message: bloqueio };
+  if (!['SCHEDULED', 'CONFIRMED', 'ATTENDED', 'MISSED'].includes(target)) return { ok: false, message: 'Situação inválida.' };
+  const appt = await prisma.appointment.findFirst({ where: { id, tenantId }, select: { id: true, patientId: true, status: true, arrivedAt: true, startedAt: true, finishedAt: true } });
+  if (!appt) return { ok: false, message: 'Agendamento não encontrado.' };
+  const mudanca = directStatusChange(appt, target, new Date());
+  if (!mudanca) return { ok: true };
+  const antes = await appointmentSnapshot(tenantId, id);
+  await prisma.appointment.update({
+    where: { id, tenantId },
+    data: {
+      ...mudanca,
+      cancelReason: null,
+      cancelReasonId: null,
+      cancelledBy: null,
+      ...(target === 'CONFIRMED' ? { confirmationSource: 'RECEPTION' } : target === 'SCHEDULED' ? { confirmationSource: null } : {}),
+      updatedById: userId,
+    },
+  });
+  await auditAppointment(tenantId, userId, id, 'APPOINTMENT_STATUS', antes);
+  after(() => notifyCrm(tenantId, { type: appointmentStatusEvent(target), patientId: appt.patientId, appointmentId: id }));
+  after(() => timelineAppointment(tenantId, id, 'status', userId));
+  const fin = await agendaFinance(tenantId);
+  const openCents = fin && target === 'ATTENDED' ? await fin.attended(id) : undefined;
+  revalidatePath('/agenda');
+  revalidatePath('/dashboard');
+  return { ok: true, openCents };
+}
+
+/**
+ * Remarcar: o mesmo agendamento vai para outro dia, hora ou profissional
+ * (itens, cobrança e conversa continuam presos nele) e fica o registro de
+ * onde veio, para onde foi, quem remarcou e o motivo.
+ */
+export async function rescheduleAppointmentAction(
+  id: string,
+  input: { date: string; startTime: string; endTime: string; professionalId: string; reason?: string },
+): Promise<Ok> {
+  const { tenantId, userId } = await requireTenant();
+  const bloqueio = (await writeBlocked(tenantId)) ?? (await capabilityBlocked(tenantId, 'agenda'));
+  if (bloqueio) return { ok: false, message: bloqueio };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date) || !/^\d{2}:\d{2}$/.test(input.startTime) || !/^\d{2}:\d{2}$/.test(input.endTime)) return { ok: false, message: 'Data ou horário inválido.' };
+  const { start, end } = buildDateTimes(input.date, input.startTime, input.endTime);
+  if (end <= start) return { ok: false, message: 'O fim precisa ser depois do início.' };
+  const foreign = await refOutsideTenant(tenantId, { professionalId: input.professionalId });
+  if (foreign) return { ok: false, message: refErrorMessage(foreign) };
+  const antes = await prisma.appointment.findFirst({ where: { id, tenantId }, select: { startTime: true, endTime: true, professionalId: true, patientId: true, status: true } });
+  if (!antes) return { ok: false, message: 'Agendamento não encontrado.' };
+  if (['CANCELLED', 'ATTENDED', 'MISSED'].includes(antes.status)) return { ok: false, message: 'Só dá para remarcar o que ainda vai acontecer.' };
+  if (!isReschedule(antes, { startTime: start, endTime: end, professionalId: input.professionalId })) return { ok: false, message: 'Escolha outro dia, horário ou profissional.' };
+  const conflict = (await agendaRules(tenantId)).allowOverlap ? null : await checkConflict(tenantId, input.professionalId, start, end, id);
+  if (conflict) return { ok: false, message: `Conflito com o agendamento de ${conflict.patient.name} às ${wallClockTime(conflict.startTime)}.` };
+  const blocked = await checkBlocked(tenantId, input.professionalId, start, end);
+  if (blocked) return { ok: false, message: `Horário bloqueado${blocked.reason ? ` (${blocked.reason})` : ''}.` };
+  const foto = await appointmentSnapshot(tenantId, id);
+  await prisma.appointment.update({ where: { id, tenantId }, data: { startTime: start, endTime: end, professionalId: input.professionalId, arrivedAt: null, startedAt: null, updatedById: userId } });
+  await recordReschedule(tenantId, userId, id, antes, { startTime: start, endTime: end, professionalId: input.professionalId }, 'AGENDA', input.reason);
+  await auditAppointment(tenantId, userId, id, 'APPOINTMENT_MOVED', foto, { note: input.reason?.trim() || undefined });
+  after(() => notifyCrm(tenantId, { type: 'appointment.rescheduled', patientId: antes.patientId, appointmentId: id }));
+  after(() => timelineAppointment(tenantId, id, 'rescheduled', userId, { from: antes.startTime }));
+  revalidatePath('/agenda');
   return { ok: true };
 }

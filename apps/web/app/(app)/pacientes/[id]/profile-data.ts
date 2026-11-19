@@ -100,6 +100,7 @@ export async function loadProfileExtras(tenantId: string, patientId: string) {
   const ultimo = appts.find((a) => a.status === 'ATTENDED');
   const conversa = modules.crm ? await db.conversation.findFirst({ where: { patientId }, orderBy: { lastMessageAt: 'desc' }, select: { id: true } }) : null;
   const insurance = p?.insurances[0] ?? null;
+  const remarcacoes = await db.appointmentReschedule.count({ where: { patientId } });
   const devendo = veFinanceiro
     ? await db.financialTitle
         .count({ where: { patientId, direction: 'RECEIVABLE', status: { in: ['OPEN', 'PARTIAL'] }, dueDate: { lt: hoje } } })
@@ -116,6 +117,7 @@ export async function loadProfileExtras(tenantId: string, patientId: string) {
     lastAttended: ultimo ? { startTime: ultimo.startTime, professional: ultimo.professional.name } : null,
     next: proximas[0] ? { id: proximas[0].id, startTime: proximas[0].startTime, professional: proximas[0].professional.name } : null,
     attendance: attendanceOf(appts),
+    reschedules: remarcacoes,
     appointments: appts.map((a) => ({
       ...a,
       procedures: [...new Set([a.procedure?.name, ...a.items.map((i) => i.procedure?.name)].filter((x): x is string => !!x))],

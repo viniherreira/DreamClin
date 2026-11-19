@@ -95,6 +95,9 @@ describe.skipIf(!process.env.DATABASE_URL)('auditoria do agendamento (banco)', a
 
   it('excluir guarda como o agendamento estava e quem excluiu', async () => {
     logado = b.user.clerkUserId;
+    // A recepção não exclui (cancela); o dono sim.
+    expect(await agenda.deleteAppointment(b.appt.id)).toMatchObject({ success: false, error: 'forbidden' });
+    await prisma.user.update({ where: { id: b.user.id }, data: { role: 'OWNER' } });
     expect(await agenda.deleteAppointment(b.appt.id)).toEqual({ success: true });
     const audit = await agenda.getAppointmentAuditAction(b.appt.id);
     const fim = audit!.at(-1)!;

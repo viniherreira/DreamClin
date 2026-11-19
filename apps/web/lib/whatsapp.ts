@@ -696,7 +696,11 @@ export async function applyAppointmentResponse(
   await prisma.appointment.update({
     where: { id: appt.id },
     // Cancelou pelo botão: quem cancelou foi o paciente.
-    data: { status, ...(status === 'CANCELLED' ? { cancelledBy: 'PATIENT', cancelReason: 'Pelo WhatsApp' } : {}) },
+    data: {
+      status,
+      ...(status === 'CANCELLED' ? { cancelledBy: 'PATIENT', cancelReason: 'Pelo WhatsApp' } : {}),
+      ...(status === 'CONFIRMED' ? { confirmationSource: 'WHATSAPP' } : {}),
+    },
   });
 
   await prisma.whatsAppMessage.create({
