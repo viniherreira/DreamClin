@@ -29,6 +29,8 @@ import { answerText, priorityLabel } from '@/lib/patient-fields';
 import { wallClockTime, wallDateBR, instantDateTimeBR, ageFromBirth } from '@/lib/tz';
 import type { ProfileExtras } from '../profile-data';
 import { addNoteAction } from '../profile-actions';
+import type { DocsOverview } from '../docs-actions';
+import { AttachmentsTab, DocumentsTab, QuestionnairesTab, SignaturesTab } from './profile-docs';
 
 const APPT: Record<string, { label: string; cls: string }> = {
   SCHEDULED: { label: 'A confirmar', cls: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300' },
@@ -167,7 +169,10 @@ export async function ProfileFull({
   canCrm,
   canEdit,
   toggleActive,
+  docs,
 }: {
+  /** Documentos, assinaturas, anexos e questionários (F3). */
+  docs: DocsOverview | null;
   tenantId: string;
   meId: string;
   role: string;
@@ -413,6 +418,9 @@ export async function ProfileFull({
         { id: 'anamnese', label: 'Anamnese', badge: anamnesisAlerts.length, alert: anamnesisAlerts.length > 0, locked: !x.canSeeRecord, content: clinical.anamnese },
         { id: 'evolucoes', label: 'Evoluções', badge: clinical.evolutions, locked: !x.canSeeRecord, content: clinical.evolucoes },
         { id: 'imagens', label: 'Imagens', badge: clinical.files, locked: !x.canSeeRecord, content: clinical.imagens },
+        ...(docs && x.canSeeRecord
+          ? [{ id: 'documentos-clinicos', label: 'Documentos clínicos', badge: docs.docs.filter((d) => d.clinical).length, content: <DocumentsTab patientId={patient.id} data={{ ...docs, docs: docs.docs.filter((d) => d.clinical) }} phone={x.whatsappPhone} /> }]
+          : []),
       ],
     },
     {
@@ -442,6 +450,20 @@ export async function ProfileFull({
         ...(canCrm ? [{ id: 'conversas', label: 'Conversas', content: conversas }] : []),
       ],
     },
+    ...(docs
+      ? [
+          {
+            id: 'documentos-g',
+            label: 'Documentos',
+            tabs: [
+              { id: 'documentos', label: 'Documentos', badge: docs.docs.filter((d) => !d.clinical).length, content: <DocumentsTab patientId={patient.id} data={{ ...docs, docs: docs.docs.filter((d) => !d.clinical) }} phone={x.whatsappPhone} /> },
+              { id: 'assinaturas', label: 'Assinaturas', badge: docs.signatures.filter((s) => s.state === 'PENDING' || s.state === 'VIEWED').length, content: <SignaturesTab data={docs} phone={x.whatsappPhone} /> },
+              { id: 'anexos', label: 'Anexos', badge: docs.files.length, content: <AttachmentsTab patientId={patient.id} data={docs} /> },
+              { id: 'questionarios', label: 'Questionários', badge: docs.questionnaires.filter((q) => !q.answeredAt && !q.expired).length, content: <QuestionnairesTab patientId={patient.id} data={docs} phone={x.whatsappPhone} /> },
+            ],
+          },
+        ]
+      : []),
     { id: 'cadastro', label: 'Cadastro', tabs: [{ id: 'dados', label: 'Dados cadastrais', content: dados }] },
   ];
 

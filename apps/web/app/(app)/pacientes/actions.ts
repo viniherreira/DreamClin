@@ -12,6 +12,7 @@ import { clinicToday } from '@/lib/tz';
 import { refOutsideTenant } from '@/lib/owns';
 import { notifyPatientCreated } from '@/crm/notify';
 import { recordPatientEvent } from '@/lib/patient-timeline';
+import { ensureDefaultFolders } from '@/lib/patient-docs';
 import { cpfHash, cpfTaken, findPatientByCpf } from '@/lib/cpf-hash';
 import { pacienteAgendaEnabled } from '@/lib/feature-flags';
 import { missingRequired, readPatientSettings, type CustomAnswers } from '@/lib/patient-fields';
@@ -487,6 +488,7 @@ export async function createPatient(
   // Já conversava pelo WhatsApp? O lead e a conversa do CRM passam a ser deste paciente.
   after(() => notifyPatientCreated(tenantId, patient.id));
   after(() => recordPatientEvent(tenantId, patient.id, 'patient.created', 'Paciente cadastrado', { actorId: userId }));
+  if (extra) after(() => ensureDefaultFolders(tenantId, patient.id).catch(() => 0));
 
   revalidatePath('/pacientes');
   return { success: true, patientId: patient.id };

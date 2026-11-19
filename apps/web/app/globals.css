@@ -665,3 +665,14 @@
     .viz-rise, .viz-grow-y, .viz-grow-x, .viz-draw, .viz-reveal, .viz-ping, .viz-flow { animation: none; }
   }
 }
+
+/* Texto dos documentos do paciente (modelos, documentos, assinatura por link):
+   o Tailwind zera listas, títulos e tabelas; aqui eles voltam a aparecer. */
+.doc-body h2 { font-size: 1.15rem; font-weight: 600; margin: 0.6rem 0 0.4rem; }
+.doc-body h3 { font-size: 1rem; font-weight: 600; margin: 0.5rem 0 0.3rem; }
+.doc-body p { margin: 0 0 0.55rem; }
+.doc-body ul { list-style: disc; padding-left: 1.4rem; margin: 0 0 0.55rem; }
+.doc-body ol { list-style: decimal; padding-left: 1.4rem; margin: 0 0 0.55rem; }
+.doc-body table { border-collapse: collapse; width: 100%; margin: 0.4rem 0 0.7rem; }
+.doc-body th, .doc-body td { border: 1px solid hsl(var(--border)); padding: 0.3rem 0.5rem; text-align: left; vertical-align: top; }
+.doc-body th { background: hsl(var(--surface-alt)); font-weight: 600; }

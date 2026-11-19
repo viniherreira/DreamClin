@@ -52,6 +52,7 @@ import { can } from '@/lib/permissions';
 import { pacienteAgendaEnabled } from '@/lib/feature-flags';
 import { loadProfileExtras } from './profile-data';
 import { ProfileFull } from './_components/profile-full';
+import { docsOverview } from './docs-actions';
 
 export const metadata = { title: 'Ficha do paciente' };
 
@@ -385,10 +386,11 @@ export default async function PatientPage({
   // Paciente e agenda novos (spec 2026-11-18, F2): o perfil com abas agrupadas.
   const acesso = await currentAccess();
   if (acesso && (await pacienteAgendaEnabled(acesso.tenantId))) {
-    const [extras, modules, podeExportar] = await Promise.all([
+    const [extras, modules, podeExportar, docs] = await Promise.all([
       loadProfileExtras(acesso.tenantId, patient.id),
       getTenantModules(acesso.tenantId),
       hasCapability(acesso.tenantId, 'pacientes_exportar'),
+      docsOverview(patient.id),
     ]);
     const travado = <Locked what="ao prontuário" />;
     const financeiro = fin?.can('fin_ver') ? (
@@ -446,6 +448,7 @@ export default async function PatientPage({
         canCrm={modules.crm && can(acesso.role, 'crm')}
         canEdit={can(acesso.role, 'pacientes')}
         toggleActive={togglePatientActive.bind(null, patient.id)}
+        docs={docs}
       />
     );
   }

@@ -12,6 +12,9 @@ import { SITE } from '@/lib/seo';
 const SISTEMA = [
   '/api/',
   '/orcamento/',
+  '/assinar/',
+  '/questionario/',
+  '/enviar/',
   '/onboarding',
   '/dashboard',
   '/crm',
