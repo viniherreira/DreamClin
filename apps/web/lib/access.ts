@@ -151,6 +151,11 @@ const tenantSettings = cache(async (tenantId: string): Promise<unknown> => {
 export async function hasCapability(tenantId: string, capability: Capability): Promise<boolean> {
   const role = await currentRole(tenantId);
   if (capability === 'prontuario') return recordAllowed(role, await tenantSettings(tenantId));
+  // Exportar pacientes: a recepção só quando a clínica liberou.
+  if (capability === 'pacientes_exportar' && role === 'RECEPTIONIST') {
+    const s = (await tenantSettings(tenantId)) as { patients?: { receptionCanExport?: unknown } } | null;
+    return s?.patients?.receptionCanExport === true;
+  }
   return can(role, capability);
 }
 

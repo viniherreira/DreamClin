@@ -204,6 +204,11 @@ model Tenant {
   collectionDispatches  CollectionDispatch[]
   adTopics              AdTopic[]
 
+  // Paciente e agenda (spec 2026-11-18)
+  patientOrigins      PatientOrigin[]
+  patientInsurances   PatientInsurance[]
+  patientCustomFields PatientCustomField[]
+
   @@map("tenants")
 }
 
@@ -313,7 +318,49 @@ model Patient {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
+  // ── Cadastro completo (spec 2026-11-18, F1). Tudo opcional: as telas antigas não mudam.
+  /// Nome social: quando preenchido, é o nome de tela e das mensagens. O civil (`name`) fica nos documentos oficiais.
+  socialName               String?
+  /// Gênero (texto livre, opcional). A coluna `gender` é mostrada como "Sexo".
+  genderIdentity           String?
+  rgEncrypted              String?   @map("rg")
+  rgIssuer                 String?
+  foreigner                Boolean   @default(false)
+  nationality              String?
+  /// Passaporte ou documento de estrangeiro (no lugar do CPF).
+  foreignDocEncrypted      String?   @map("foreign_doc")
+  landlineEncrypted        String?   @map("landline")
+  landlineExt              String?
+  /// Outros contatos: lista de { tipo, numero } com o número cifrado.
+  otherContacts            Json?
+  /// Cartão Nacional de Saúde (SUS).
+  cnsEncrypted             String?   @map("cns")
+  bloodType                String?
+  spouseName               String?
+  motherName               String?
+  fatherName               String?
+  legalGuardian            String?
+  /// Responsável financeiro: outro paciente (recibos e cobranças saem no nome dele) ou só o nome.
+  financialResponsibleId   String?
+  financialResponsibleText String?
+  /// Atendimento prioritário e o motivo (`lib/patient-fields.ts`, PRIORITY_TYPES).
+  priority                 Boolean   @default(false)
+  priorityType             String?
+  education                String?
+  hobby                    String?
+  /// Paciente que indicou (o texto livre continua em `referredBy`).
+  referredById             String?
+  originId                 String?
+  /// Recebe parabéns pelo WhatsApp no aniversário.
+  birthdayMessages         Boolean   @default(true)
+  /// Foto no storage privado.
+  photoPath                String?
+  /// Informações adicionais da clínica: { [campoId]: { v: valor, obs?: texto } }.
+  customFields             Json?
+
   tenant             Tenant              @relation(fields: [tenantId], references: [id])
+  origin             PatientOrigin?      @relation(fields: [originId], references: [id], onDelete: SetNull)
+  insurances         PatientInsurance[]
   patientNotes       PatientNote[]
   appointments       Appointment[]
   quotes             Quote[]
@@ -334,7 +381,73 @@ model Patient {
   @@index([tenantId, name])
   @@index([tenantId, deletedAt])
   @@index([tenantId, cpfHash])
+  @@index([tenantId, financialResponsibleId])
   @@map("patients")
+}
+
+/// De onde o paciente veio (Instagram, Google, indicação…). Lista da clínica.
+model PatientOrigin {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  order     Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
+  patients Patient[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, order])
+  @@map("patient_origins")
+}
+
+/// Convênio do paciente: plano, carteirinha e validade. "Particular" não é linha: é a falta dela.
+model PatientInsurance {
+  id            String    @id @default(cuid())
+  tenantId      String
+  patientId     String
+  /// O convênio no cadastro de clientes e fornecedores (financeiro novo). Nulo = só o nome em `planName`.
+  insurerId     String?
+  insurerName   String
+  planName      String?
+  cardNumber    String?
+  validUntil    DateTime?
+  active        Boolean   @default(true)
+  createdById   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  patient Patient @relation(fields: [patientId], references: [id])
+
+  @@index([tenantId, patientId])
+  @@index([tenantId, insurerName])
+  @@map("patient_insurances")
+}
+
+/// Informação adicional que a clínica cria para o cadastro (Configurações › Pacientes).
+model PatientCustomField {
+  id         String   @id @default(cuid())
+  tenantId   String
+  label      String
+  /// DATE, SHORT_TEXT, LONG_TEXT, MULTI, SINGLE, NUMBER.
+  type       String
+  options    String[] @default([])
+  required   Boolean  @default(false)
+  /// Caixa de observação ao lado da resposta.
+  hasNote    Boolean  @default(false)
+  /// A resposta vira alerta no cabeçalho do paciente.
+  highlight  Boolean  @default(false)
+  order      Int      @default(0)
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, order])
+  @@map("patient_custom_fields")
 }
 
 model PatientNote {
