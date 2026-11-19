@@ -1,6 +1,10 @@
 import Link from 'next/link';
 import { Suspense } from 'react';
-import { listPatients } from './actions';
+import { listPatients, listPatientsFull, patientFilterOptions } from './actions';
+import { PatientListFull } from './_components/patient-list-full';
+import { currentAccess } from '@/lib/guard';
+import { pacienteAgendaEnabled } from '@/lib/feature-flags';
+import { readPatientFilters } from '@/lib/patient-filters';
 import { PatientTable } from './_components/patient-table';
 import { PatientAvatar } from './_components/patient-avatar';
 import { PatientStatusBadge } from './_components/patient-status-badge';
@@ -54,14 +58,23 @@ async function PatientsContent({
   );
 }
 
+async function PatientsFull({ params }: { params: Record<string, string | string[] | undefined> }) {
+  const filters = readPatientFilters(params);
+  const page = Math.max(1, Number(params.page ?? 1) || 1);
+  const [data, options] = await Promise.all([listPatientsFull(filters, page), patientFilterOptions()]);
+  return <PatientListFull rows={data.patients} total={data.total} pages={data.pages} page={page} filters={filters} options={options} recent={data.recent} />;
+}
+
 export default async function PatientsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; page?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
-  const search = params.q ?? '';
+  const search = typeof params.q === 'string' ? params.q : '';
   const page = Math.max(1, Number(params.page ?? 1));
+  const acesso = await currentAccess();
+  const completo = acesso ? await pacienteAgendaEnabled(acesso.tenantId) : false;
 
   return (
     <div className="mx-auto max-w-6xl p-6 lg:p-8">
@@ -82,7 +95,7 @@ export default async function PatientsPage({
       </header>
 
       <Suspense fallback={<div className="py-12 text-center text-sm text-muted-foreground">Carregando...</div>}>
-        <PatientsContent search={search} page={page} />
+        {completo ? <PatientsFull params={params} /> : <PatientsContent search={search} page={page} />}
       </Suspense>
     </div>
   );
