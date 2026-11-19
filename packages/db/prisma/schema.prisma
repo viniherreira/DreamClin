@@ -331,8 +331,8 @@ model Patient {
   foreignDocEncrypted      String?   @map("foreign_doc")
   landlineEncrypted        String?   @map("landline")
   landlineExt              String?
-  /// Outros contatos: lista de { tipo, numero } com o número cifrado.
-  otherContacts            Json?
+  /// Outros contatos: a lista [{ kind, number }] em JSON, cifrada inteira (a troca da chave recifra como as outras colunas).
+  otherContactsEncrypted   String?   @map("other_contacts")
   /// Cartão Nacional de Saúde (SUS).
   cnsEncrypted             String?   @map("cns")
   bloodType                String?

@@ -157,7 +157,7 @@ export async function extraRefError(tenantId: string, x: ExtraInput, selfId?: st
 export function extraData(x: ExtraInput, tenantId: string, answers: CustomAnswers): Prisma.PatientUncheckedUpdateInput {
   const key = masterKey();
   const enc = (v: string | undefined) => (v ? encrypt(v, key, tenantId) : null);
-  const contatos = parseOtherContacts(x.otherContacts).map((c) => ({ kind: c.kind, number: encrypt(c.number, key, tenantId) }));
+  const contatos = parseOtherContacts(x.otherContacts);
   const foreigner = x.foreigner === '1';
   const priority = x.priority === '1';
   return {
@@ -170,7 +170,7 @@ export function extraData(x: ExtraInput, tenantId: string, answers: CustomAnswer
     foreignDocEncrypted: foreigner ? enc(x.foreignDoc) : null,
     landlineEncrypted: enc(x.landline?.replace(/\D/g, '')),
     landlineExt: x.landlineExt || null,
-    otherContacts: contatos.length ? contatos : undefined,
+    otherContactsEncrypted: contatos.length ? encrypt(JSON.stringify(contatos), key, tenantId) : null,
     cnsEncrypted: enc(x.cns?.replace(/\D/g, '')),
     bloodType: x.bloodType && (BLOOD_TYPES as readonly string[]).includes(x.bloodType) ? x.bloodType : null,
     spouseName: x.spouseName || null,
@@ -241,16 +241,11 @@ export function openExtra(
     foreignDocEncrypted: string | null;
     landlineEncrypted: string | null;
     cnsEncrypted: string | null;
-    otherContacts: Prisma.JsonValue | null;
+    otherContactsEncrypted: string | null;
   },
   tenantId: string,
 ) {
-  const contatos = Array.isArray(p.otherContacts)
-    ? (p.otherContacts as { kind?: unknown; number?: unknown }[]).map((c) => ({
-        kind: typeof c?.kind === 'string' ? c.kind : 'Outro',
-        number: typeof c?.number === 'string' ? abrir(c.number, tenantId) : '',
-      }))
-    : [];
+  const contatos = parseOtherContacts(abrir(p.otherContactsEncrypted, tenantId) || undefined);
   return {
     rg: abrir(p.rgEncrypted, tenantId),
     foreignDoc: abrir(p.foreignDocEncrypted, tenantId),

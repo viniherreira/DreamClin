@@ -559,7 +559,6 @@ export async function updatePatient(
       city: data.city || null,
       state: data.state || null,
       ...(extra ? extraData(extra.extra, tenantId, extra.answers) : {}),
-      ...(extra && !extra.extra.otherContacts ? { otherContacts: Prisma.DbNull } : {}),
       ...(extra && !Object.keys(extra.answers).length ? { customFields: Prisma.DbNull } : {}),
       ...(novoNumero ? { controlNumber: novoNumero } : {}),
       updatedById: userId,

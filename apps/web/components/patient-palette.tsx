@@ -112,26 +112,13 @@ export function PatientPalette() {
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-[60] flex items-start justify-center bg-foreground/40 p-4 pt-[12vh]" onMouseDown={() => setOpen(false)}>
+        <div className="fixed inset-0 z-[60] flex items-start justify-center p-4 pt-[12vh]">
+          <div className="absolute inset-0 bg-foreground/40" onMouseDown={() => setOpen(false)} aria-hidden="true" />
           <div
             role="dialog"
             aria-modal="true"
             aria-label="Buscar paciente"
-            className="w-full max-w-lg overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl"
-            onMouseDown={(e) => e.stopPropagation()}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') setOpen(false);
-              else if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                setSel((s) => Math.min(s + 1, Math.max(lista.length - 1, 0)));
-              } else if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                setSel((s) => Math.max(s - 1, 0));
-              } else if (e.key === 'Enter' && lista[sel]) {
-                e.preventDefault();
-                ir(lista[sel]);
-              }
-            }}
+            className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl"
           >
             <div className="flex items-center gap-2 border-b border-border px-3">
               <Search className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -139,6 +126,19 @@ export function PatientPalette() {
                 ref={inputRef}
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') setOpen(false);
+                  else if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    setSel((s) => Math.min(s + 1, Math.max(lista.length - 1, 0)));
+                  } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    setSel((s) => Math.max(s - 1, 0));
+                  } else if (e.key === 'Enter' && lista[sel]) {
+                    e.preventDefault();
+                    ir(lista[sel]);
+                  }
+                }}
                 placeholder="Nome, nº, CPF, telefone ou responsável"
                 aria-label="Buscar paciente"
                 role="combobox"
@@ -168,6 +168,10 @@ export function PatientPalette() {
                   aria-selected={i === sel}
                   onMouseEnter={() => setSel(i)}
                   onClick={() => ir(it)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') ir(it);
+                  }}
+                  tabIndex={-1}
                   className={`flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm ${i === sel ? 'bg-primary/10 text-foreground' : ''}`}
                 >
                   {buscando ? (
