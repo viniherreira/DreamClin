@@ -1,4 +1,5 @@
 import { prisma, decrypt, type AppointmentStatus } from '@clinicaiq/db';
+import { appointmentSnapshot, auditAppointment } from './appointment-audit-server';
 import {
   CloudApiError,
   getWhatsAppProvider,
@@ -691,9 +692,11 @@ export async function applyAppointmentResponse(
     return false;
   }
 
+  const antes = await appointmentSnapshot(appt.tenantId, appt.id);
   await prisma.appointment.update({
     where: { id: appt.id },
-    data: { status },
+    // Cancelou pelo botão: quem cancelou foi o paciente.
+    data: { status, ...(status === 'CANCELLED' ? { cancelledBy: 'PATIENT', cancelReason: 'Pelo WhatsApp' } : {}) },
   });
 
   await prisma.whatsAppMessage.create({
@@ -708,14 +711,7 @@ export async function applyAppointmentResponse(
     },
   });
 
-  await prisma.auditLog.create({
-    data: {
-      tenantId: appt.tenantId,
-      action: `WHATSAPP_RESPONSE_${status}`,
-      entity: 'Appointment',
-      entityId: appt.id,
-    },
-  });
+  await auditAppointment(appt.tenantId, null, appt.id, `WHATSAPP_RESPONSE_${status}`, antes, { actorLabel: 'Paciente pelo WhatsApp', note: 'resposta do paciente' });
 
   return true;
 }

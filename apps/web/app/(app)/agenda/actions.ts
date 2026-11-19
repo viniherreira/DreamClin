@@ -32,6 +32,7 @@ import { refOutsideTenant, refErrorMessage } from '@/lib/owns';
 import { appointmentStatusEvent, notifyCrm } from '@/crm/notify';
 import { agendaFinance, AgendaAbort } from '@/fin/agenda-bridge';
 import { timelineAppointment } from '@/lib/timeline-hooks';
+import { appointmentSnapshot, auditAppointment, auditAppointmentDeleted, loadAppointmentAudit } from '@/lib/appointment-audit-server';
 import { pacienteAgendaEnabled } from '@/lib/feature-flags';
 import { displayName } from '@/lib/patient-name';
 import { highlightedAnswers, priorityLabel, readCustomAnswers } from '@/lib/patient-fields';
@@ -246,14 +247,17 @@ export type AppointmentFormState =
   | { success: true; appointmentId: string }
   | { success: false; errors: Record<string, string[]>; message?: string };
 
+/**
+ * Hora de parede em UTC (lib/tz.ts): 14:00 vira 14:00Z. Montado com as partes
+ * UTC, e não com `setHours`, que usa o fuso de quem roda: na Vercel (UTC) dava
+ * o mesmo, mas num computador no horário de Brasília deslocava 3 horas.
+ */
 function buildDateTimes(date: string, startTime: string, endTime: string) {
   const [sh, sm] = startTime.split(':').map(Number);
   const [eh, em] = endTime.split(':').map(Number);
-  const base = parseISO(date);
-  const start = new Date(base);
-  start.setHours(sh, sm, 0, 0);
-  const end = new Date(base);
-  end.setHours(eh, em, 0, 0);
+  const [y, m, d] = date.split('-').map(Number);
+  const start = new Date(Date.UTC(y, m - 1, d, sh, sm, 0, 0));
+  const end = new Date(Date.UTC(y, m - 1, d, eh, em, 0, 0));
   return { start, end };
 }
 
@@ -390,6 +394,7 @@ export async function createAppointment(
   // Avisa o CRM depois da resposta; ele nunca falha nem atrasa o agendamento.
   after(() => notifyCrm(tenantId, { type: 'appointment.created', patientId, appointmentId: appointment.id }));
   after(() => timelineAppointment(tenantId, appointment.id, 'created', userId));
+  await auditAppointment(tenantId, userId, appointment.id, 'APPOINTMENT_CREATED', null);
 
   if (sendWhatsApp) {
     // Record the message *before* returning, while we still control the request.
@@ -471,6 +476,8 @@ export async function updateAppointment(
   const fin = await agendaFinance(tenantId);
   const extra = fin ? await financeFields(fin, formData, type) : { ok: true as const, items: null, insuranceContactId: null };
   if (!extra.ok) return { success: false, errors: {}, message: extra.message };
+  // Auditoria: a foto de antes, para gravar o que mudou.
+  const antes = await appointmentSnapshot(tenantId, id);
   const dados = {
     patientId,
     professionalId,
@@ -500,7 +507,9 @@ export async function updateAppointment(
   if (fin && status === 'ATTENDED') await fin.attended(id);
 
   after(() => notifyCrm(tenantId, { type: appointmentStatusEvent(status), patientId, appointmentId: id }));
-  after(() => timelineAppointment(tenantId, id, 'status', userId));
+  // Linha do tempo só quando a situação mudou de verdade (editar a observação não é "confirmou" de novo).
+  if (!antes || antes.status !== status) after(() => timelineAppointment(tenantId, id, 'status', userId));
+  await auditAppointment(tenantId, userId, id, 'APPOINTMENT_UPDATED', antes);
 
   revalidatePath('/agenda');
   return { success: true, appointmentId: id };
@@ -537,10 +546,12 @@ export async function moveAppointment(
     return { success: false, message: `Horário bloqueado${blocked.reason ? ` (${blocked.reason})` : ''}` };
   }
 
+  const antesMover = await appointmentSnapshot(tenantId, id);
   const movido = await prisma.appointment.update({
     where: { id, tenantId },
     data: { startTime: start, endTime: end, professionalId, updatedById: userId },
   });
+  await auditAppointment(tenantId, userId, id, 'APPOINTMENT_MOVED', antesMover);
   after(() => notifyCrm(tenantId, { type: 'appointment.rescheduled', patientId: movido.patientId, appointmentId: id }));
   after(() => timelineAppointment(tenantId, id, 'rescheduled', userId));
 
@@ -644,6 +655,7 @@ export async function updateAppointmentStatus(
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return;
 
+  const antesSituacao = await appointmentSnapshot(tenantId, id);
   const atualizado = await prisma.appointment.update({
     where: { id, tenantId },
     data: {
@@ -652,6 +664,7 @@ export async function updateAppointmentStatus(
       updatedById: userId,
     },
   });
+  await auditAppointment(tenantId, userId, id, 'APPOINTMENT_STATUS', antesSituacao);
   if (status === 'ATTENDED') await (await agendaFinance(tenantId))?.attended(id);
   after(() => notifyCrm(tenantId, { type: appointmentStatusEvent(status), patientId: atualizado.patientId, appointmentId: id }));
   after(() => timelineAppointment(tenantId, id, 'status', userId));
@@ -673,7 +686,7 @@ export async function cancelAppointment(id: string, cancelReason?: string) {
  * foreign key. Tenant-scoped: only the owner's row can be removed.
  */
 export async function deleteAppointment(id: string) {
-  const { tenantId } = await requireTenant();
+  const { tenantId, userId } = await requireTenant();
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { success: false as const, error: 'blocked' as const };
@@ -689,6 +702,7 @@ export async function deleteAppointment(id: string) {
   const recusa = fin ? await fin.deleting(id) : null;
   if (recusa) return { success: false as const, error: 'has-payment' as const, message: recusa };
 
+  const antesExcluir = await appointmentSnapshot(tenantId, id);
   await prisma.$transaction([
     prisma.whatsAppMessage.updateMany({
       where: { appointmentId: id, tenantId },
@@ -697,9 +711,8 @@ export async function deleteAppointment(id: string) {
     prisma.appointment.delete({ where: { id, tenantId } }),
   ]);
 
-  await prisma.auditLog.create({
-    data: { tenantId, action: 'APPOINTMENT_DELETED', entity: 'Appointment', entityId: id },
-  });
+  // O agendamento some; a foto de antes fica no registro, com quem excluiu.
+  await auditAppointmentDeleted(tenantId, userId, id, antesExcluir);
   after(() => notifyCrm(tenantId, { type: 'appointment.cancelled', patientId: appt.patientId, appointmentId: id }));
   after(() => recordPatientEvent(tenantId, appt.patientId, 'appointment.deleted', 'Agendamento excluído da agenda', { refType: 'appointment', refId: id }));
 
@@ -753,6 +766,7 @@ export async function advanceAppointment(
 
   const mudanca = applyAction(appt, action, new Date());
   if (!mudanca) return { ok: false, message: 'Essa ação não cabe agora. Atualize a agenda.' };
+  const antesPasso = await appointmentSnapshot(tenantId, id);
 
   await prisma.appointment.update({
     where: { id, tenantId },
@@ -768,6 +782,7 @@ export async function advanceAppointment(
     after(() => notifyCrm(tenantId, { type: appointmentStatusEvent(status), patientId: appt.patientId, appointmentId: id }));
     after(() => timelineAppointment(tenantId, id, 'status', userId));
   }
+  await auditAppointment(tenantId, userId, id, 'APPOINTMENT_STATUS', antesPasso);
   // Terminou: fatura sozinho (se a clínica ligou) e devolve o que falta receber, para a tela sugerir "Receber agora".
   const openCents = fin && mudanca.status === 'ATTENDED' ? await fin.attended(id) : undefined;
   revalidatePath('/agenda');
@@ -784,10 +799,26 @@ export async function setAppointmentLabel(id: string, labelId: string | null): P
     const existe = await prisma.appointmentLabel.findFirst({ where: { id: labelId, tenantId }, select: { id: true } });
     if (!existe) return { ok: false, message: 'Rótulo não encontrado.' };
   }
+  const antesRotulo = await appointmentSnapshot(tenantId, id);
   const r = await prisma.appointment.updateMany({ where: { id, tenantId }, data: { labelId, updatedById: userId } });
   if (!r.count) return { ok: false, message: 'Agendamento não encontrado.' };
+  await auditAppointment(tenantId, userId, id, 'APPOINTMENT_LABEL', antesRotulo);
   revalidatePath('/agenda');
   return { ok: true };
+}
+
+/**
+ * A auditoria do agendamento (aba Auditoria da janela): quem criou e cada
+ * alteração, com antes e depois. Com o paciente e a agenda novos ligados.
+ */
+export async function getAppointmentAuditAction(id: string) {
+  const { tenantId } = await requireTenant();
+  if (!(await pacienteAgendaEnabled(tenantId))) return null;
+  if (await capabilityBlocked(tenantId, 'agenda')) return null;
+  const existe = await prisma.appointment.findFirst({ where: { id, tenantId }, select: { id: true } });
+  const historico = await loadAppointmentAudit(tenantId, id);
+  if (!existe && !historico.length) return null;
+  return historico;
 }
 
 /**
@@ -887,6 +918,8 @@ export async function getAppointmentDetail(id: string) {
     agendaNotes: notasAgenda,
     alerts: novo ? highlightedAnswers(campos, readCustomAnswers(p.customFields)).map((h) => `${h.label}: ${h.text}`) : [],
     priority: novo && p.priority ? priorityLabel(p.priorityType) : null,
+    /** Paciente e agenda novos: a aba Auditoria. */
+    audit: novo,
     history: historico,
     financial: financeiro,
     /** Financeiro completo ligado: a aba Financeiro carrega os itens e as contas deste agendamento. */

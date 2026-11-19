@@ -16,6 +16,7 @@ import { labelClasses } from '@/lib/label-colors';
 import { advanceAppointment, deleteAppointment, getAppointmentDetail, setAppointmentLabel } from '../actions';
 import { STATUS_STYLES, TYPE_LABELS } from './constants';
 import { AppointmentFinanceTab } from './appointment-finance-tab';
+import { AppointmentAuditTab } from './appointment-audit-tab';
 import { clinicToday } from '@/lib/tz';
 
 type Detail = NonNullable<Awaited<ReturnType<typeof getAppointmentDetail>>>;
@@ -72,7 +73,9 @@ export function AppointmentDetailModal({ open, appointmentId, labels, onClose, o
   const baseId = useId();
   const [detail, setDetail] = useState<Detail | null>(null);
   const [loading, setLoading] = useState(false);
-  const [aba, setAba] = useState<'detalhes' | 'financeiro' | 'historico'>('detalhes');
+  const [aba, setAba] = useState<'detalhes' | 'financeiro' | 'historico' | 'auditoria'>('detalhes');
+  // Muda a cada alteração feita aqui: a aba Auditoria lê de novo.
+  const [versao, setVersao] = useState(0);
   const [erro, setErro] = useState('');
   const [aviso, setAviso] = useState('');
   const [cancelando, setCancelando] = useState(false);
@@ -84,6 +87,7 @@ export function AppointmentDetailModal({ open, appointmentId, labels, onClose, o
     setLoading(true);
     try {
       setDetail(await getAppointmentDetail(id));
+      setVersao((v) => v + 1);
     } finally {
       setLoading(false);
     }
@@ -162,6 +166,7 @@ export function AppointmentDetailModal({ open, appointmentId, labels, onClose, o
     { id: 'detalhes' as const, label: 'Detalhes' },
     ...(detail?.financial || detail?.newFinance ? [{ id: 'financeiro' as const, label: 'Financeiro' }] : []),
     { id: 'historico' as const, label: 'Histórico na clínica' },
+    ...(detail?.audit ? [{ id: 'auditoria' as const, label: 'Auditoria' }] : []),
   ];
 
   return (
@@ -404,6 +409,8 @@ export function AppointmentDetailModal({ open, appointmentId, labels, onClose, o
                       </div>
                     </div>
                   )}
+
+                  {aba === 'auditoria' && appointmentId && <AppointmentAuditTab appointmentId={appointmentId} version={versao} />}
 
                   {aba === 'historico' &&
                     (detail.history.length === 0 ? (
