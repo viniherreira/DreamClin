@@ -4,6 +4,9 @@ import { ChevronLeft } from 'lucide-react';
 import { requireCrm } from '@/crm/guard';
 import { decryptPhone } from '@/crm/phone';
 import { PatientForm } from '@/app/(app)/pacientes/_components/patient-form';
+import { PatientFormFull } from '@/app/(app)/pacientes/_components/patient-form-full';
+import { patientFormContext } from '@/app/(app)/pacientes/patient-extra';
+import { pacienteAgendaEnabled } from '@/lib/feature-flags';
 import { linkAfterCreateAction, type ConvertIntent } from '../actions';
 
 export const metadata = { title: 'Converter em paciente' };
@@ -32,6 +35,8 @@ export default async function ConverterPage({
     select: { id: true, name: true, email: true, phoneEncrypted: true, patientId: true },
   });
   if (!lead) notFound();
+  const completo = (await pacienteAgendaEnabled(ctx.tenantId)) ? await patientFormContext(ctx.tenantId) : null;
+  const inicial = { name: lead.name, phone: decryptPhone(lead.phoneEncrypted, ctx.tenantId), email: lead.email ?? undefined };
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
@@ -45,10 +50,18 @@ export default async function ConverterPage({
           : 'Complete o cadastro. Ao salvar, o lead fica ligado à ficha do paciente.'}
       </p>
       <div className="mt-6">
-        <PatientForm
-          patient={{ name: lead.name, phone: decryptPhone(lead.phoneEncrypted, ctx.tenantId), email: lead.email ?? undefined }}
-          afterCreate={linkAfterCreateAction.bind(null, lead.id, intent)}
-        />
+        {completo ? (
+          <PatientFormFull
+            patient={inicial}
+            origins={completo.origins}
+            fields={completo.fields}
+            required={completo.required}
+            insurers={completo.insurers}
+            afterCreate={linkAfterCreateAction.bind(null, lead.id, intent)}
+          />
+        ) : (
+          <PatientForm patient={inicial} afterCreate={linkAfterCreateAction.bind(null, lead.id, intent)} />
+        )}
       </div>
     </div>
   );

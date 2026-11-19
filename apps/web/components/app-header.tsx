@@ -13,6 +13,7 @@ import { Logo, LogoMark } from './logo';
 import { UserMenu } from './user-menu';
 import { UnitSwitcher, type UnitChoice } from './unit-switcher';
 import { AvailabilityToggle } from './crm-availability';
+import { PatientPalette } from './patient-palette';
 
 export function AppHeader({
   clinicName,
@@ -28,7 +29,13 @@ export function AppHeader({
   crmOnly = false,
   crmManager,
   crmAvailable,
+  patientPalette = false,
+  finance = false,
 }: {
+  /** Paciente e agenda novos: a busca vira a janela do Ctrl+K. */
+  patientPalette?: boolean;
+  /** Financeiro completo: o menu do celular mostra os mesmos itens da lateral. */
+  finance?: boolean;
   /** É Gestor no CRM: o menu do celular mostra o mesmo que a lateral. */
   crmManager?: boolean;
   /** No CRM: se a pessoa está disponível para receber leads (a chave do topo). */
@@ -54,7 +61,7 @@ export function AppHeader({
   const buscaId = useId();
   const [busca, setBusca] = useState('');
   // O menu do celular precisa esconder exatamente o mesmo que a lateral.
-  const itens = navFor(role, space, crmOnly, crmManager);
+  const itens = navFor(role, space, crmOnly, crmManager, finance, patientPalette);
   const ativo = activeHref(itens, pathname);
   const atual = itens.find((i) => i.href === ativo);
   // A busca rápida de paciente, como a do topo do Clínica nas Nuvens: Enter abre a lista filtrada.
@@ -100,7 +107,8 @@ export function AppHeader({
 
         {units && <UnitSwitcher units={units} />}
 
-        {buscaPaciente && (
+        {buscaPaciente && patientPalette && <PatientPalette />}
+        {buscaPaciente && !patientPalette && (
           <form
             role="search"
             className="relative hidden w-72 lg:block"
