@@ -84,3 +84,30 @@ export async function fillMissingCpfHashes(limit = 200): Promise<number> {
   }
   return filled;
 }
+
+/**
+ * O paciente (não excluído) da clínica com este CPF, para o "CPF primeiro" do
+ * cadastro abrir a ficha que já existe em vez de duplicar. Mesma busca do
+ * `cpfTaken`, devolvendo quem é.
+ */
+export async function findPatientByCpf(tenantId: string, cpf: string): Promise<{ id: string; name: string; socialName: string | null } | null> {
+  const select = { id: true, name: true, socialName: true } as const;
+  const found = await prisma.patient.findFirst({
+    where: { tenantId, deletedAt: null, cpfHash: { in: cpfHashes(cpf, tenantId) } },
+    select,
+  });
+  if (found) return found;
+  const pendentes = await prisma.patient.findMany({
+    where: { tenantId, deletedAt: null, cpfHash: null, cpfEncrypted: { not: null } },
+    select: { ...select, cpfEncrypted: true },
+  });
+  const digits = digitsOf(cpf);
+  const hit = pendentes.find((p) => {
+    try {
+      return digitsOf(decrypt(p.cpfEncrypted!, masterKey(), tenantId)) === digits;
+    } catch {
+      return false;
+    }
+  });
+  return hit ? { id: hit.id, name: hit.name, socialName: hit.socialName } : null;
+}
