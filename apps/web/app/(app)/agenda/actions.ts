@@ -31,6 +31,11 @@ import type { Preparation } from '@/lib/whatsapp';
 import { refOutsideTenant, refErrorMessage } from '@/lib/owns';
 import { appointmentStatusEvent, notifyCrm } from '@/crm/notify';
 import { agendaFinance, AgendaAbort } from '@/fin/agenda-bridge';
+import { timelineAppointment } from '@/lib/timeline-hooks';
+import { pacienteAgendaEnabled } from '@/lib/feature-flags';
+import { displayName } from '@/lib/patient-name';
+import { highlightedAnswers, priorityLabel, readCustomAnswers } from '@/lib/patient-fields';
+import { recordPatientEvent } from '@/lib/patient-timeline';
 
 // ─── Auth helper ─────────────────────────────────────────────────────────────
 
@@ -83,7 +88,7 @@ export async function getAgendaData(dateStr: string, view: 'day' | 'week' | 'mon
     db.appointment.findMany({
       where: { startTime: { gte: from, lte: to }, ...unitAppointmentWhere(unit.id, units.main.id) },
       include: {
-        patient: { select: { id: true, name: true } },
+        patient: { select: { id: true, name: true, socialName: true } },
         professional: { select: { id: true, name: true, specialty: true } },
         procedure: { select: { id: true, name: true, durationMinutes: true } },
         label: { select: { id: true, name: true, color: true } },
@@ -165,8 +170,10 @@ export async function getAgendaData(dateStr: string, view: 'day' | 'week' | 'mon
       }
     : null;
 
+  // Paciente e agenda novos: o nome social é o nome da agenda.
+  const nomeSocial = await pacienteAgendaEnabled(tenantId);
   return {
-    appointments,
+    appointments: appointments.map(({ patient, ...a }) => ({ ...a, patient: { id: patient.id, name: nomeSocial ? displayName(patient) : patient.name } })),
     blockedSlots,
     finance,
     professionals: daUnidade,
@@ -382,6 +389,7 @@ export async function createAppointment(
 
   // Avisa o CRM depois da resposta; ele nunca falha nem atrasa o agendamento.
   after(() => notifyCrm(tenantId, { type: 'appointment.created', patientId, appointmentId: appointment.id }));
+  after(() => timelineAppointment(tenantId, appointment.id, 'created', userId));
 
   if (sendWhatsApp) {
     // Record the message *before* returning, while we still control the request.
@@ -492,6 +500,7 @@ export async function updateAppointment(
   if (fin && status === 'ATTENDED') await fin.attended(id);
 
   after(() => notifyCrm(tenantId, { type: appointmentStatusEvent(status), patientId, appointmentId: id }));
+  after(() => timelineAppointment(tenantId, id, 'status', userId));
 
   revalidatePath('/agenda');
   return { success: true, appointmentId: id };
@@ -533,6 +542,7 @@ export async function moveAppointment(
     data: { startTime: start, endTime: end, professionalId, updatedById: userId },
   });
   after(() => notifyCrm(tenantId, { type: 'appointment.rescheduled', patientId: movido.patientId, appointmentId: id }));
+  after(() => timelineAppointment(tenantId, id, 'rescheduled', userId));
 
   revalidatePath('/agenda');
   return { success: true };
@@ -644,6 +654,7 @@ export async function updateAppointmentStatus(
   });
   if (status === 'ATTENDED') await (await agendaFinance(tenantId))?.attended(id);
   after(() => notifyCrm(tenantId, { type: appointmentStatusEvent(status), patientId: atualizado.patientId, appointmentId: id }));
+  after(() => timelineAppointment(tenantId, id, 'status', userId));
 
   revalidatePath('/agenda');
 }
@@ -690,6 +701,7 @@ export async function deleteAppointment(id: string) {
     data: { tenantId, action: 'APPOINTMENT_DELETED', entity: 'Appointment', entityId: id },
   });
   after(() => notifyCrm(tenantId, { type: 'appointment.cancelled', patientId: appt.patientId, appointmentId: id }));
+  after(() => recordPatientEvent(tenantId, appt.patientId, 'appointment.deleted', 'Agendamento excluído da agenda', { refType: 'appointment', refId: id }));
 
   revalidatePath('/agenda');
   revalidatePath('/dashboard');
@@ -754,6 +766,7 @@ export async function advanceAppointment(
   if (mudanca.status && mudanca.status !== appt.status) {
     const status = mudanca.status;
     after(() => notifyCrm(tenantId, { type: appointmentStatusEvent(status), patientId: appt.patientId, appointmentId: id }));
+    after(() => timelineAppointment(tenantId, id, 'status', userId));
   }
   // Terminou: fatura sozinho (se a clínica ligou) e devolve o que falta receber, para a tela sugerir "Receber agora".
   const openCents = fin && mudanca.status === 'ATTENDED' ? await fin.attended(id) : undefined;
@@ -788,7 +801,7 @@ export async function getAppointmentDetail(id: string) {
   const appointment = await db.appointment.findFirst({
     where: { id },
     include: {
-      patient: { select: { id: true, name: true, controlNumber: true, birthDate: true, phoneEncrypted: true, email: true } },
+      patient: { select: { id: true, name: true, socialName: true, controlNumber: true, birthDate: true, phoneEncrypted: true, email: true, priority: true, priorityType: true, customFields: true } },
       professional: { select: { id: true, name: true } },
       procedure: { select: { id: true, name: true, durationMinutes: true, basePrice: true } },
       label: { select: { id: true, name: true, color: true } },
@@ -850,7 +863,15 @@ export async function getAppointmentDetail(id: string) {
 
   const nomeDe = (uid: string | null) => quem.find((u) => u.id === uid)?.name ?? null;
   const p = appointment.patient;
-  const paciente = { id: p.id, name: p.name, controlNumber: p.controlNumber, birthDate: p.birthDate, email: p.email };
+  // Paciente e agenda novos: nome social, observações marcadas "aparece na agenda" e respostas destacadas.
+  const novo = await pacienteAgendaEnabled(tenantId);
+  const [notasAgenda, campos] = novo
+    ? await Promise.all([
+        db.patientNote.findMany({ where: { patientId, showInAgenda: true }, orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }], take: 5, select: { id: true, content: true } }),
+        db.patientCustomField.findMany({ where: { active: true, highlight: true }, select: { id: true, label: true, type: true, options: true, required: true, hasNote: true, highlight: true, active: true } }),
+      ])
+    : [[], []];
+  const paciente = { id: p.id, name: novo ? displayName(p) : p.name, controlNumber: p.controlNumber, birthDate: p.birthDate, email: p.email };
   return {
     appointment: {
       ...appointment,
@@ -863,6 +884,9 @@ export async function getAppointmentDetail(id: string) {
       whatsapp: phone ? normalizeBrazilPhone(phone) : '',
     },
     lastVisit: ultimo ? { at: ultimo.startTime, professional: ultimo.professional.name } : null,
+    agendaNotes: notasAgenda,
+    alerts: novo ? highlightedAnswers(campos, readCustomAnswers(p.customFields)).map((h) => `${h.label}: ${h.text}`) : [],
+    priority: novo && p.priority ? priorityLabel(p.priorityType) : null,
     history: historico,
     financial: financeiro,
     /** Financeiro completo ligado: a aba Financeiro carrega os itens e as contas deste agendamento. */

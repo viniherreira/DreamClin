@@ -233,6 +233,25 @@ export function AppointmentDetailModal({ open, appointmentId, labels, onClose, o
                         <Wallet className="h-3.5 w-3.5" aria-hidden="true" /> Em aberto: {brl(detail.financial.balance)}
                       </p>
                     )}
+                    {(detail.priority || detail.alerts.length > 0) && (
+                      <div className="mt-2 flex flex-wrap gap-1.5" role={detail.alerts.length ? 'alert' : undefined}>
+                        {detail.priority && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">{detail.priority}</span>}
+                        {detail.alerts.map((t) => (
+                          <span key={t} className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-800 ring-1 ring-inset ring-red-200 dark:bg-red-950/50 dark:text-red-200 dark:ring-red-900">
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {detail.agendaNotes.length > 0 && (
+                      <ul className="mt-2 space-y-1" aria-label="Observações do paciente">
+                        {detail.agendaNotes.map((n) => (
+                          <li key={n.id} className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                            {n.content}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 </section>
 

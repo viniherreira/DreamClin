@@ -4,6 +4,10 @@ import { afterAll, describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
 vi.mock('next/cache', () => ({ revalidatePath: () => undefined }));
+vi.mock('next/server', async (original) => ({
+  ...(await original<typeof import('next/server')>()),
+  after: () => undefined,
+}));
 
 let logado: string | null = null;
 vi.mock('@clerk/nextjs/server', () => ({

@@ -2,6 +2,7 @@
 
 import { headers } from 'next/headers';
 import { after } from 'next/server';
+import { timelineAppointment } from '@/lib/timeline-hooks';
 import { z } from 'zod';
 import { prisma, encrypt, decrypt } from '@clinicaiq/db';
 import { addDays, format, parseISO } from 'date-fns';
@@ -305,6 +306,7 @@ export async function bookOnline(slug: string, input: z.input<typeof bookingSche
     data: { tenantId, action: 'ONLINE_BOOKING', entity: 'Appointment', entityId: appointment.id },
   });
   after(() => notifyCrm(tenantId, { type: 'appointment.created', patientId: appointment.patientId, appointmentId: appointment.id }));
+  after(() => timelineAppointment(tenantId, appointment.id, 'created', null, { actorLabel: 'Agendamento online' }));
 
   // A confirmação pelo WhatsApp sai como a de um agendamento feito pela recepção.
   let prepared: Preparation | null = null;

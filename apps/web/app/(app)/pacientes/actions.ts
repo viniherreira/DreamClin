@@ -11,6 +11,7 @@ import { activeFilterCount, patientFiltersWhere, type PatientFilters } from '@/l
 import { clinicToday } from '@/lib/tz';
 import { refOutsideTenant } from '@/lib/owns';
 import { notifyPatientCreated } from '@/crm/notify';
+import { recordPatientEvent } from '@/lib/patient-timeline';
 import { cpfHash, cpfTaken, findPatientByCpf } from '@/lib/cpf-hash';
 import { pacienteAgendaEnabled } from '@/lib/feature-flags';
 import { missingRequired, readPatientSettings, type CustomAnswers } from '@/lib/patient-fields';
@@ -485,6 +486,7 @@ export async function createPatient(
   });
   // Já conversava pelo WhatsApp? O lead e a conversa do CRM passam a ser deste paciente.
   after(() => notifyPatientCreated(tenantId, patient.id));
+  after(() => recordPatientEvent(tenantId, patient.id, 'patient.created', 'Paciente cadastrado', { actorId: userId }));
 
   revalidatePath('/pacientes');
   return { success: true, patientId: patient.id };
@@ -569,6 +571,7 @@ export async function updatePatient(
   await prisma.auditLog.create({
     data: { tenantId, userId, action: 'UPDATE', entity: 'Patient', entityId: id },
   });
+  after(() => recordPatientEvent(tenantId, id, 'patient.updated', 'Cadastro alterado', { actorId: userId }));
 
   revalidatePath('/pacientes');
   revalidatePath(`/pacientes/${id}`);
@@ -600,6 +603,7 @@ export async function togglePatientActive(id: string) {
       entityId: id,
     },
   });
+  after(() => recordPatientEvent(tenantId, id, patient.active ? 'patient.deactivated' : 'patient.activated', patient.active ? 'Paciente inativado' : 'Paciente reativado', { actorId: userId }));
 
   revalidatePath('/pacientes');
   revalidatePath(`/pacientes/${id}`);
