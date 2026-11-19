@@ -6,6 +6,7 @@ import type { ContractDocumentProps, QuoteDocumentProps } from '@clinicaiq/pdf';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { after } from 'next/server';
+import { timelineQuote } from '@/lib/timeline-hooks';
 import { z } from 'zod';
 import { addDays } from 'date-fns';
 import { capabilityToken } from '@/lib/tokens';
@@ -439,6 +440,7 @@ export async function createQuote(
     data: { tenantId, userId, action: 'CREATE', entity: 'Quote', entityId: quote.id },
   });
   after(() => notifyCrm(tenantId, { type: 'quote.created', patientId: data.patientId, quoteId: quote.id }));
+  after(() => timelineQuote(tenantId, quote.id, 'quote.created', userId));
 
   revalidatePath('/orcamentos');
   return { success: true, quoteId: quote.id };
@@ -733,6 +735,7 @@ export async function acceptQuote(id: string): Promise<{ ok: boolean; message?: 
   const fin = await bridge(tenantId);
   if (fin) await bridgeQuoteAccepted(fin, id);
   after(() => notifyCrm(tenantId, { type: 'quote.accepted', patientId: quote.patientId, quoteId: id }));
+  after(() => timelineQuote(tenantId, id, 'quote.accepted', userId));
 
   revalidatePath('/orcamentos');
   revalidatePath(`/orcamentos/${id}`);

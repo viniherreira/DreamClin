@@ -1,5 +1,6 @@
 'use server';
 
+import { recordPatientEvent } from '@/lib/patient-timeline';
 import { revalidatePath } from 'next/cache';
 import { after } from 'next/server';
 import { notifyCrm } from '@/crm/notify';
@@ -577,6 +578,7 @@ export async function settleAction(input: z.input<typeof settleSchema>): Promise
       const patientId = t.patientId;
       const amountCents = parsed.data.lines.reduce((soma, l) => soma + l.amountCents, 0);
       after(() => notifyCrm(ctx.tenantId, { type: 'payment.received', patientId, receiptId: r.receiptGroupId, amountCents }));
+      after(() => recordPatientEvent(ctx.tenantId, patientId, 'payment.received', new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(amountCents / 100), { actorId: ctx.userId, refType: 'receipt', refId: r.receiptGroupId }));
     }
   }
   return r;

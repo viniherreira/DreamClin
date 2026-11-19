@@ -1,5 +1,7 @@
 'use server';
 
+import { recordPatientEvent } from '@/lib/patient-timeline';
+import { after } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { prisma, getTenantClient } from '@clinicaiq/db';
 import { revalidatePath } from 'next/cache';
@@ -459,6 +461,7 @@ export async function addPayment(
       createdById: userId,
     },
   });
+  after(() => recordPatientEvent(tenantId, patientId, 'payment.received', new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(amount), { actorId: userId, refType: 'payment', refId: payment.id }));
 
   await prisma.auditLog.create({
     data: { tenantId, userId, action: 'CREATE', entity: 'Payment', entityId: payment.id },
@@ -598,6 +601,7 @@ export async function addEvolution(
   await prisma.auditLog.create({
     data: { tenantId, userId, action: 'CREATE', entity: 'Evolution', entityId: evolution.id },
   });
+  after(() => recordPatientEvent(tenantId, patientId, 'evolution.created', 'Evolução registrada', { actorId: userId, refType: 'evolution', refId: evolution.id }));
 
   revalidatePath(`/pacientes/${patientId}`);
   return { ok: true };
