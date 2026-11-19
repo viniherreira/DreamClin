@@ -4,6 +4,7 @@ import { GeistMono } from 'geist/font/mono';
 import { siteUrl } from '@/lib/company';
 import { OG_IMAGE } from '@/lib/seo';
 import { ThemeKeeper } from '@/components/theme-keeper';
+import { SelectSizing } from '@/components/select-sizing';
 import './globals.css';
 
 // A fonte do manual de marca.
@@ -69,6 +70,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           Pular para o conteúdo principal
         </a>
         <ThemeKeeper />
+        <SelectSizing />
         {children}
       </body>
     </html>
