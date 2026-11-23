@@ -214,6 +214,7 @@ model Tenant {
   documentTemplates   DocumentTemplate[]
   cancelReasons       CancelReason[]
   careTypes           CareType[]
+  waitlistEntries     WaitlistEntry[]
   agendaResources     AgendaResource[]
   holidays            Holiday[]
   appointmentReschedules AppointmentReschedule[]
@@ -475,6 +476,38 @@ model TreatmentPlanItem {
 
   @@index([tenantId, planId])
   @@map("treatment_plan_items")
+}
+
+/// Lista de espera: paciente que quer horário antes (profissional, período, dias da semana).
+model WaitlistEntry {
+  id             String    @id @default(cuid())
+  tenantId       String
+  patientId      String
+  professionalId String?
+  careTypeId     String?
+  procedureId    String?
+  /// MORNING, AFTERNOON, EVENING ou ANY.
+  period         String    @default("ANY")
+  /// Dias da semana aceitos (0 = domingo). Vazio = qualquer dia.
+  weekdays       Int[]     @default([])
+  /// Desde quando pode (data de parede).
+  fromDate       DateTime?
+  notes          String?
+  /// 0 normal, 1 alta.
+  priority       Int       @default(0)
+  /// WAITING, SCHEDULED, ATTENDED, REMOVED.
+  status         String    @default("WAITING")
+  removedReason  String?
+  appointmentId  String?
+  createdById    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, patientId])
+  @@map("waitlist_entries")
 }
 
 /// Tipo de atendimento (Configurações › Agenda › Tipos de atendimento).
