@@ -377,6 +377,11 @@ export function AppointmentDetailModal({ open, appointmentId, labels, onClose, o
                               ))}
                           </div>
                         )}
+                        {detail.audit && appointmentId && a.status === 'CANCELLED' && new Date(a.startTime).getTime() > Date.now() && (
+                          <Link href={`/agenda/lista-de-espera?vaga=${appointmentId}`} className="btn-outline btn-sm mb-2 inline-flex">
+                            Horário vagou: ver quem da lista de espera combina
+                          </Link>
+                        )}
                         {detail.audit && appointmentId && (
                           <AppointmentStatusPanel
                             appointmentId={appointmentId}

@@ -43,9 +43,11 @@ interface AgendaShellProps {
   initialData: AgendaData;
   /** Abre o "Novo agendamento" já com este paciente (link "Agendar avaliação" do CRM). */
   prefillPatient?: Patient | null;
+  /** Abre o "Novo agendamento" neste horário (telas Horários livres e Lista de espera). */
+  prefillSlot?: { time: string; professionalId?: string } | null;
 }
 
-export function AgendaShell({ initialDate, initialView, initialData, prefillPatient = null }: AgendaShellProps) {
+export function AgendaShell({ initialDate, initialView, initialData, prefillPatient = null, prefillSlot = null }: AgendaShellProps) {
   const router = useRouter();
 
   const [currentDate, setCurrentDate] = useState(initialDate);
@@ -67,8 +69,8 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
   // `router.replace`: este último é uma navegação que vai ao servidor, e o
   // "Agendar" clicado enquanto ela corre fica na fila atrás dela.
   useEffect(() => {
-    if (!prefillPatient) return;
-    setModal({ open: true, defaultDate: initialDate, defaultPatient: prefillPatient });
+    if (!prefillPatient && !prefillSlot) return;
+    setModal({ open: true, defaultDate: initialDate, defaultPatient: prefillPatient ?? undefined, defaultTime: prefillSlot?.time, defaultProfessionalId: prefillSlot?.professionalId });
     window.history.replaceState(null, '', `/agenda?date=${initialDate}&view=${initialView}`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
