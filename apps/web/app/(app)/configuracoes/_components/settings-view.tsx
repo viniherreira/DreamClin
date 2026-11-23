@@ -21,6 +21,8 @@ import { FinanceContactsPanel, FinanceMethodsPanel, FinancePermissionsPanel, Fin
 import { FinanceCommissionPanel } from './finance-commission-panel';
 import { FinanceCollectionPanel } from './finance-collection-panel';
 import { PatientCustomFieldsPanel, PatientOriginsPanel, PatientRulesPanel } from './patients-panels';
+import { DocumentTemplatesPanel, FolderDefaultsPanel, QuestionnairesPanel } from './docs-panels';
+import { CancelReasonsPanel } from './cancel-reasons-panel';
 import type { AgendaRules } from '@/lib/agenda-rules';
 import { TeamPanel } from './team-panel';
 import { PrivacyPanel } from './privacy-panel';
@@ -195,6 +197,10 @@ export function SettingsView({
           { id: 'pac-campos', group: 'Pacientes', label: 'Campos do cadastro', panel: <PatientRulesPanel /> },
           { id: 'pac-adicionais', group: 'Pacientes', label: 'Informações adicionais', panel: <PatientCustomFieldsPanel /> },
           { id: 'pac-origens', group: 'Pacientes', label: 'Origens do paciente', panel: <PatientOriginsPanel /> },
+          { id: 'pac-pastas', group: 'Pacientes', label: 'Padrão de pastas', panel: <FolderDefaultsPanel /> },
+          { id: 'modelos-doc', group: 'Atendimento', label: 'Modelos de documento', panel: <DocumentTemplatesPanel /> },
+          { id: 'questionarios', group: 'Atendimento', label: 'Questionários', panel: <QuestionnairesPanel /> },
+          { id: 'motivos-cancelamento', group: 'Agenda', label: 'Motivos de cancelamento', panel: <CancelReasonsPanel /> },
         ]
       : []),
     { id: 'pagamentos', group: 'Financeiro', label: finance ? 'Formas (financeiro antigo)' : 'Formas de recebimento', panel: <PaymentMethodsPanel methods={rules.paymentMethods} /> },

@@ -5,10 +5,11 @@ import { ReceiptDocument, type ReceiptDocumentProps } from './receipt-template';
 import { ContractDocument, type ContractDocumentProps } from './contract-template';
 import { CouponDocument, type CouponDocumentProps } from './receipt-coupon';
 import { CashReportDocument, type CashReportProps } from './cash-report';
+import { RichDocument, type RichDocumentProps, type RichBlock, type SignatureProof } from './rich-document';
 import { PatientCardDocument, PatientSheetDocument, type PatientCardProps, type PatientSheetProps } from './patient-sheet';
 
 export { QuoteDocument, ReceiptDocument, ContractDocument, CouponDocument, CashReportDocument };
-export type { QuoteDocumentProps, ReceiptDocumentProps, ContractDocumentProps, CouponDocumentProps, CashReportProps, PatientSheetProps, PatientCardProps };
+export type { QuoteDocumentProps, ReceiptDocumentProps, ContractDocumentProps, CouponDocumentProps, CashReportProps, PatientSheetProps, PatientCardProps, RichDocumentProps, RichBlock, SignatureProof };
 export type { ClinicInfo, Person, TreatmentItem } from './theme';
 
 // `renderToBuffer` is typed for a root <Document>; every template renders one,
@@ -48,4 +49,9 @@ export async function renderPatientSheetPdf(props: PatientSheetProps): Promise<U
 /** Cartão do paciente no tamanho de cartão de visita, com o QR do agendamento online. */
 export async function renderPatientCardPdf(props: PatientCardProps): Promise<Uint8Array> {
   return renderToBuffer(createElement(PatientCardDocument, props) as never);
+}
+
+/** Documento do paciente feito de um modelo (atestado, receita, termo), com a comprovação da assinatura quando houver. */
+export async function renderRichDocumentPdf(props: RichDocumentProps): Promise<Uint8Array> {
+  return renderToBuffer(createElement(RichDocument, props) as never);
 }

@@ -303,7 +303,7 @@ export async function bookOnline(slug: string, input: z.input<typeof bookingSche
   if (!appointment) return { ok: false, message: 'Esse horário acabou de ser ocupado. Escolha outro.' };
 
   await prisma.auditLog.create({
-    data: { tenantId, action: 'ONLINE_BOOKING', entity: 'Appointment', entityId: appointment.id },
+    data: { tenantId, action: 'ONLINE_BOOKING', entity: 'Appointment', entityId: appointment.id, metadata: { actorLabel: 'Paciente pelo agendamento online' } },
   });
   after(() => notifyCrm(tenantId, { type: 'appointment.created', patientId: appointment.patientId, appointmentId: appointment.id }));
   after(() => timelineAppointment(tenantId, appointment.id, 'created', null, { actorLabel: 'Agendamento online' }));

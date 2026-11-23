@@ -13,6 +13,9 @@ const isPublicRoute = createRouteMatcher([
   '/sitemap.xml', // Google Search Console
   '/robots.txt',
   '/agendar/(.*)', // agendamento online: público, sem login
+  '/assinar/(.*)', // assinatura de documento pelo paciente (o token é a chave)
+  '/questionario/(.*)', // questionário respondido pelo paciente
+  '/enviar/(.*)', // fotos pelo celular, link de 15 minutos
   '/api/webhooks/(.*)',
   '/api/cron/(.*)', // Vercel Cron authenticates via CRON_SECRET, not Clerk
   '/api/health', // monitor de site fora do ar: só diz se está de pé

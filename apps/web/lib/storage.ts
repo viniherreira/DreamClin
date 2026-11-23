@@ -95,3 +95,44 @@ export async function deleteObject(path: string): Promise<void> {
     headers: headers(),
   });
 }
+
+/**
+ * Endereço de envio direto ao armazenamento, válido por 2 horas: o navegador
+ * manda o arquivo sem passar pelo servidor do app (que tem limite de tamanho).
+ * Depois o servidor confere o começo do arquivo (`objectHead`) antes de aceitar.
+ */
+export async function signUploadUrl(path: string): Promise<string | null> {
+  if (!serviceKey()) return null;
+  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/upload/sign/${BUCKET}/${path}`, {
+    method: 'POST',
+    headers: headers({ 'Content-Type': 'application/json' }),
+    body: '{}',
+  });
+  if (res.status === 400 || res.status === 404) {
+    await ensureBucket();
+    const again = await fetch(`${SUPABASE_URL}/storage/v1/object/upload/sign/${BUCKET}/${path}`, {
+      method: 'POST',
+      headers: headers({ 'Content-Type': 'application/json' }),
+      body: '{}',
+    });
+    if (!again.ok) return null;
+    const d = (await again.json()) as { url?: string };
+    return d.url ? `${SUPABASE_URL}/storage/v1${d.url}` : null;
+  }
+  if (!res.ok) return null;
+  const data = (await res.json()) as { url?: string };
+  return data.url ? `${SUPABASE_URL}/storage/v1${data.url}` : null;
+}
+
+/** Os primeiros bytes e o tamanho de um objeto (para conferir o tipo sem baixar tudo). */
+export async function objectHead(path: string, bytes = 32): Promise<{ head: Uint8Array; size: number; contentType: string } | null> {
+  if (!serviceKey()) return null;
+  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${path}`, {
+    headers: headers({ Range: `bytes=0-${bytes - 1}` }),
+    cache: 'no-store',
+  });
+  if (!res.ok) return null;
+  const total = res.headers.get('content-range')?.split('/')[1];
+  const buf = new Uint8Array(await res.arrayBuffer()).slice(0, bytes);
+  return { head: buf, size: total ? Number(total) : Number(res.headers.get('content-length') ?? buf.length), contentType: res.headers.get('content-type') ?? '' };
+}
