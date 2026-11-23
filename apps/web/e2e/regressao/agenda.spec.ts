@@ -48,8 +48,18 @@ test('cadastra paciente, agenda, marca falta e cancela', async ({ page }) => {
 
   // Cancelamento
   await blockWith('Faltou').click();
-  await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
-  await page.getByLabel(/Motivo do cancelamento/).fill('Paciente desmarcou');
+  // Agenda nova (PACIENTE_AGENDA): cancelar é pela lista Situação, com quem cancelou e o motivo.
+  const situacao = page.getByLabel('Situação', { exact: true });
+  const antigo = page.getByRole('button', { name: 'Cancelar', exact: true });
+  await situacao.or(antigo).first().waitFor();
+  if (await situacao.isVisible()) {
+    await situacao.selectOption('CANCELLED');
+    await page.getByRole('radio', { name: 'O paciente' }).check();
+    await page.getByLabel(/^Motivo/).selectOption({ label: 'Paciente desmarcou' });
+  } else {
+    await antigo.click();
+    await page.getByLabel(/Motivo do cancelamento/).fill('Paciente desmarcou');
+  }
   await page.getByRole('button', { name: 'Confirmar cancelamento' }).click();
   await expect(blockWith('Cancelado')).toBeVisible();
 });

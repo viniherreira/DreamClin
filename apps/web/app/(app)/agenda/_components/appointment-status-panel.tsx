@@ -20,8 +20,11 @@ export function AppointmentStatusPanel({
   endTime,
   professionalId,
   professionals,
+  inSeries = false,
   onDone,
 }: {
+  /** Faz parte de uma repetição: cancelar pergunta se é só este, este e os próximos ou todos. */
+  inSeries?: boolean;
   appointmentId: string;
   status: string;
   date: string;
@@ -36,7 +39,7 @@ export function AppointmentStatusPanel({
   const [erro, setErro] = useState('');
   const [pending, start] = useTransition();
   const [opcoes, setOpcoes] = useState<{ reasons: { id: string; name: string }[]; required: boolean } | null>(null);
-  const [cancel, setCancel] = useState({ cancelledBy: '', reasonId: '', reasonText: '' });
+  const [cancel, setCancel] = useState({ cancelledBy: '', reasonId: '', reasonText: '', scope: 'one' as 'one' | 'next' | 'all' });
   const [rem, setRem] = useState({ date, startTime, endTime, professionalId, reason: '' });
 
   useEffect(() => {
@@ -90,7 +93,7 @@ export function AppointmentStatusPanel({
             e.preventDefault();
             setErro('');
             start(async () => {
-              const r = await cancelAppointmentFull(appointmentId, { cancelledBy: cancel.cancelledBy, reasonId: cancel.reasonId || null, reasonText: cancel.reasonText });
+              const r = await cancelAppointmentFull(appointmentId, { cancelledBy: cancel.cancelledBy, reasonId: cancel.reasonId || null, reasonText: cancel.reasonText, scope: cancel.scope });
               if (!r.ok) return setErro(r.message);
               onDone({ message: 'Agendamento cancelado.', closed: true });
             });
@@ -123,6 +126,24 @@ export function AppointmentStatusPanel({
               ))}
             </select>
           </div>
+          {inSeries && (
+            <fieldset>
+              <legend className="text-sm font-medium">Este agendamento se repete. Cancelar</legend>
+              <div className="mt-1 flex flex-wrap gap-4 text-sm">
+                {[
+                  { v: 'one', l: 'Só este' },
+                  { v: 'next', l: 'Este e os próximos' },
+                  { v: 'all', l: 'Todos da repetição' },
+                ].map((o) => (
+                  <label key={o.v} className="inline-flex items-center gap-2">
+                    <input type="radio" name={`${id}-escopo`} checked={cancel.scope === o.v} onChange={() => setCancel({ ...cancel, scope: o.v as 'one' | 'next' | 'all' })} className="h-4 w-4 accent-primary" />
+                    {o.l}
+                  </label>
+                ))}
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">Os já atendidos não mudam.</p>
+            </fieldset>
+          )}
           <label className="block text-sm">
             <span className="font-medium">{outro ? 'Qual o motivo' : 'Detalhe'}</span> {!outro && <span className="text-muted-foreground">(opcional)</span>}
             <input value={cancel.reasonText} onChange={(e) => setCancel({ ...cancel, reasonText: e.target.value })} maxLength={200} className={`${field} mt-1`} />

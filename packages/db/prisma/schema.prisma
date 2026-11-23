@@ -213,6 +213,9 @@ model Tenant {
   treatmentPlanItems  TreatmentPlanItem[]
   documentTemplates   DocumentTemplate[]
   cancelReasons       CancelReason[]
+  careTypes           CareType[]
+  agendaResources     AgendaResource[]
+  holidays            Holiday[]
   appointmentReschedules AppointmentReschedule[]
   patientDocuments    PatientDocument[]
   signatureRequests   SignatureRequest[]
@@ -472,6 +475,62 @@ model TreatmentPlanItem {
 
   @@index([tenantId, planId])
   @@map("treatment_plan_items")
+}
+
+/// Tipo de atendimento (Configurações › Agenda › Tipos de atendimento).
+model CareType {
+  id              String   @id @default(cuid())
+  tenantId        String
+  name            String
+  color           String   @default("blue")
+  durationMinutes Int      @default(30)
+  /// Permite horário sobreposto (encaixe).
+  allowOverlap    Boolean  @default(false)
+  /// Gera cobrança (aparece em "A faturar").
+  chargeable      Boolean  @default(true)
+  order           Int      @default(0)
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, name])
+  @@index([tenantId, order])
+  @@map("care_types")
+}
+
+/// Agenda de recurso: sala, cadeira, equipamento ou canal (Configurações › Agenda › Salas e equipamentos).
+model AgendaResource {
+  id           String   @id @default(cuid())
+  tenantId     String
+  name         String
+  color        String   @default("teal")
+  unitId       String?
+  allowOverlap Boolean  @default(false)
+  order        Int      @default(0)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, name])
+  @@index([tenantId, order])
+  @@map("agenda_resources")
+}
+
+/// Feriado municipal ou dia marcado pela clínica. Os nacionais são calculados (`lib/holidays.ts`).
+model Holiday {
+  id        String   @id @default(cuid())
+  tenantId  String
+  /// Dia (meia-noite UTC, data de parede).
+  date      DateTime
+  name      String
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, date])
+  @@map("holidays")
 }
 
 /// Motivos de cancelamento da clínica (Configurações › Agenda › Motivos de cancelamento).
@@ -907,6 +966,13 @@ model Appointment {
   cancelReasonId     String?
   /// Por onde chegou a confirmação: WHATSAPP, LINK, PHONE, RECEPTION. WHATSAPP e LINK = "confirmado pelo paciente".
   confirmationSource String?
+  /// Tipo de atendimento (consulta, avaliação, retorno…). O `type` continua sendo quem paga.
+  careTypeId         String?
+  /// Agenda de recurso (sala, cadeira, equipamento, canal). Nulo = só a do profissional.
+  agendaId           String?
+  /// Agendamento repetido: o mesmo `seriesId` em todos, e a posição na série.
+  seriesId           String?
+  seriesIndex        Int?
   /// Convênio que paga este agendamento (cadastro de clientes e fornecedores). Só no tipo convênio.
   insuranceContactId String?
   createdById        String?
@@ -928,6 +994,8 @@ model Appointment {
   @@index([tenantId, unitId, startTime])
   @@index([tenantId, startTime])
   @@index([tenantId, status])
+  @@index([tenantId, seriesId])
+  @@index([tenantId, agendaId, startTime])
   @@map("appointments")
 }
 

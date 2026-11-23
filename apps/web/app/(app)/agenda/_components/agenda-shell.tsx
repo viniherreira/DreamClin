@@ -159,6 +159,8 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
       type: detail.type,
       status: detail.status,
       notes: detail.notes,
+      careTypeId: (detail as { careTypeId?: string | null }).careTypeId ?? null,
+      agendaId: (detail as { agendaId?: string | null }).agendaId ?? null,
     });
     setModal({ open: true, defaultDate: currentDate });
   }
@@ -303,6 +305,17 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
           </header>
 
           {/* WhatsApp down: confirmations silently stop, so say so where bookings happen. */}
+          {(() => {
+            // Agenda nova: os feriados do período (nacionais e da clínica).
+            const feriados = (data.agendaNova?.holidays ?? []).filter((h) => (view === 'day' ? h.date === currentDate : true));
+            if (!feriados.length) return null;
+            return (
+              <p role="note" className="mx-4 mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                Feriado: {feriados.map((h) => `${h.date.slice(8, 10)}/${h.date.slice(5, 7)} ${h.name}`).join(' · ')}
+                {data.agendaNova?.blockHolidays ? ' (a clínica não marca em feriado)' : ''}
+              </p>
+            );
+          })()}
           {data.whatsappHealth?.problem && (
             <div
               role="status"
@@ -400,6 +413,7 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
         defaultTime={modal.defaultTime}
         defaultProfessionalId={modal.defaultProfessionalId}
         defaultPatient={modal.defaultPatient ?? null}
+        agendaNova={data.agendaNova}
         editing={editing}
         onSuccess={() => {
           refreshData();
