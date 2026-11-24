@@ -14,7 +14,7 @@ import {
   readOnlineBooking,
   type OnlineBookingSettings,
 } from '@/lib/availability';
-import { buildWorkingHoursMap } from '@/lib/working-hours';
+import { buildWorkingDaysMap } from '@/lib/working-hours';
 import { listUnits } from '@/lib/units';
 import { mainUnit } from '@/lib/unit-rules';
 import { prepareAppointmentMessage, deliverPrepared, type Preparation } from '@/lib/whatsapp';
@@ -147,7 +147,7 @@ async function slotsFor(
   const fimDia = new Date(`${date}T23:59:59.999Z`);
   const [map, appts, bloqueios] = await Promise.all([
     // O expediente desta unidade; os horários ocupados valem em todas (a pessoa não está em dois lugares).
-    buildWorkingHoursMap(tenantId, [professionalId], {
+    buildWorkingDaysMap(tenantId, [professionalId], date, date, {
       unitId: onde.unit.id,
       mainId: onde.main.id,
       businessHours: onde.unit.businessHours,
@@ -169,8 +169,8 @@ async function slotsFor(
     return d.getUTCHours() * 60 + d.getUTCMinutes();
   };
   const busy: [number, number][] = [...appts, ...bloqueios].map((x) => [min(x.startTime), min(x.endTime)]);
-  const semana = map[professionalId] ?? [];
-  const day = semana[parseISO(date).getDay()] ?? null;
+  // A escala do dia (nova, se o profissional tiver; senão o horário semanal de sempre).
+  const day = map[professionalId]?.[date] ?? null;
   return freeSlots({ day, busy, durationMin: duracao, stepMin: rules.stepMinutes, notBeforeMin: notBefore });
 }
 

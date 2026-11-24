@@ -2,7 +2,7 @@ import 'server-only';
 
 import { decrypt, getTenantClient, prisma } from '@clinicaiq/db';
 import { countBy, daysBetween, daysDiff, pct, workMinutes, type Cell, type ReportKey, type ReportTable } from './agenda-reports';
-import { buildWorkingHoursMap } from './working-hours';
+import { buildWorkingDaysMap } from './working-hours';
 import { holidaysBetween } from './holidays';
 import { displayName } from './patient-name';
 import { attendanceOf } from './attendance';
@@ -151,7 +151,7 @@ export async function runReport(tenantId: string, key: ReportKey, f: ReportFilte
     case 'ocupacao': {
       const profs = await db.professional.findMany({ where: { active: true, ...(f.professionalId ? { id: f.professionalId } : {}) }, orderBy: { name: 'asc' }, select: { id: true, name: true } });
       const [semanas, custom, ags, bloqs] = await Promise.all([
-        buildWorkingHoursMap(tenantId, profs.map((p) => p.id)),
+        buildWorkingDaysMap(tenantId, profs.map((p) => p.id), f.from, f.to),
         db.holiday.findMany({ select: { date: true, name: true } }),
         db.appointment.findMany({ where: { ...noPeriodo, professionalId: { in: profs.map((p) => p.id) }, status: { notIn: ['CANCELLED'] } }, select: { professionalId: true, startTime: true, endTime: true, status: true } }),
         db.blockedSlot.findMany({ where: { startTime: { lte: fim(f.to) }, endTime: { gte: ini(f.from) }, professionalId: { in: profs.map((p) => p.id) } }, select: { professionalId: true, startTime: true, endTime: true } }),
@@ -160,9 +160,8 @@ export async function runReport(tenantId: string, key: ReportKey, f: ReportFilte
       const dias = daysBetween(f.from, f.to).filter((d) => !feriados.has(d));
       const minutos = (a: Date, b: Date) => Math.max(0, (b.getTime() - a.getTime()) / 60_000);
       const rows: Cell[][] = profs.map((p) => {
-        const semana = semanas[p.id] ?? [];
         let disponivel = 0;
-        for (const d of dias) disponivel += workMinutes(semana[new Date(`${d}T00:00:00Z`).getUTCDay()]);
+        for (const d of dias) disponivel += workMinutes(semanas[p.id]?.[d]);
         const bloqueado = bloqs
           .filter((b) => b.professionalId === p.id)
           .reduce((s, b) => s + minutos(b.startTime < ini(f.from) ? ini(f.from) : b.startTime, b.endTime > fim(f.to) ? fim(f.to) : b.endTime), 0);
@@ -175,7 +174,7 @@ export async function runReport(tenantId: string, key: ReportKey, f: ReportFilte
         columns: ['Profissional', 'Horas disponíveis', 'Horas agendadas', 'Ocupação', 'Atendidos'],
         rows,
         percentColumns: [3],
-        note: 'Horas disponíveis = horário de atendimento de cada dia, sem almoço, feriados e bloqueios. Cancelados não ocupam.',
+        note: 'Horas disponíveis = escala de cada dia (ou o horário de atendimento, para quem não tem escala), sem almoço, feriados e bloqueios. Cancelados não ocupam.',
       };
     }
 

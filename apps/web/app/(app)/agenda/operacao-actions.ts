@@ -11,7 +11,7 @@ import { statusLabel } from '@/lib/appointment-status';
 import { suggestForSlot } from '@/lib/waitlist';
 import { bulkPlan, type BulkChange } from '@/lib/bulk-change';
 import { freeSlots } from '@/lib/availability';
-import { buildWorkingHoursMap } from '@/lib/working-hours';
+import { buildWorkingDaysMap } from '@/lib/working-hours';
 import { holidaysBetween } from '@/lib/holidays';
 import { readAgendaRules } from '@/lib/agenda-rules';
 import { clinicToday, wallClockMinutes } from '@/lib/tz';
@@ -236,7 +236,7 @@ export async function findFreeSlots(f: { from: string; professionalId?: string; 
   const dias = Math.max(1, Math.min(60, f.days ?? 21));
   const ate = new Date(dia(f.from).getTime() + dias * 86_400_000).toISOString().slice(0, 10);
   const feriados = new Set(holidaysBetween(f.from, ate, custom.map((h) => ({ date: h.date.toISOString().slice(0, 10), name: h.name }))).map((h) => h.date));
-  const horarios = await buildWorkingHoursMap(c.tenantId, profs.map((p) => p.id));
+  const horarios = await buildWorkingDaysMap(c.tenantId, profs.map((p) => p.id), f.from, ate, undefined, f.careTypeId || null);
   const [ags, bloqs] = await Promise.all([
     db.appointment.findMany({ where: { professionalId: { in: profs.map((p) => p.id) }, status: { notIn: ['CANCELLED', 'MISSED'] }, startTime: { gte: dia(f.from), lte: fimDoDia(ate) } }, select: { professionalId: true, startTime: true, endTime: true } }),
     db.blockedSlot.findMany({ where: { startTime: { lte: fimDoDia(ate) }, endTime: { gte: dia(f.from) } }, select: { professionalId: true, startTime: true, endTime: true } }),
@@ -255,8 +255,7 @@ export async function findFreeSlots(f: { from: string; professionalId?: string; 
     for (let i = 0; i <= dias && out.length < limite; i++) {
       const d = new Date(dia(f.from).getTime() + i * 86_400_000).toISOString().slice(0, 10);
       if (d < hoje || feriados.has(d)) continue;
-      const semana = horarios[p.id] ?? [];
-      const expediente = semana[new Date(`${d}T00:00:00Z`).getUTCDay()] ?? null;
+      const expediente = horarios[p.id]?.[d] ?? null;
       const ocupado: [number, number][] = [
         ...ags.filter((a) => a.professionalId === p.id && a.startTime.toISOString().slice(0, 10) === d).map((a) => [wallClockMinutes(a.startTime), wallClockMinutes(a.endTime)] as [number, number]),
         ...bloqs

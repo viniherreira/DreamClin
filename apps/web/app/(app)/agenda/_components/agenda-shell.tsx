@@ -432,6 +432,7 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
                   appointments={data.appointments}
                   blockedSlots={data.blockedSlots}
                   workingHours={data.workingHours}
+                  workingDays={data.workingDays}
                   visibleProfessionals={visibleProfessionals}
                   mode={mode === 'list' ? 'sidebyside' : mode}
                   onAppointmentClick={(id) => setDetailId(id)}

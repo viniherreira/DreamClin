@@ -10,7 +10,7 @@ import {
   startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, parseISO,
 } from 'date-fns';
 import { PROFESSIONAL_COLORS } from './_components/constants';
-import { buildWorkingHoursMap } from '@/lib/working-hours';
+import { buildWorkingDaysMap, buildWorkingHoursMap } from '@/lib/working-hours';
 import { getUnitContext } from '@/lib/units';
 import { unitAppointmentWhere } from '@/lib/unit-rules';
 import { readAgendaRules } from '@/lib/agenda-rules';
@@ -162,6 +162,14 @@ export async function getAgendaData(dateStr: string, view: 'day' | 'week' | 'mon
   const daUnidade = noneHere ? professionalsWithColor : atendemAqui;
   // Nesse caso vale o horário de sempre de cada um (senão a grade ficaria toda fechada).
   const horarios = noneHere ? await buildWorkingHoursMap(tenantId, professionals.map((p) => p.id)) : workingHours;
+  // Escala por dia (F7): quem tem escala nova usa ela; os outros, o horário de sempre.
+  const workingDays = await buildWorkingDaysMap(
+    tenantId,
+    professionals.map((p) => p.id),
+    from.toISOString().slice(0, 10),
+    to.toISOString().slice(0, 10),
+    noneHere ? undefined : { unitId: unit.id, mainId: units.main.id, businessHours: unit.businessHours },
+  );
 
   // Financeiro completo: o cifrão de cada horário e o que a janela de agendar precisa.
   const fin = await agendaFinance(tenantId);
@@ -201,6 +209,7 @@ export async function getAgendaData(dateStr: string, view: 'day' | 'week' | 'mon
     rules,
     procedures: serializedProcedures,
     workingHours: horarios,
+    workingDays,
     whatsappHealth,
     labels,
   };
