@@ -205,21 +205,27 @@ model Tenant {
   adTopics              AdTopic[]
 
   // Paciente e agenda (spec 2026-11-18)
-  patientOrigins      PatientOrigin[]
-  patientInsurances   PatientInsurance[]
-  patientCustomFields PatientCustomField[]
-  patientEvents       PatientEvent[]
-  treatmentPlans      TreatmentPlan[]
-  treatmentPlanItems  TreatmentPlanItem[]
-  documentTemplates   DocumentTemplate[]
-  cancelReasons       CancelReason[]
+  patientOrigins         PatientOrigin[]
+  patientInsurances      PatientInsurance[]
+  patientCustomFields    PatientCustomField[]
+  patientEvents          PatientEvent[]
+  treatmentPlans         TreatmentPlan[]
+  treatmentPlanItems     TreatmentPlanItem[]
+  documentTemplates      DocumentTemplate[]
+  cancelReasons          CancelReason[]
+  careTypes              CareType[]
+  waitlistEntries        WaitlistEntry[]
+  scheduleRules          ScheduleRule[]
+  scheduleExceptions     ScheduleException[]
+  agendaResources        AgendaResource[]
+  holidays               Holiday[]
   appointmentReschedules AppointmentReschedule[]
-  patientDocuments    PatientDocument[]
-  signatureRequests   SignatureRequest[]
-  patientFolders      PatientFolder[]
-  uploadSessions      UploadSession[]
-  questionnaires      Questionnaire[]
-  questionnaireRequests QuestionnaireRequest[]
+  patientDocuments       PatientDocument[]
+  signatureRequests      SignatureRequest[]
+  patientFolders         PatientFolder[]
+  uploadSessions         UploadSession[]
+  questionnaires         Questionnaire[]
+  questionnaireRequests  QuestionnaireRequest[]
 
   @@map("tenants")
 }
@@ -335,18 +341,18 @@ model Patient {
   socialName               String?
   /// Gênero (texto livre, opcional). A coluna `gender` é mostrada como "Sexo".
   genderIdentity           String?
-  rgEncrypted              String?   @map("rg")
+  rgEncrypted              String? @map("rg")
   rgIssuer                 String?
-  foreigner                Boolean   @default(false)
+  foreigner                Boolean @default(false)
   nationality              String?
   /// Passaporte ou documento de estrangeiro (no lugar do CPF).
-  foreignDocEncrypted      String?   @map("foreign_doc")
-  landlineEncrypted        String?   @map("landline")
+  foreignDocEncrypted      String? @map("foreign_doc")
+  landlineEncrypted        String? @map("landline")
   landlineExt              String?
   /// Outros contatos: a lista [{ kind, number }] em JSON, cifrada inteira (a troca da chave recifra como as outras colunas).
-  otherContactsEncrypted   String?   @map("other_contacts")
+  otherContactsEncrypted   String? @map("other_contacts")
   /// Cartão Nacional de Saúde (SUS).
-  cnsEncrypted             String?   @map("cns")
+  cnsEncrypted             String? @map("cns")
   bloodType                String?
   spouseName               String?
   motherName               String?
@@ -356,7 +362,7 @@ model Patient {
   financialResponsibleId   String?
   financialResponsibleText String?
   /// Atendimento prioritário e o motivo (`lib/patient-fields.ts`, PRIORITY_TYPES).
-  priority                 Boolean   @default(false)
+  priority                 Boolean @default(false)
   priorityType             String?
   education                String?
   hobby                    String?
@@ -364,7 +370,7 @@ model Patient {
   referredById             String?
   originId                 String?
   /// Recebe parabéns pelo WhatsApp no aniversário.
-  birthdayMessages         Boolean   @default(true)
+  birthdayMessages         Boolean @default(true)
   /// Foto no storage privado.
   photoPath                String?
   /// Informações adicionais da clínica: { [campoId]: { v: valor, obs?: texto } }.
@@ -402,21 +408,21 @@ model Patient {
 /// Linha do tempo do paciente: um evento por coisa que aconteceu (cadastro, agendamento,
 /// orçamento, pagamento…), gravado nas ações com `after()` (`lib/patient-timeline.ts`).
 model PatientEvent {
-  id        String   @id @default(cuid())
-  tenantId  String
-  patientId String
+  id         String   @id @default(cuid())
+  tenantId   String
+  patientId  String
   /// Tipo em `lib/patient-events.ts` (ex.: appointment.created, quote.accepted).
-  type      String
+  type       String
   /// Texto curto já pronto para a tela (sem dado sensível de saúde).
-  summary   String
+  summary    String
   /// Quem fez: usuário da clínica. Nulo = sistema ou o próprio paciente (ver `actorLabel`).
-  actorId   String?
+  actorId    String?
   actorLabel String?
   /// Ligação com o que gerou (agendamento, orçamento…), para abrir dali.
-  refType   String?
-  refId     String?
-  data      Json?
-  at        DateTime @default(now())
+  refType    String?
+  refId      String?
+  data       Json?
+  at         DateTime @default(now())
 
   tenant  Tenant  @relation(fields: [tenantId], references: [id])
   patient Patient @relation(fields: [patientId], references: [id])
@@ -472,6 +478,152 @@ model TreatmentPlanItem {
 
   @@index([tenantId, planId])
   @@map("treatment_plan_items")
+}
+
+/// Escala do profissional (spec 2026-11-18, F7): em que dias e horários atende,
+/// por vigência. Sem escala nova, vale o horário antigo (`professional_schedules`).
+model ScheduleRule {
+  id             String    @id @default(cuid())
+  tenantId       String
+  professionalId String
+  /// Unidade onde atende. Nulo = a principal.
+  unitId         String?
+  /// Só para este tipo de atendimento. Nulo = todos.
+  careTypeId     String?
+  /// Vigência (datas de parede). Sem fim = vale até mudar.
+  startsOn       DateTime
+  endsOn         DateTime?
+  /// WEEKLY, BIWEEKLY, EVERY_N_DAYS ou MONTH_DAY.
+  repeat         String    @default("WEEKLY")
+  /// Dias da semana (0 = domingo), para semanal e quinzenal.
+  weekdays       Int[]     @default([])
+  /// A cada N dias (EVERY_N_DAYS).
+  everyDays      Int?
+  /// Dia do mês (MONTH_DAY).
+  monthDay       Int?
+  /// Até 2 períodos no dia: o intervalo entre eles é o almoço.
+  start1         String
+  end1           String
+  start2         String?
+  end2           String?
+  active         Boolean   @default(true)
+  createdById    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, professionalId])
+  @@map("schedule_rules")
+}
+
+/// Exceção da escala num dia: folga (OFF) ou plantão (EXTRA).
+model ScheduleException {
+  id             String   @id @default(cuid())
+  tenantId       String
+  professionalId String
+  date           DateTime
+  /// OFF ou EXTRA.
+  kind           String
+  /// Plantão: o horário. Folga sem horário = o dia todo.
+  start          String?
+  end            String?
+  reason         String?
+  createdById    String?
+  createdAt      DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, professionalId, date])
+  @@map("schedule_exceptions")
+}
+
+/// Lista de espera: paciente que quer horário antes (profissional, período, dias da semana).
+model WaitlistEntry {
+  id             String    @id @default(cuid())
+  tenantId       String
+  patientId      String
+  professionalId String?
+  careTypeId     String?
+  procedureId    String?
+  /// MORNING, AFTERNOON, EVENING ou ANY.
+  period         String    @default("ANY")
+  /// Dias da semana aceitos (0 = domingo). Vazio = qualquer dia.
+  weekdays       Int[]     @default([])
+  /// Desde quando pode (data de parede).
+  fromDate       DateTime?
+  notes          String?
+  /// 0 normal, 1 alta.
+  priority       Int       @default(0)
+  /// WAITING, SCHEDULED, ATTENDED, REMOVED.
+  status         String    @default("WAITING")
+  removedReason  String?
+  appointmentId  String?
+  createdById    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, patientId])
+  @@map("waitlist_entries")
+}
+
+/// Tipo de atendimento (Configurações › Agenda › Tipos de atendimento).
+model CareType {
+  id              String   @id @default(cuid())
+  tenantId        String
+  name            String
+  color           String   @default("blue")
+  durationMinutes Int      @default(30)
+  /// Permite horário sobreposto (encaixe).
+  allowOverlap    Boolean  @default(false)
+  /// Gera cobrança (aparece em "A faturar").
+  chargeable      Boolean  @default(true)
+  order           Int      @default(0)
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, name])
+  @@index([tenantId, order])
+  @@map("care_types")
+}
+
+/// Agenda de recurso: sala, cadeira, equipamento ou canal (Configurações › Agenda › Salas e equipamentos).
+model AgendaResource {
+  id           String   @id @default(cuid())
+  tenantId     String
+  name         String
+  color        String   @default("teal")
+  unitId       String?
+  allowOverlap Boolean  @default(false)
+  order        Int      @default(0)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, name])
+  @@index([tenantId, order])
+  @@map("agenda_resources")
+}
+
+/// Feriado municipal ou dia marcado pela clínica. Os nacionais são calculados (`lib/holidays.ts`).
+model Holiday {
+  id        String   @id @default(cuid())
+  tenantId  String
+  /// Dia (meia-noite UTC, data de parede).
+  date      DateTime
+  name      String
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, date])
+  @@map("holidays")
 }
 
 /// Motivos de cancelamento da clínica (Configurações › Agenda › Motivos de cancelamento).
@@ -538,7 +690,7 @@ model DocumentTemplate {
 
 /// Documento emitido para o paciente. Clínico (atestado, receita, exame, laudo) segue o prontuário.
 model PatientDocument {
-  id             String    @id @default(cuid())
+  id             String   @id @default(cuid())
   tenantId       String
   patientId      String
   templateId     String?
@@ -546,12 +698,12 @@ model PatientDocument {
   title          String
   /// HTML já com as variáveis preenchidas.
   body           String
-  clinical       Boolean   @default(false)
+  clinical       Boolean  @default(false)
   professionalId String?
   appointmentId  String?
   createdById    String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   tenant     Tenant             @relation(fields: [tenantId], references: [id])
   signatures SignatureRequest[]
@@ -614,15 +766,15 @@ model PatientFolder {
 
 /// "Enviar pelo celular": QR que abre uma página por 15 minutos, só para um paciente e uma pasta.
 model UploadSession {
-  id        String   @id @default(cuid())
-  tenantId  String
-  patientId String
-  folderId  String?
-  token     String   @unique
-  expiresAt DateTime
-  uploads   Int      @default(0)
+  id          String   @id @default(cuid())
+  tenantId    String
+  patientId   String
+  folderId    String?
+  token       String   @unique
+  expiresAt   DateTime
+  uploads     Int      @default(0)
   createdById String?
-  createdAt DateTime @default(now())
+  createdAt   DateTime @default(now())
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
 
@@ -692,19 +844,19 @@ model PatientOrigin {
 
 /// Convênio do paciente: plano, carteirinha e validade. "Particular" não é linha: é a falta dela.
 model PatientInsurance {
-  id            String    @id @default(cuid())
-  tenantId      String
-  patientId     String
+  id          String    @id @default(cuid())
+  tenantId    String
+  patientId   String
   /// O convênio no cadastro de clientes e fornecedores (financeiro novo). Nulo = só o nome em `planName`.
-  insurerId     String?
-  insurerName   String
-  planName      String?
-  cardNumber    String?
-  validUntil    DateTime?
-  active        Boolean   @default(true)
-  createdById   String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  insurerId   String?
+  insurerName String
+  planName    String?
+  cardNumber  String?
+  validUntil  DateTime?
+  active      Boolean   @default(true)
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   tenant  Tenant  @relation(fields: [tenantId], references: [id])
   patient Patient @relation(fields: [patientId], references: [id])
@@ -716,21 +868,21 @@ model PatientInsurance {
 
 /// Informação adicional que a clínica cria para o cadastro (Configurações › Pacientes).
 model PatientCustomField {
-  id         String   @id @default(cuid())
-  tenantId   String
-  label      String
+  id        String   @id @default(cuid())
+  tenantId  String
+  label     String
   /// DATE, SHORT_TEXT, LONG_TEXT, MULTI, SINGLE, NUMBER.
-  type       String
-  options    String[] @default([])
-  required   Boolean  @default(false)
+  type      String
+  options   String[] @default([])
+  required  Boolean  @default(false)
   /// Caixa de observação ao lado da resposta.
-  hasNote    Boolean  @default(false)
+  hasNote   Boolean  @default(false)
   /// A resposta vira alerta no cabeçalho do paciente.
-  highlight  Boolean  @default(false)
-  order      Int      @default(0)
-  active     Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  highlight Boolean  @default(false)
+  order     Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
 
@@ -739,17 +891,17 @@ model PatientCustomField {
 }
 
 model PatientNote {
-  id        String   @id @default(cuid())
-  tenantId  String
-  patientId String
-  userId    String
-  content   String
+  id           String   @id @default(cuid())
+  tenantId     String
+  patientId    String
+  userId       String
+  content      String
   /// Fixada no topo das observações (spec 2026-11-18, F2).
   pinned       Boolean  @default(false)
   /// Aparece na janela do agendamento.
   showInAgenda Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   tenant  Tenant  @relation(fields: [tenantId], references: [id])
   patient Patient @relation(fields: [patientId], references: [id])
@@ -907,6 +1059,13 @@ model Appointment {
   cancelReasonId     String?
   /// Por onde chegou a confirmação: WHATSAPP, LINK, PHONE, RECEPTION. WHATSAPP e LINK = "confirmado pelo paciente".
   confirmationSource String?
+  /// Tipo de atendimento (consulta, avaliação, retorno…). O `type` continua sendo quem paga.
+  careTypeId         String?
+  /// Agenda de recurso (sala, cadeira, equipamento, canal). Nulo = só a do profissional.
+  agendaId           String?
+  /// Agendamento repetido: o mesmo `seriesId` em todos, e a posição na série.
+  seriesId           String?
+  seriesIndex        Int?
   /// Convênio que paga este agendamento (cadastro de clientes e fornecedores). Só no tipo convênio.
   insuranceContactId String?
   createdById        String?
@@ -928,6 +1087,8 @@ model Appointment {
   @@index([tenantId, unitId, startTime])
   @@index([tenantId, startTime])
   @@index([tenantId, status])
+  @@index([tenantId, seriesId])
+  @@index([tenantId, agendaId, startTime])
   @@map("appointments")
 }
 
@@ -1155,22 +1316,22 @@ model Evolution {
  * Image/document attached to a patient (stored in Supabase Storage).
  */
 model PatientFile {
-  id          String   @id @default(cuid())
-  tenantId    String
-  patientId   String
-  bucketPath  String
-  filename    String
-  mimeType    String
-  sizeBytes   Int
-  description String?
+  id            String   @id @default(cuid())
+  tenantId      String
+  patientId     String
+  bucketPath    String
+  filename      String
+  mimeType      String
+  sizeBytes     Int
+  description   String?
   /// Pasta do paciente (spec 2026-11-18, F3). Nulo = "Sem pasta" (os de antes).
   folderId      String?
   /// Atendimento do dia em que o anexo foi feito (aparece no prontuário daquele dia).
   appointmentId String?
   /// Foto clínica ou exame: segue a regra do prontuário. Os de antes são todos clínicos.
   clinical      Boolean  @default(true)
-  createdById String?
-  createdAt   DateTime @default(now())
+  createdById   String?
+  createdAt     DateTime @default(now())
 
   tenant  Tenant  @relation(fields: [tenantId], references: [id])
   patient Patient @relation(fields: [patientId], references: [id])

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format, addDays, addMonths, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Plus, LayoutGrid, Columns2, CalendarDays, Lock, FileBarChart, AlertTriangle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, LayoutGrid, Columns2, CalendarDays, Lock, FileBarChart, AlertTriangle, List, Printer } from 'lucide-react';
 import { MiniCalendar } from './mini-calendar';
 import { ProfessionalFilter } from './professional-filter';
 import { CalendarGrid } from './calendar-grid';
@@ -15,6 +15,11 @@ import { WaitingRoom } from './waiting-room';
 import { MonthGrid } from './month-grid';
 import { BlockSlotModal } from './block-slot-modal';
 import { getAgendaData, deleteBlockedSlot } from '../actions';
+import { agendaMonthMarks } from '../view-actions';
+import { AgendaList } from './agenda-list';
+import { FindInAgenda } from './find-in-agenda';
+import { parsePrefs, PREFS_KEY, type ListSort } from '@/lib/agenda-view';
+import { owesMoney } from '@/lib/financeiro/billing';
 import { GridContext } from './grid-context';
 import { makeGrid } from '@/lib/agenda-rules';
 import { clinicToday, wallClockTime } from '@/lib/tz';
@@ -43,14 +48,18 @@ interface AgendaShellProps {
   initialData: AgendaData;
   /** Abre o "Novo agendamento" já com este paciente (link "Agendar avaliação" do CRM). */
   prefillPatient?: Patient | null;
+  /** Abre o "Novo agendamento" neste horário (telas Horários livres e Lista de espera). */
+  prefillSlot?: { time: string; professionalId?: string } | null;
 }
 
-export function AgendaShell({ initialDate, initialView, initialData, prefillPatient = null }: AgendaShellProps) {
+export function AgendaShell({ initialDate, initialView, initialData, prefillPatient = null, prefillSlot = null }: AgendaShellProps) {
   const router = useRouter();
 
   const [currentDate, setCurrentDate] = useState(initialDate);
   const [view, setView] = useState<AgendaView>(initialView);
-  const [mode, setMode] = useState<'grouped' | 'sidebyside'>('sidebyside');
+  const [mode, setMode] = useState<'grouped' | 'sidebyside' | 'list'>('sidebyside');
+  const [sort, setSort] = useState<ListSort>('horario');
+  const novaAgenda = Boolean(initialData.agendaNova);
   const [data, setData] = useState<AgendaData>(initialData);
   // Início, fim e intervalo da grade: Configurações → Agenda → Regras da agenda.
   const grid = useMemo(() => makeGrid(data.rules), [data.rules]);
@@ -67,8 +76,8 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
   // `router.replace`: este último é uma navegação que vai ao servidor, e o
   // "Agendar" clicado enquanto ela corre fica na fila atrás dela.
   useEffect(() => {
-    if (!prefillPatient) return;
-    setModal({ open: true, defaultDate: initialDate, defaultPatient: prefillPatient });
+    if (!prefillPatient && !prefillSlot) return;
+    setModal({ open: true, defaultDate: initialDate, defaultPatient: prefillPatient ?? undefined, defaultTime: prefillSlot?.time, defaultProfessionalId: prefillSlot?.professionalId });
     window.history.replaceState(null, '', `/agenda?date=${initialDate}&view=${initialView}`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -85,6 +94,34 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
       return next;
     });
   }, [data.professionals]);
+
+  // Agenda nova: lembra profissionais escondidos, o layout, a ordem da lista e
+  // "só quem falta pagar" neste navegador. Sem acesso ao armazenamento, segue o padrão.
+  const [prefsLidas, setPrefsLidas] = useState(false);
+  useEffect(() => {
+    if (!novaAgenda) return;
+    let p = parsePrefs(null);
+    try {
+      p = parsePrefs(window.localStorage.getItem(PREFS_KEY));
+    } catch {
+      /* navegador sem armazenamento */
+    }
+    if (p.hidden.length) setVisibleProfessionals(new Set(initialData.professionals.map((x) => x.id).filter((id) => !p.hidden.includes(id))));
+    setMode(p.layout);
+    setSort(p.sort);
+    setSoDevendo(p.onlyOwing);
+    setPrefsLidas(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (!novaAgenda || !prefsLidas) return;
+    const hidden = data.professionals.map((p) => p.id).filter((id) => !visibleProfessionals.has(id));
+    try {
+      window.localStorage.setItem(PREFS_KEY, JSON.stringify({ hidden, layout: mode, onlyOwing: soDevendo, sort }));
+    } catch {
+      /* navegador sem armazenamento */
+    }
+  }, [novaAgenda, prefsLidas, visibleProfessionals, mode, soDevendo, sort, data.professionals]);
 
   async function navigate(dateStr: string, nextView?: AgendaView) {
     setLoading(true);
@@ -159,6 +196,8 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
       type: detail.type,
       status: detail.status,
       notes: detail.notes,
+      careTypeId: (detail as { careTypeId?: string | null }).careTypeId ?? null,
+      agendaId: (detail as { agendaId?: string | null }).agendaId ?? null,
     });
     setModal({ open: true, defaultDate: currentDate });
   }
@@ -190,7 +229,17 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
       <div className="flex h-full overflow-hidden bg-background">
         {/* Sidebar — hidden on small screens; header arrows/mini date nav cover mobile */}
         <aside className="hidden w-60 shrink-0 flex-col gap-4 overflow-y-auto border-r border-border bg-surface p-4 lg:flex">
-          <MiniCalendar selectedDate={currentDate} onSelect={(d) => navigate(d)} />
+          <MiniCalendar selectedDate={currentDate} onSelect={(d) => navigate(d)} marksFor={novaAgenda ? agendaMonthMarks : undefined} />
+          {novaAgenda && (
+            <div className="border-t border-border pt-4">
+              <FindInAgenda
+                onPick={async (d, id) => {
+                  await navigate(d, view === 'month' ? 'day' : undefined);
+                  setDetailId(id);
+                }}
+              />
+            </div>
+          )}
           <div className="border-t border-border pt-4">
             <ProfessionalFilter
               professionals={data.professionals}
@@ -266,7 +315,19 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
               <button type="button" onClick={() => setMode('sidebyside')} title="Lado a lado" aria-label="Visualização lado a lado" aria-pressed={mode === 'sidebyside'} className="segmented-item !px-2">
                 <Columns2 className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
+              {novaAgenda && (
+                <button type="button" onClick={() => setMode('list')} title="Lista" aria-label="Visualização em lista" aria-pressed={mode === 'list'} className="segmented-item !px-2">
+                  <List className="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
+              )}
             </div>
+
+            {novaAgenda && (
+              <a href={`/agenda/imprimir?date=${currentDate}&view=${view === 'month' ? 'day' : view}`} target="_blank" rel="noreferrer" className="btn-ghost btn-sm !h-9 sm:px-3" aria-label="Imprimir a agenda" title="Imprimir a agenda">
+                <Printer className="h-4 w-4" aria-hidden="true" />
+                <span className="hidden 2xl:inline">Imprimir</span>
+              </a>
+            )}
 
             <Link
               href={`/financeiro?type=agendamentos&from=${currentDate}&to=${currentDate}#detalhe`}
@@ -303,6 +364,17 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
           </header>
 
           {/* WhatsApp down: confirmations silently stop, so say so where bookings happen. */}
+          {(() => {
+            // Agenda nova: os feriados do período (nacionais e da clínica).
+            const feriados = (data.agendaNova?.holidays ?? []).filter((h) => (view === 'day' ? h.date === currentDate : true));
+            if (!feriados.length) return null;
+            return (
+              <p role="note" className="mx-4 mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                Feriado: {feriados.map((h) => `${h.date.slice(8, 10)}/${h.date.slice(5, 7)} ${h.name}`).join(' · ')}
+                {data.agendaNova?.blockHolidays ? ' (a clínica não marca em feriado)' : ''}
+              </p>
+            );
+          })()}
           {data.whatsappHealth?.problem && (
             <div
               role="status"
@@ -322,7 +394,15 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
           {/* Grid / empty state. `isolate`: as camadas da grade (cabeçalhos fixos) ficam
               aqui dentro e não passam por cima do menu da unidade no topo. */}
           <div className="isolate flex-1 overflow-auto overscroll-contain bg-surface">
-            {hasProfessionals && view === 'month' ? (
+            {hasProfessionals && mode === 'list' ? (
+              <AgendaList
+                appointments={data.appointments.filter((a) => visibleProfessionals.has(a.professionalId) && (!soDevendo || owesMoney(data.finance?.billing?.[a.id])))}
+                sort={sort}
+                onSort={setSort}
+                onOpen={setDetailId}
+                showDate={view !== 'day'}
+              />
+            ) : hasProfessionals && view === 'month' ? (
               <MonthGrid
                 dateStr={currentDate}
                 appointments={data.appointments}
@@ -352,8 +432,9 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
                   appointments={data.appointments}
                   blockedSlots={data.blockedSlots}
                   workingHours={data.workingHours}
+                  workingDays={data.workingDays}
                   visibleProfessionals={visibleProfessionals}
-                  mode={mode}
+                  mode={mode === 'list' ? 'sidebyside' : mode}
                   onAppointmentClick={(id) => setDetailId(id)}
                   onBlockedSlotClick={(id) => setRemovingBlockId(id)}
                   onSlotClick={(professionalId, slotDate, timeStr) => openNewModal(professionalId, timeStr, slotDate)}
@@ -400,6 +481,7 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
         defaultTime={modal.defaultTime}
         defaultProfessionalId={modal.defaultProfessionalId}
         defaultPatient={modal.defaultPatient ?? null}
+        agendaNova={data.agendaNova}
         editing={editing}
         onSuccess={() => {
           refreshData();

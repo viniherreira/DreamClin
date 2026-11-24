@@ -15,9 +15,10 @@ describe('regras da agenda', () => {
       defaultDurationMinutes: 45,
       allowOverlap: true,
       cancelReasonRequired: true,
+      blockHolidays: false,
     });
     const torto = readAgendaRules({ agenda: { slotMinutes: 7, startHour: -3, endHour: 99, defaultDurationMinutes: 1000, allowOverlap: 'sim' } });
-    expect(torto).toEqual({ slotMinutes: 10, startHour: 0, endHour: 24, defaultDurationMinutes: 240, allowOverlap: false, cancelReasonRequired: true });
+    expect(torto).toEqual({ slotMinutes: 10, startHour: 0, endHour: 24, defaultDurationMinutes: 240, allowOverlap: false, cancelReasonRequired: true, blockHolidays: false });
     expect(readAgendaRules({ agenda: { cancelReasonRequired: false } }).cancelReasonRequired).toBe(false);
   });
 

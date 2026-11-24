@@ -6,7 +6,7 @@ import { clinicToday } from '@/lib/tz';
 export const metadata = { title: 'Agenda' };
 
 interface PageProps {
-  searchParams: Promise<{ date?: string; view?: string; novo?: string; paciente?: string }>;
+  searchParams: Promise<{ date?: string; view?: string; novo?: string; paciente?: string; hora?: string; profissional?: string }>;
 }
 
 export default async function AgendaPage({ searchParams }: PageProps) {
@@ -19,6 +19,8 @@ export default async function AgendaPage({ searchParams }: PageProps) {
     params.novo === '1' && params.paciente ? getPrefillPatient(params.paciente) : Promise.resolve(null),
   ]);
 
+  const prefillSlot = params.novo === '1' && /^\d{2}:\d{2}$/.test(params.hora ?? '') ? { time: params.hora!, professionalId: params.profissional || undefined } : null;
+
   return (
     <Suspense>
       {/* Trocar a unidade no topo recomeça a agenda com os dados da outra unidade. */}
@@ -28,6 +30,7 @@ export default async function AgendaPage({ searchParams }: PageProps) {
         initialView={view}
         initialData={data}
         prefillPatient={prefillPatient}
+        prefillSlot={prefillSlot}
       />
     </Suspense>
   );

@@ -18,6 +18,8 @@ export interface AgendaRules {
   allowOverlap: boolean;
   /** Cancelar pede o motivo (com o paciente e a agenda novos). */
   cancelReasonRequired: boolean;
+  /** Não deixa marcar em feriado (nacional ou da clínica). */
+  blockHolidays: boolean;
 }
 
 export const AGENDA_DEFAULTS: AgendaRules = {
@@ -27,6 +29,7 @@ export const AGENDA_DEFAULTS: AgendaRules = {
   defaultDurationMinutes: 30,
   allowOverlap: false,
   cancelReasonRequired: true,
+  blockHolidays: false,
 };
 
 const inteiro = (v: unknown, min: number, max: number, padrao: number) =>
@@ -46,6 +49,7 @@ export function readAgendaRules(settings: unknown): AgendaRules {
     defaultDurationMinutes: inteiro(o.defaultDurationMinutes, 5, 240, d.defaultDurationMinutes),
     allowOverlap: o.allowOverlap === true,
     cancelReasonRequired: o.cancelReasonRequired !== false,
+    blockHolidays: o.blockHolidays === true,
   };
 }
 

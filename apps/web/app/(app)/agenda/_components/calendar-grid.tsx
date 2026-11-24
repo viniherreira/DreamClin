@@ -9,7 +9,7 @@ import { owesMoney, type BillingStatus } from '@/lib/financeiro/billing';
 import { CurrentTimeIndicator } from './current-time-indicator';
 import { WorkingHoursOverlay } from './working-hours-overlay';
 import { BlockedSlotBlock, type BlockedSlotItem } from './blocked-slot-block';
-import type { WeekSchedule } from '@/lib/schedule';
+import type { DaySchedule, WeekSchedule } from '@/lib/schedule';
 import { clinicToday } from '@/lib/tz';
 import { firstLetters } from '@/lib/initials';
 
@@ -28,6 +28,7 @@ interface Appointment {
   patient: { id: string; name: string };
   professional: { id: string; name: string; specialty?: string | null };
   procedure?: { id: string; name: string; durationMinutes: number } | null;
+  badges?: string[];
 }
 
 interface CalendarGridProps {
@@ -37,6 +38,8 @@ interface CalendarGridProps {
   appointments: Appointment[];
   blockedSlots: BlockedSlotItem[];
   workingHours: Record<string, WeekSchedule>;
+  /** Escala por dia (F7): profissional → data → horário. */
+  workingDays?: Record<string, Record<string, DaySchedule | null>>;
   visibleProfessionals: Set<string>;
   mode: 'grouped' | 'sidebyside';
   onAppointmentClick: (id: string) => void;
@@ -117,7 +120,7 @@ function ProfessionalHeader({ prof }: { prof: Professional }) {
 }
 
 export function CalendarGrid({
-  dateStr, view, professionals, appointments, blockedSlots, workingHours, visibleProfessionals, mode,
+  dateStr, view, professionals, appointments, blockedSlots, workingHours, workingDays, visibleProfessionals, mode,
   onAppointmentClick, onBlockedSlotClick, onSlotClick, onDayClick, billing, onlyOwing = false,
 }: CalendarGridProps) {
   const grid = useGrid();
@@ -135,7 +138,12 @@ export function CalendarGrid({
     }));
 
   const visibleBlocks = blockedSlots.filter((b) => b.professional && visibleProfessionals.has(b.professional.id));
-  const scheduleFor = (profId: string, iso: string) => workingHours[profId]?.[weekdayOf(iso)] ?? null;
+  // A escala do dia (F7) quando veio; senão o horário semanal.
+  const scheduleFor = (profId: string, iso: string) => {
+    const dia = workingDays?.[profId];
+    if (dia && iso in dia) return dia[iso] ?? null;
+    return workingHours[profId]?.[weekdayOf(iso)] ?? null;
+  };
 
   const handleSlotClick = useCallback(
     (professionalId: string, slotDate: string, e: React.MouseEvent<HTMLElement>) => {

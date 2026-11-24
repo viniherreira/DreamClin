@@ -10,7 +10,7 @@ import {
   startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, parseISO,
 } from 'date-fns';
 import { PROFESSIONAL_COLORS } from './_components/constants';
-import { buildWorkingHoursMap } from '@/lib/working-hours';
+import { buildWorkingDaysMap, buildWorkingHoursMap } from '@/lib/working-hours';
 import { getUnitContext } from '@/lib/units';
 import { unitAppointmentWhere } from '@/lib/unit-rules';
 import { readAgendaRules } from '@/lib/agenda-rules';
@@ -34,9 +34,12 @@ import { agendaFinance, AgendaAbort } from '@/fin/agenda-bridge';
 import { timelineAppointment } from '@/lib/timeline-hooks';
 import { appointmentSnapshot, auditAppointment, auditAppointmentDeleted, loadAppointmentAudit } from '@/lib/appointment-audit-server';
 import { pacienteAgendaEnabled } from '@/lib/feature-flags';
+import { appointmentBadges, type Badge } from '@/lib/agenda-view';
 import { displayName } from '@/lib/patient-name';
 import { highlightedAnswers, priorityLabel, readCustomAnswers } from '@/lib/patient-fields';
 import { cancelError, cancelReasonText, DEFAULT_CANCEL_REASONS, directStatusChange, isReschedule, statusLabel } from '@/lib/appointment-status';
+import { holidayOn, holidaysBetween } from '@/lib/holidays';
+import { isRepeatKind, occurrences, type RepeatRule } from '@/lib/recurrence';
 import { recordPatientEvent } from '@/lib/patient-timeline';
 
 // ─── Auth helper ─────────────────────────────────────────────────────────────
@@ -90,7 +93,7 @@ export async function getAgendaData(dateStr: string, view: 'day' | 'week' | 'mon
     db.appointment.findMany({
       where: { startTime: { gte: from, lte: to }, ...unitAppointmentWhere(unit.id, units.main.id) },
       include: {
-        patient: { select: { id: true, name: true, socialName: true } },
+        patient: { select: { id: true, name: true, socialName: true, birthDate: true } },
         professional: { select: { id: true, name: true, specialty: true } },
         procedure: { select: { id: true, name: true, durationMinutes: true } },
         label: { select: { id: true, name: true, color: true } },
@@ -159,6 +162,14 @@ export async function getAgendaData(dateStr: string, view: 'day' | 'week' | 'mon
   const daUnidade = noneHere ? professionalsWithColor : atendemAqui;
   // Nesse caso vale o horário de sempre de cada um (senão a grade ficaria toda fechada).
   const horarios = noneHere ? await buildWorkingHoursMap(tenantId, professionals.map((p) => p.id)) : workingHours;
+  // Escala por dia (F7): quem tem escala nova usa ela; os outros, o horário de sempre.
+  const workingDays = await buildWorkingDaysMap(
+    tenantId,
+    professionals.map((p) => p.id),
+    from.toISOString().slice(0, 10),
+    to.toISOString().slice(0, 10),
+    noneHere ? undefined : { unitId: unit.id, mainId: units.main.id, businessHours: unit.businessHours },
+  );
 
   // Financeiro completo: o cifrão de cada horário e o que a janela de agendar precisa.
   const fin = await agendaFinance(tenantId);
@@ -174,8 +185,23 @@ export async function getAgendaData(dateStr: string, view: 'day' | 'week' | 'mon
 
   // Paciente e agenda novos: o nome social é o nome da agenda.
   const nomeSocial = await pacienteAgendaEnabled(tenantId);
+  const agendaNova = await agendaNewOptions(tenantId, from.toISOString().slice(0, 10), to.toISOString().slice(0, 10));
+  // Agenda nova: os selos do card (1ª vez, aniversário, confirmou pelo WhatsApp ou link).
+  let selos: Record<string, Badge[]> = {};
+  if (agendaNova && appointments.length) {
+    const jaVieram = await db.appointment.findMany({
+      where: { patientId: { in: [...new Set(appointments.map((a) => a.patientId))] }, status: 'ATTENDED', startTime: { lt: from } },
+      select: { patientId: true },
+      distinct: ['patientId'],
+    });
+    selos = appointmentBadges(
+      appointments.map((a) => ({ id: a.id, patientId: a.patientId, startTime: a.startTime, status: a.status, confirmationSource: a.confirmationSource, birthDate: a.patient.birthDate })),
+      new Set(jaVieram.map((x) => x.patientId)),
+    );
+  }
   return {
-    appointments: appointments.map(({ patient, ...a }) => ({ ...a, patient: { id: patient.id, name: nomeSocial ? displayName(patient) : patient.name } })),
+    appointments: appointments.map(({ patient, ...a }) => ({ ...a, badges: selos[a.id] ?? [], patient: { id: patient.id, name: nomeSocial ? displayName(patient) : patient.name } })),
+    agendaNova,
     blockedSlots,
     finance,
     professionals: daUnidade,
@@ -183,6 +209,7 @@ export async function getAgendaData(dateStr: string, view: 'day' | 'week' | 'mon
     rules,
     procedures: serializedProcedures,
     workingHours: horarios,
+    workingDays,
     whatsappHealth,
     labels,
   };
@@ -340,7 +367,18 @@ export async function createAppointment(
     return { success: false, errors: {}, message: refErrorMessage(foreign) };
   }
 
-  const conflict = (await agendaRules(tenantId)).allowOverlap ? null : await checkConflict(tenantId, professionalId, start, end);
+  // Agenda nova: tipo de atendimento, sala/equipamento, feriado e repetição.
+  const novo = await readNewAgendaFields(tenantId, formData);
+  if (!novo.ok) return { success: false, errors: {}, message: novo.message };
+  const regrasCriar = await agendaRules(tenantId);
+  if (novo.enabled) {
+    const feriado = await holidayBlock(tenantId, date, regrasCriar.blockHolidays);
+    if (feriado) return { success: false, errors: {}, message: feriado };
+    const sala = await checkResourceConflict(tenantId, novo, start, end);
+    if (sala) return { success: false, errors: {}, message: sala };
+  }
+
+  const conflict = regrasCriar.allowOverlap || novo.careType?.allowOverlap ? null : await checkConflict(tenantId, professionalId, start, end);
   if (conflict) {
     return {
       success: false,
@@ -376,6 +414,7 @@ export async function createAppointment(
     createdById: userId,
     updatedById: userId,
     ...(fin ? { insuranceContactId: extra.insuranceContactId } : {}),
+    ...(novo.enabled ? { careTypeId: novo.careType?.id ?? null, agendaId: novo.resource?.id ?? null } : {}),
   };
   let appointment;
   try {
@@ -390,6 +429,11 @@ export async function createAppointment(
   } catch (e) {
     if (e instanceof AgendaAbort) return { success: false, errors: {}, message: e.message };
     throw e;
+  }
+
+  // Repetição: as outras datas da série, pulando as que dão conflito.
+  if (novo.enabled && novo.rule.kind !== 'none') {
+    await createSeries(tenantId, userId, appointment.id, dados, date, startTime, endTime, novo, regrasCriar);
   }
 
   // Avisa o CRM depois da resposta; ele nunca falha nem atrasa o agendamento.
@@ -477,6 +521,12 @@ export async function updateAppointment(
   const fin = await agendaFinance(tenantId);
   const extra = fin ? await financeFields(fin, formData, type) : { ok: true as const, items: null, insuranceContactId: null };
   if (!extra.ok) return { success: false, errors: {}, message: extra.message };
+  const novoEditar = await readNewAgendaFields(tenantId, formData);
+  if (!novoEditar.ok) return { success: false, errors: {}, message: novoEditar.message };
+  if (novoEditar.enabled) {
+    const sala = await checkResourceConflict(tenantId, novoEditar, start, end, id);
+    if (sala) return { success: false, errors: {}, message: sala };
+  }
   // Auditoria: a foto de antes, para gravar o que mudou.
   const antes = await appointmentSnapshot(tenantId, id);
   const antesRemarcar = await prisma.appointment.findFirst({ where: { id, tenantId }, select: { startTime: true, endTime: true, professionalId: true, patientId: true, status: true } });
@@ -491,6 +541,7 @@ export async function updateAppointment(
     notes: notes || null,
     updatedById: userId,
     ...(fin ? { insuranceContactId: extra.insuranceContactId } : {}),
+    ...(novoEditar.enabled ? { careTypeId: novoEditar.careType?.id ?? null, agendaId: novoEditar.resource?.id ?? null } : {}),
   };
   try {
     if (fin) {
@@ -940,6 +991,9 @@ export async function getAppointmentDetail(id: string) {
     statusText: statusLabel(appointment.status, { confirmationSource: appointment.confirmationSource, cancelledBy: appointment.cancelledBy }),
     reschedules: novo ? await loadReschedules(tenantId, id) : [],
     professionals: novo ? await db.professional.findMany({ where: { active: true }, orderBy: { name: 'asc' }, select: { id: true, name: true } }) : [],
+    careType: novo && appointment.careTypeId ? await db.careType.findFirst({ where: { id: appointment.careTypeId }, select: { name: true, color: true } }) : null,
+    resource: novo && appointment.agendaId ? await db.agendaResource.findFirst({ where: { id: appointment.agendaId }, select: { name: true } }) : null,
+    series: novo && appointment.seriesId ? { index: (appointment.seriesIndex ?? 0) + 1, total: await db.appointment.count({ where: { seriesId: appointment.seriesId } }) } : null,
     history: historico,
     financial: financeiro,
     /** Financeiro completo ligado: a aba Financeiro carrega os itens e as contas deste agendamento. */
@@ -1080,7 +1134,7 @@ export async function cancelOptionsAction(): Promise<{ reasons: { id: string; na
  * Cancelar com quem cancelou (paciente ou clínica) e o motivo da lista. O
  * horário fica livre e o agendamento continua no histórico.
  */
-export async function cancelAppointmentFull(id: string, input: { cancelledBy: string; reasonId?: string | null; reasonText?: string | null }): Promise<Ok> {
+export async function cancelAppointmentFull(id: string, input: { cancelledBy: string; reasonId?: string | null; reasonText?: string | null; scope?: 'one' | 'next' | 'all' }): Promise<Ok> {
   const { tenantId, userId } = await requireTenant();
   const bloqueio = (await writeBlocked(tenantId)) ?? (await capabilityBlocked(tenantId, 'agenda'));
   if (bloqueio) return { ok: false, message: bloqueio };
@@ -1108,6 +1162,30 @@ export async function cancelAppointmentFull(id: string, input: { cancelledBy: st
     },
   });
   await auditAppointment(tenantId, userId, id, 'APPOINTMENT_STATUS', antes);
+  // Série: "este e os próximos" ou "todos", sem mexer nos já atendidos, faltas e cancelados.
+  if (input.scope === 'next' || input.scope === 'all') {
+    const serie = await prisma.appointment.findFirst({ where: { id, tenantId }, select: { seriesId: true, startTime: true } });
+    if (serie?.seriesId) {
+      const outros = await prisma.appointment.findMany({
+        where: {
+          tenantId,
+          seriesId: serie.seriesId,
+          id: { not: id },
+          status: { in: ['SCHEDULED', 'CONFIRMED', 'RESCHEDULED'] },
+          ...(input.scope === 'next' ? { startTime: { gt: serie.startTime } } : {}),
+        },
+        select: { id: true },
+      });
+      for (const o of outros) {
+        const fotoOutro = await appointmentSnapshot(tenantId, o.id);
+        await prisma.appointment.update({
+          where: { id: o.id, tenantId },
+          data: { status: 'CANCELLED', cancelledBy: input.cancelledBy, cancelReasonId: input.reasonId || null, cancelReason: cancelReasonText(motivo?.name, input.reasonText, outro), updatedById: userId },
+        });
+        await auditAppointment(tenantId, userId, o.id, 'APPOINTMENT_STATUS', fotoOutro, { note: 'cancelado junto com a série' });
+      }
+    }
+  }
   after(() => notifyCrm(tenantId, { type: 'appointment.cancelled', patientId: appt.patientId, appointmentId: id }));
   after(() => timelineAppointment(tenantId, id, 'status', userId));
   revalidatePath('/agenda');
@@ -1180,4 +1258,142 @@ export async function rescheduleAppointmentAction(
   after(() => timelineAppointment(tenantId, id, 'rescheduled', userId, { from: antes.startTime }));
   revalidatePath('/agenda');
   return { ok: true };
+}
+
+
+// ─── Tipos de atendimento, salas, feriados e repetição (spec 2026-11-18, F4) ─
+
+type NewFields =
+  | { ok: false; message: string }
+  | {
+      ok: true;
+      enabled: boolean;
+      careType: { id: string; allowOverlap: boolean; durationMinutes: number } | null;
+      resource: { id: string; name: string; allowOverlap: boolean } | null;
+      rule: RepeatRule;
+    };
+
+/** Lê do formulário o tipo de atendimento, a sala/equipamento e a repetição (só com a agenda nova). */
+async function readNewAgendaFields(tenantId: string, formData: FormData): Promise<NewFields> {
+  if (!(await pacienteAgendaEnabled(tenantId))) return { ok: true, enabled: false, careType: null, resource: null, rule: { kind: 'none' } };
+  const careTypeId = String(formData.get('careTypeId') ?? '');
+  const agendaId = String(formData.get('agendaId') ?? '');
+  const careType = careTypeId ? await prisma.careType.findFirst({ where: { id: careTypeId, tenantId }, select: { id: true, allowOverlap: true, durationMinutes: true } }) : null;
+  if (careTypeId && !careType) return { ok: false, message: 'Tipo de atendimento não encontrado.' };
+  const resource = agendaId ? await prisma.agendaResource.findFirst({ where: { id: agendaId, tenantId }, select: { id: true, name: true, allowOverlap: true } }) : null;
+  if (agendaId && !resource) return { ok: false, message: 'Sala ou equipamento não encontrado.' };
+  const kind = String(formData.get('repeat') ?? 'none');
+  const rule: RepeatRule = {
+    kind: isRepeatKind(kind) ? kind : 'none',
+    count: Number(formData.get('repeatCount') ?? 0) || undefined,
+    until: String(formData.get('repeatUntil') ?? '') || undefined,
+    everyDays: Number(formData.get('repeatEvery') ?? 0) || undefined,
+  };
+  return { ok: true, enabled: true, careType, resource, rule };
+}
+
+async function checkResourceConflict(
+  tenantId: string,
+  f: { resource: { id: string; name: string; allowOverlap: boolean } | null; careType: { allowOverlap: boolean } | null },
+  start: Date,
+  end: Date,
+  excludeId?: string,
+): Promise<string | null> {
+  if (!f.resource || f.resource.allowOverlap || f.careType?.allowOverlap) return null;
+  const outro = await prisma.appointment.findFirst({
+    where: { tenantId, agendaId: f.resource.id, status: { notIn: ['CANCELLED', 'MISSED'] }, ...(excludeId ? { NOT: { id: excludeId } } : {}), AND: [{ startTime: { lt: end } }, { endTime: { gt: start } }] },
+    select: { startTime: true, patient: { select: { name: true } } },
+  });
+  return outro ? `${f.resource.name} já está ocupada às ${wallClockTime(outro.startTime)} (${outro.patient.name}).` : null;
+}
+
+async function clinicHolidays(tenantId: string, from: string, to: string) {
+  const rows = await prisma.holiday.findMany({ where: { tenantId, date: { gte: new Date(`${from}T00:00:00Z`), lte: new Date(`${to}T00:00:00Z`) } }, select: { date: true, name: true } });
+  return rows.map((r) => ({ date: r.date.toISOString().slice(0, 10), name: r.name }));
+}
+
+async function holidayBlock(tenantId: string, date: string, block: boolean): Promise<string | null> {
+  if (!block) return null;
+  const f = holidayOn(date, await clinicHolidays(tenantId, date, date));
+  return f ? `${f.name} é feriado e a clínica não marca em feriado (Configurações › Feriados).` : null;
+}
+
+/** Cria as outras datas da série com os mesmos dados, pulando conflito, bloqueio e feriado bloqueado. */
+async function createSeries(
+  tenantId: string,
+  userId: string,
+  firstId: string,
+  dados: Record<string, unknown>,
+  date: string,
+  startTime: string,
+  endTime: string,
+  f: Extract<NewFields, { ok: true }>,
+  rules: Awaited<ReturnType<typeof agendaRules>>,
+) {
+  const datas = occurrences(date, f.rule).slice(1);
+  await prisma.appointment.update({ where: { id: firstId, tenantId }, data: { seriesId: firstId, seriesIndex: 0 } });
+  let i = 1;
+  for (const d of datas) {
+    const { start, end } = buildDateTimes(d, startTime, endTime);
+    const prof = String(dados.professionalId);
+    const ruim =
+      (await holidayBlock(tenantId, d, rules.blockHolidays)) ||
+      (rules.allowOverlap || f.careType?.allowOverlap ? null : await checkConflict(tenantId, prof, start, end)) ||
+      (await checkBlocked(tenantId, prof, start, end)) ||
+      (await checkResourceConflict(tenantId, f, start, end));
+    if (ruim) continue;
+    const criado = await prisma.appointment.create({ data: { ...(dados as Parameters<typeof prisma.appointment.create>[0]['data']), startTime: start, endTime: end, seriesId: firstId, seriesIndex: i++ } });
+    await auditAppointment(tenantId, userId, criado.id, 'APPOINTMENT_CREATED', null, { note: 'repetição' });
+  }
+}
+
+/** Antes de salvar a repetição: as datas e quais dão conflito (essas serão puladas). */
+export async function previewSeriesAction(input: {
+  date: string;
+  startTime: string;
+  endTime: string;
+  professionalId: string;
+  agendaId?: string;
+  careTypeId?: string;
+  repeat: string;
+  repeatCount?: number;
+  repeatUntil?: string;
+  repeatEvery?: number;
+}): Promise<{ date: string; problem: string | null }[]> {
+  const { tenantId } = await requireTenant();
+  if (!(await pacienteAgendaEnabled(tenantId))) return [];
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date) || !isRepeatKind(input.repeat)) return [];
+  const fd = new FormData();
+  fd.set('careTypeId', input.careTypeId ?? '');
+  fd.set('agendaId', input.agendaId ?? '');
+  const f = await readNewAgendaFields(tenantId, fd);
+  if (!f.ok) return [];
+  if (await refOutsideTenant(tenantId, { professionalId: input.professionalId })) return [];
+  const rules = await agendaRules(tenantId);
+  const datas = occurrences(input.date, { kind: input.repeat, count: input.repeatCount, until: input.repeatUntil, everyDays: input.repeatEvery });
+  const out: { date: string; problem: string | null }[] = [];
+  for (const d of datas) {
+    const { start, end } = buildDateTimes(d, input.startTime, input.endTime);
+    const conflito = rules.allowOverlap || f.careType?.allowOverlap ? null : await checkConflict(tenantId, input.professionalId, start, end);
+    const bloqueio = await checkBlocked(tenantId, input.professionalId, start, end);
+    out.push({
+      date: d,
+      problem:
+        (await holidayBlock(tenantId, d, rules.blockHolidays)) ??
+        (conflito ? `conflito com ${conflito.patient.name}` : bloqueio ? 'horário bloqueado' : await checkResourceConflict(tenantId, f, start, end)),
+    });
+  }
+  return out;
+}
+
+/** Tipos de atendimento, salas e feriados do período, para a agenda e a janela de agendar. */
+async function agendaNewOptions(tenantId: string, from: string, to: string) {
+  if (!(await pacienteAgendaEnabled(tenantId))) return null;
+  const [careTypes, resources, custom, rules] = await Promise.all([
+    prisma.careType.findMany({ where: { tenantId, active: true }, orderBy: [{ order: 'asc' }, { name: 'asc' }], select: { id: true, name: true, color: true, durationMinutes: true, allowOverlap: true } }),
+    prisma.agendaResource.findMany({ where: { tenantId, active: true }, orderBy: [{ order: 'asc' }, { name: 'asc' }], select: { id: true, name: true, color: true } }),
+    clinicHolidays(tenantId, from, to),
+    agendaRules(tenantId),
+  ]);
+  return { careTypes, resources, holidays: holidaysBetween(from, to, custom), blockHolidays: rules.blockHolidays };
 }

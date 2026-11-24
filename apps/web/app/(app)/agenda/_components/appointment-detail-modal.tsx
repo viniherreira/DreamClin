@@ -298,6 +298,9 @@ export function AppointmentDetailModal({ open, appointmentId, labels, onClose, o
                           </Info>
                           <Info label="Profissional">{a.professional.name}</Info>
                           {a.procedure && <Info label="Procedimento">{a.procedure.name}</Info>}
+                          {detail.careType && <Info label="Atendimento">{detail.careType.name}</Info>}
+                          {detail.resource && <Info label="Sala">{detail.resource.name}</Info>}
+                          {detail.series && <Info label="Repetição">{detail.series.index}º de {detail.series.total}</Info>}
                           <Info label="Tipo">{TYPE_LABELS[a.type as keyof typeof TYPE_LABELS] ?? a.type}</Info>
                           {a.notes && <Info label="Observações">{a.notes}</Info>}
                           {a.cancelReason && <Info label="Motivo do cancelamento">{a.cancelReason}</Info>}
@@ -374,6 +377,11 @@ export function AppointmentDetailModal({ open, appointmentId, labels, onClose, o
                               ))}
                           </div>
                         )}
+                        {detail.audit && appointmentId && a.status === 'CANCELLED' && new Date(a.startTime).getTime() > Date.now() && (
+                          <Link href={`/agenda/lista-de-espera?vaga=${appointmentId}`} className="btn-outline btn-sm mb-2 inline-flex">
+                            Horário vagou: ver quem da lista de espera combina
+                          </Link>
+                        )}
                         {detail.audit && appointmentId && (
                           <AppointmentStatusPanel
                             appointmentId={appointmentId}
@@ -383,6 +391,7 @@ export function AppointmentDetailModal({ open, appointmentId, labels, onClose, o
                             endTime={wallClockTime(a.endTime)}
                             professionalId={a.professional.id}
                             professionals={detail.professionals}
+                            inSeries={Boolean(detail.series)}
                             onDone={async (r) => {
                               setAviso(r.message);
                               onChanged();

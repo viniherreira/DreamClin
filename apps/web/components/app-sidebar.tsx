@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation';
 import { useLiveUnread } from './crm-chat/unread';
 import {
   LayoutDashboard, CalendarDays, Users, Stethoscope, FileText, Wallet,
-  MessageCircle, Megaphone, Settings, PhoneCall, KanbanSquare, List, ListChecks, Smartphone, BarChart3, Zap, TrendingUp, Receipt, Banknote, ClipboardList, Percent, Cake,
+  MessageCircle, Megaphone, Settings, PhoneCall, KanbanSquare, List, ListChecks, Smartphone, BarChart3, Zap, TrendingUp, Receipt, Banknote, ClipboardList, Percent, Cake, CalendarCheck, Hourglass, Sun,
 } from 'lucide-react';
 import { CrmRail } from './crm-rail';
 import { ClinicSidebar } from './clinic-sidebar';
@@ -63,6 +63,12 @@ export const FINANCE_NAV: NavItem[] = [
  * `pacienteAgendaEnabled`. Cada item entra logo depois do endereço da chave.
  */
 export const PATIENT_AGENDA_NAV: Record<string, NavItem[]> = {
+  '/agenda': [
+    { href: '/agenda/confirmacoes', label: 'Confirmações', icon: CalendarCheck, capability: 'agenda', group: 'Atendimento' },
+    { href: '/agenda/lista-de-espera', label: 'Lista de espera', icon: Hourglass, capability: 'agenda', group: 'Atendimento' },
+    { href: '/agenda/meu-dia', label: 'Meu dia', icon: Sun, capability: 'agenda', group: 'Atendimento' },
+    { href: '/relatorios/agenda', label: 'Relatórios da agenda', icon: BarChart3, capability: 'agenda_config', group: 'Atendimento' },
+  ],
   '/pacientes': [{ href: '/pacientes/aniversariantes', label: 'Aniversariantes', icon: Cake, capability: 'pacientes', group: 'Atendimento' }],
 };
 

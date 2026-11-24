@@ -1,5 +1,6 @@
 'use client';
 
+import { AppointmentExtraFields, type AgendaNewOptions } from './appointment-extra-fields';
 import { useActionState, useEffect, useRef, useState, useTransition } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { X, Search, Loader2, Check, CalendarDays } from 'lucide-react';
@@ -43,9 +44,13 @@ export interface EditingAppointment {
   type: string;
   status: string;
   notes: string | null;
+  careTypeId?: string | null;
+  agendaId?: string | null;
 }
 
 interface AppointmentModalProps {
+  /** Agenda nova: tipos de atendimento, salas, feriados e repetição. */
+  agendaNova?: AgendaNewOptions | null;
   open: boolean;
   onClose: () => void;
   professionals: Professional[];
@@ -86,6 +91,7 @@ export function AppointmentModal({
   editing = null,
   defaultPatient = null,
   finance = null,
+  agendaNova = null,
   onSuccess,
 }: AppointmentModalProps) {
   const [itens, setItens] = useState<ItemRow[] | null>(null);
@@ -336,6 +342,20 @@ export function AppointmentModal({
                   </div>)}
                 </div>
               </fieldset>
+
+              {agendaNova && (
+                <AppointmentExtraFields
+                  options={agendaNova}
+                  editing={Boolean(editing)}
+                  initialCareTypeId={editing?.careTypeId}
+                  initialAgendaId={editing?.agendaId}
+                  date={date}
+                  startTime={startTime}
+                  endTime={endTime}
+                  professionalId={profId}
+                  onDuration={(min) => setEndTime(addMinutesToTime(startTime, min))}
+                />
+              )}
 
               {/* Paciente */}
               <fieldset className="space-y-3">
