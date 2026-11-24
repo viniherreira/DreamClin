@@ -24,6 +24,7 @@ import { PatientCustomFieldsPanel, PatientOriginsPanel, PatientRulesPanel } from
 import { DocumentTemplatesPanel, FolderDefaultsPanel, QuestionnairesPanel } from './docs-panels';
 import { CancelReasonsPanel } from './cancel-reasons-panel';
 import { CareTypesPanel, HolidaysPanel, ResourcesPanel } from './agenda-config-panels';
+import { SchedulesPanel } from './schedules-panel';
 import type { AgendaRules } from '@/lib/agenda-rules';
 import { TeamPanel } from './team-panel';
 import { PrivacyPanel } from './privacy-panel';
@@ -201,6 +202,7 @@ export function SettingsView({
           { id: 'pac-pastas', group: 'Pacientes', label: 'Padrão de pastas', panel: <FolderDefaultsPanel /> },
           { id: 'modelos-doc', group: 'Atendimento', label: 'Modelos de documento', panel: <DocumentTemplatesPanel /> },
           { id: 'questionarios', group: 'Atendimento', label: 'Questionários', panel: <QuestionnairesPanel /> },
+          { id: 'escalas', group: 'Agenda', label: 'Escalas', panel: <SchedulesPanel /> },
           { id: 'tipos-atendimento', group: 'Agenda', label: 'Tipos de atendimento', panel: <CareTypesPanel /> },
           { id: 'salas', group: 'Agenda', label: 'Salas e equipamentos', panel: <ResourcesPanel /> },
           { id: 'feriados', group: 'Agenda', label: 'Feriados', panel: <HolidaysPanel /> },
