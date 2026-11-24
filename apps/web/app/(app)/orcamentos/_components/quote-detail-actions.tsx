@@ -15,6 +15,7 @@ export function QuoteDetailActions({ quoteId, status }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [erro, setErro] = useState('');
 
   const isDraft = status === 'DRAFT';
   const isAccepted = status === 'ACCEPTED';
@@ -34,9 +35,16 @@ export function QuoteDetailActions({ quoteId, status }: Props) {
     });
   }
 
+  // Só volta para a lista quando excluiu de verdade; senão mostra o motivo.
   function remove() {
     startTransition(async () => {
-      await deleteQuote(quoteId);
+      setErro('');
+      const r = await deleteQuote(quoteId);
+      if (!r.ok) {
+        setErro(r.message);
+        setConfirmDelete(false);
+        return;
+      }
       router.push('/orcamentos');
     });
   }
@@ -98,6 +106,12 @@ export function QuoteDetailActions({ quoteId, status }: Props) {
         >
           <Trash2 className="h-4 w-4" aria-hidden="true" /> Excluir
         </button>
+      )}
+
+      {erro && (
+        <p role="alert" className="w-full text-right text-sm text-destructive">
+          Não foi possível excluir: {erro}
+        </p>
       )}
     </div>
   );

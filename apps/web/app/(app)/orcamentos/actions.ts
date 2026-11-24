@@ -781,24 +781,32 @@ export async function reopenQuote(id: string): Promise<{ ok: boolean }> {
   return { ok: true };
 }
 
-export async function deleteQuote(id: string) {
+/**
+ * Exclui o orçamento. Quando não pode (só leitura, perfil sem financeiro,
+ * pagamento recebido no financeiro completo), devolve o motivo para a tela
+ * mostrar, em vez de voltar para a lista como se tivesse excluído.
+ */
+export async function deleteQuote(id: string): Promise<{ ok: true } | { ok: false; message: string }> {
   const { tenantId, userId } = await requireTenant();
 
   const bloqueio = await writeBlocked(tenantId);
-  if (bloqueio) return;
+  if (bloqueio) return { ok: false, message: bloqueio };
 
   const semAcesso = await capabilityBlocked(tenantId, 'financeiro');
-  if (semAcesso) return;
+  if (semAcesso) return { ok: false, message: semAcesso };
   const quote = await prisma.quote.findFirst({
     where: { id, tenantId },
     select: { patientId: true },
   });
-  if (!quote) return;
+  if (!quote) return { ok: false, message: 'Orçamento não encontrado. Atualize a página.' };
 
   // Financeiro completo: orçamento com pagamento não se exclui (estorna primeiro);
   // sem pagamento, os títulos em aberto são cancelados junto.
   const fin = await bridge(tenantId);
-  if (fin && (await bridgeQuoteDeleting(fin, id))) return;
+  if (fin) {
+    const recusa = await bridgeQuoteDeleting(fin, id);
+    if (recusa) return { ok: false, message: recusa };
+  }
 
   // Payments reference the quote with SetNull, so a bare delete would leave them
   // orphaned and still counted in the financial totals. Remove them together.
@@ -815,6 +823,7 @@ export async function deleteQuote(id: string) {
   revalidatePath('/financeiro');
   revalidatePath('/dashboard');
   revalidatePath(`/pacientes/${quote.patientId}`);
+  return { ok: true };
 }
 
 // ─── Documentos (PDF) ──────────────────────────────────────────────────────────
