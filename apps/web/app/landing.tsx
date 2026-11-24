@@ -18,8 +18,9 @@
 import Link from 'next/link';
 import { Outfit } from 'next/font/google';
 import {
-  Accessibility, ArrowRight, BadgeCheck, Bot, CalendarCheck, Check, ClipboardCheck, Database, Heart, Inbox,
-  KanbanSquare, ListChecks, Lock, Megaphone, MessageCircle, Plus, RefreshCcw, ShieldCheck, Trophy,
+  Accessibility, ArrowRight, BadgeCheck, BellRing, Bot, CalendarCheck, CalendarClock, Check, ClipboardCheck, Database,
+  FileSignature, FileSpreadsheet, Heart, History, Hourglass, Inbox, KanbanSquare, Landmark, ListChecks, Lock, Megaphone,
+  MessageCircle, Percent, PhoneCall, Plus, RefreshCcw, ShieldCheck, Sparkles, Target, TrendingUp, Trophy, Wallet,
 } from 'lucide-react';
 import { Logo } from '@/components/logo';
 import { COMPANY, salesWhatsAppUrl } from '@/lib/company';
@@ -155,6 +156,7 @@ function Header() {
         <a href="#como-funciona">Como funciona</a>
         <a href="#produtos">Produtos</a>
         <a href="#recursos">Recursos</a>
+        <a href="#anuncios">Anúncios</a>
         <a href="#planos">Preços</a>
         <a href="#perguntas">Perguntas</a>
       </nav>
@@ -241,6 +243,7 @@ function Hero() {
 
 const CONFIANCA = [
   { icon: BadgeCheck, label: 'API oficial do WhatsApp (Meta)' },
+  { icon: Sparkles, label: 'Provedor de tecnologia aprovado pela Meta' },
   { icon: ShieldCheck, label: 'LGPD por padrão' },
   { icon: Lock, label: 'CPF e telefone criptografados' },
   { icon: Database, label: 'Dados separados por clínica' },
@@ -389,7 +392,7 @@ function Products({ plans }: { plans: PublicPlan[] }) {
         <article className="vt v1">
           <h3><a href="#planos-agenda">Agenda</a></h3>
           <p>A rotina da clínica.</p>
-          <Lista itens={['Agenda e agendamento online', 'Prontuário e odontograma', 'Orçamentos e financeiro', 'Lembretes no WhatsApp oficial']} />
+          <Lista itens={['Agenda, escalas e lista de espera', 'Prontuário e odontograma', 'Orçamentos e financeiro completo', 'Lembretes no WhatsApp oficial']} />
           <Preco produto="AGENDA" />
         </article>
         <article className="vt v2">
@@ -401,7 +404,7 @@ function Products({ plans }: { plans: PublicPlan[] }) {
         <article className="vt v3">
           <h3><a href="#planos-crm">CRM</a></h3>
           <p>A captação de pacientes.</p>
-          <Lista itens={['Funis em quadro', 'WhatsApp oficial da equipe', 'Robô e transmissões', 'Tarefas e painel de vendas']} />
+          <Lista itens={['Funis em quadro', 'WhatsApp oficial da equipe', 'Robô e transmissões', 'Anúncios: custo por paciente']} />
           <Preco produto="CRM" />
         </article>
       </div>
@@ -514,8 +517,123 @@ function Features() {
             </div>
           </article>
         </div>
+        <MaisRecursos />
         <p className="ilustra">As telas desta página são ilustrações, com nomes e valores fictícios.</p>
       </div>
+    </section>
+  );
+}
+
+const MAIS: { grupo: string; itens: { icon: typeof Check; t: string; d: string }[] }[] = [
+  {
+    grupo: 'Na agenda',
+    itens: [
+      { icon: PhoneCall, t: 'Confirmações', d: 'Quem ainda não confirmou amanhã, e se o lembrete foi entregue, lido ou respondido.' },
+      { icon: Hourglass, t: 'Lista de espera', d: 'Alguém desmarcou? A agenda mostra quem da lista combina com o horário vago.' },
+      { icon: CalendarClock, t: 'Escalas e folgas', d: 'Quem atende em cada dia, a cada 15 dias ou só às quintas, com folgas e plantões.' },
+      { icon: FileSpreadsheet, t: 'Relatórios da agenda', d: 'Faltas, ocupação, quem marcou, pacientes sumidos e mais, em Excel.' },
+      { icon: History, t: 'Histórico de cada horário', d: 'Quem marcou, remarcou ou cancelou, quando e por quê.' },
+      { icon: FileSignature, t: 'Documentos e assinatura', d: 'Atestados, receitas e termos com os dados do paciente, assinados pelo celular.' },
+    ],
+  },
+  {
+    grupo: 'No financeiro',
+    itens: [
+      { icon: Wallet, t: 'Caixa da recepção', d: 'Abertura com troco, sangria e fechamento com contagem às cegas.' },
+      { icon: TrendingUp, t: 'Fluxo de caixa e DRE', d: 'O que entrou, o que vai entrar e o resultado do mês, por competência.' },
+      { icon: Landmark, t: 'Conciliação bancária', d: 'Importe o extrato do banco e o sistema casa os lançamentos sozinho.' },
+      { icon: Percent, t: 'Comissões', d: 'Por atendimento ou por recebimento, com aprovação antes de pagar.' },
+      { icon: BellRing, t: 'Cobrança no WhatsApp', d: 'Lembrete antes do vencimento e aviso de atraso, no número oficial da clínica.' },
+      { icon: Target, t: 'Carteira e renegociação', d: 'Crédito do paciente e dívida antiga parcelada de novo, sem planilha.' },
+    ],
+  },
+];
+
+function MaisRecursos() {
+  return (
+    <div className="more">
+      <h3 className="more-h" data-r>E tem mais.</h3>
+      <div className="more-cols">
+        {MAIS.map(({ grupo, itens }) => (
+          <section key={grupo} aria-label={grupo}>
+            <p className="more-g">{grupo}</p>
+            <ul>
+              {itens.map(({ icon: Icon, t, d }, i) => (
+                <li key={t} data-r style={{ '--i': i % 3 } as React.CSSProperties}>
+                  <span className="more-ic"><Icon className="ic" aria-hidden="true" /></span>
+                  <div><b>{t}</b><span>{d}</span></div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Anúncios da Meta ────────────────────────────────────────────────────────
+
+const ANUNCIOS = [
+  { icon: Megaphone, t: 'Instagram e Facebook num clique', d: 'Conecte a conta de anúncios da Meta e as campanhas aparecem no CRM, sem planilha.' },
+  { icon: Target, t: 'Custo por paciente, não por clique', d: 'Quanto custou cada conversa, cada agendamento e cada paciente que fechou.' },
+  { icon: TrendingUp, t: 'Cada campanha até o dinheiro', d: 'Conversas, agendaram, compareceram, fecharam e faturou: você vê qual anúncio dá retorno.' },
+  { icon: Sparkles, t: 'A Meta aprende com quem fechou', d: 'Quando o lead agenda ou fecha, o DreamClin avisa a Meta, e os anúncios passam a buscar gente parecida.' },
+];
+
+const CAMPANHAS: [nome: string, gasto: string, conversas: number, agendaram: number, fecharam: number, retorno: string][] = [
+  ['Implante | Reels', 'R$ 1.840', 96, 31, 9, '8,4x'],
+  ['Clareamento | Stories', 'R$ 920', 71, 22, 7, '5,1x'],
+  ['Avaliação grátis', 'R$ 610', 58, 12, 2, '1,9x'],
+];
+
+function Anuncios() {
+  return (
+    <section className="night inner ads-grid" id="anuncios" aria-labelledby="anuncios-titulo">
+      <div className="ads-head wide">
+        <span className="soon" data-r>Em breve: aguardando a liberação da Meta</span>
+        <h2 id="anuncios-titulo" data-r>Quanto custou cada paciente que veio do anúncio.</h2>
+        <p className="lede" data-r style={{ '--i': 1 } as React.CSSProperties}>
+          O gasto da Meta ao lado do que aconteceu na clínica. Pare de pagar por clique que não vira consulta.
+        </p>
+      </div>
+      <div className="board-wrap ads-board" data-r aria-hidden="true">
+        <i className="board-glow" />
+        <div className="app">
+          <div className="chrome"><Logo size="sm" tone="white" /> Anúncios · últimos 30 dias</div>
+          <div className="ads-kpis">
+            <div><span>Investido</span><b className="num">R$ 3.370</b></div>
+            <div><span>Custo por agendamento</span><b className="num">R$ 52</b></div>
+            <div><span>Custo por paciente</span><b className="num">R$ 187</b></div>
+            <div className="hl"><span>Retorno</span><b className="num">6,2x</b></div>
+          </div>
+          <table className="ads-tb">
+            <thead>
+              <tr><th>Campanha</th><th>Gasto</th><th>Conversas</th><th>Agendaram</th><th>Fecharam</th><th>Retorno</th></tr>
+            </thead>
+            <tbody>
+              {CAMPANHAS.map(([nome, gasto, c, a, f, r]) => (
+                <tr key={nome}>
+                  <td>{nome}</td>
+                  <td className="num">{gasto}</td>
+                  <td className="num">{c}</td>
+                  <td className="num">{a}</td>
+                  <td className="num">{f}</td>
+                  <td className="num"><b>{r}</b></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <ul className="feats">
+        {ANUNCIOS.map(({ icon: Icon, t, d }, i) => (
+          <li key={t} data-r style={{ '--i': i } as React.CSSProperties}>
+            <span className="dot"><Icon className="ic" aria-hidden="true" /></span>
+            <div><b>{t}</b><span>{d}</span></div>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
@@ -675,6 +793,14 @@ export const FAQS = [
   {
     q: 'O WhatsApp é oficial mesmo? Quanto custa?',
     a: 'É a API oficial do WhatsApp, da Meta, no número da sua clínica, sem QR code nem celular ligado. As conversas são cobradas pela Meta direto da clínica, conforme a tabela dela; responder quem escreveu nas últimas 24 horas não tem custo.',
+  },
+  {
+    q: 'Dá para saber quanto custou cada paciente que veio do Instagram?',
+    a: 'Vai dar. O DreamClin conecta a conta de anúncios da Meta e mostra, por campanha, o gasto, as conversas, quem agendou, quem compareceu e quem fechou, com o custo de cada etapa e o retorno. Estamos aguardando a liberação final da Meta para abrir a conexão para todas as clínicas e avisamos assim que estiver no ar.',
+  },
+  {
+    q: 'O financeiro tem caixa, DRE e conciliação do banco?',
+    a: 'Tem. Caixa da recepção com fechamento às cegas, contas a pagar e a receber, fluxo de caixa, DRE por competência, conciliação com o extrato do banco, comissões e cobrança automática no WhatsApp. Tudo baixa em planilha.',
   },
   {
     q: 'Meus dados e os dos pacientes estão seguros?',
@@ -847,6 +973,7 @@ export function LandingView({ plans, whatsapp }: { plans: PublicPlan[]; whatsapp
         <Products plans={plans} />
         <Features />
         <Crm />
+        <Anuncios />
         <WhatsAppOficial />
         <Pricing plans={plans} />
         <FAQ />
