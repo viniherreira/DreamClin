@@ -34,6 +34,7 @@ import { agendaFinance, AgendaAbort } from '@/fin/agenda-bridge';
 import { timelineAppointment } from '@/lib/timeline-hooks';
 import { appointmentSnapshot, auditAppointment, auditAppointmentDeleted, loadAppointmentAudit } from '@/lib/appointment-audit-server';
 import { pacienteAgendaEnabled } from '@/lib/feature-flags';
+import { appointmentBadges, type Badge } from '@/lib/agenda-view';
 import { displayName } from '@/lib/patient-name';
 import { highlightedAnswers, priorityLabel, readCustomAnswers } from '@/lib/patient-fields';
 import { cancelError, cancelReasonText, DEFAULT_CANCEL_REASONS, directStatusChange, isReschedule, statusLabel } from '@/lib/appointment-status';
@@ -92,7 +93,7 @@ export async function getAgendaData(dateStr: string, view: 'day' | 'week' | 'mon
     db.appointment.findMany({
       where: { startTime: { gte: from, lte: to }, ...unitAppointmentWhere(unit.id, units.main.id) },
       include: {
-        patient: { select: { id: true, name: true, socialName: true } },
+        patient: { select: { id: true, name: true, socialName: true, birthDate: true } },
         professional: { select: { id: true, name: true, specialty: true } },
         procedure: { select: { id: true, name: true, durationMinutes: true } },
         label: { select: { id: true, name: true, color: true } },
@@ -177,8 +178,21 @@ export async function getAgendaData(dateStr: string, view: 'day' | 'week' | 'mon
   // Paciente e agenda novos: o nome social é o nome da agenda.
   const nomeSocial = await pacienteAgendaEnabled(tenantId);
   const agendaNova = await agendaNewOptions(tenantId, from.toISOString().slice(0, 10), to.toISOString().slice(0, 10));
+  // Agenda nova: os selos do card (1ª vez, aniversário, confirmou pelo WhatsApp ou link).
+  let selos: Record<string, Badge[]> = {};
+  if (agendaNova && appointments.length) {
+    const jaVieram = await db.appointment.findMany({
+      where: { patientId: { in: [...new Set(appointments.map((a) => a.patientId))] }, status: 'ATTENDED', startTime: { lt: from } },
+      select: { patientId: true },
+      distinct: ['patientId'],
+    });
+    selos = appointmentBadges(
+      appointments.map((a) => ({ id: a.id, patientId: a.patientId, startTime: a.startTime, status: a.status, confirmationSource: a.confirmationSource, birthDate: a.patient.birthDate })),
+      new Set(jaVieram.map((x) => x.patientId)),
+    );
+  }
   return {
-    appointments: appointments.map(({ patient, ...a }) => ({ ...a, patient: { id: patient.id, name: nomeSocial ? displayName(patient) : patient.name } })),
+    appointments: appointments.map(({ patient, ...a }) => ({ ...a, badges: selos[a.id] ?? [], patient: { id: patient.id, name: nomeSocial ? displayName(patient) : patient.name } })),
     agendaNova,
     blockedSlots,
     finance,
