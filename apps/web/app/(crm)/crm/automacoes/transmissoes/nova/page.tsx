@@ -28,7 +28,7 @@ export default async function NovaTransmissaoPage({
     ctx.db.messageTemplate.findMany({
       where: { status: 'APPROVED', category: { in: ['MARKETING', 'UTILITY'] }, purpose: null },
       orderBy: { name: 'asc' },
-      select: { id: true, name: true, body: true, variables: true },
+      select: { id: true, name: true, body: true, variables: true, category: true },
     }),
     tagCounts(ctx),
     originFilterOptions(ctx.db),

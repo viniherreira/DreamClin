@@ -9,12 +9,13 @@ import type { OriginOptions } from '@/crm/types';
 import { EMPTY_AUDIENCE, type Audience, type AudienceStatus, type AudienceTask } from '@/crm/audience';
 import { FIELD_LABEL, matchingPreset, rangeText, resolvePeriod, type Period } from '@/crm/period';
 import { PeriodPicker } from '@/components/crm-period-picker';
+import { CATEGORY_LABEL, estimateCost, formatReais, type CostCategory } from '@/crm/message-cost';
 import { createBroadcastAction, previewAudienceAction, type AudienceSample } from '../actions';
 
 type Option = { id: string; name: string };
 type PipelineOption = { id: string; name: string; stages: Option[] };
 type TagOption = { id: string; name: string; color: string; count: number };
-type Template = { id: string; name: string; body: string; variables: number };
+type Template = { id: string; name: string; body: string; variables: number; category: string };
 
 const SOURCES = ['WHATSAPP', 'INDICACAO', 'INSTAGRAM', 'FACEBOOK', 'SITE', 'MANUAL', 'OUTRO'] as const;
 const SITUACOES: { v: AudienceStatus; label: string }[] = [
@@ -170,6 +171,7 @@ export function BroadcastForm({
       ? t?.body.replace(/\{\{\s*(\d+)\s*\}\}/g, (_, n) => (params[Number(n) - 1] || `{{${n}}}`).replace(/\{nome\}/gi, 'Ana')) ?? ''
       : texto.replace(/\{nome\}/gi, 'Ana');
   const n = preview?.reachable ?? 0;
+  const custo = channel === 'cloud' && t && preview ? estimateCost(t.category, n) : null;
 
   // O que está filtrando, em palavras, para o resumo ao lado.
   const nomesDe = (ids: string[], opts: Option[]) => ids.map((x) => opts.find((o) => o.id === x)?.name).filter(Boolean).join(', ');
@@ -478,7 +480,10 @@ export function BroadcastForm({
                 >
                   <option value="">Escolha…</option>
                   {templates.map((x) => (
-                    <option key={x.id} value={x.id}>{x.name}</option>
+                    <option key={x.id} value={x.id}>
+                      {x.name}
+                      {CATEGORY_LABEL[x.category as CostCategory] ? ` (${CATEGORY_LABEL[x.category as CostCategory]})` : ''}
+                    </option>
                   ))}
                 </select>
                 {t &&
@@ -555,6 +560,17 @@ export function BroadcastForm({
           </p>
           {preview && preview.optedOut > 0 && (
             <p className="mt-1 text-xs text-muted-foreground">{preview.optedOut} do filtro pediram para não receber mensagens e ficam de fora.</p>
+          )}
+          {custo !== null && t && (
+            <div className="mt-3 border-t border-border pt-3 text-sm">
+              <p>
+                Custo estimado: <strong className="tabular-nums">cerca de {formatReais(custo)}</strong>
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Modelo de {CATEGORY_LABEL[t.category as CostCategory]}. A Meta cobra no cartão da conta do WhatsApp da clínica, só pelo
+                que for entregue. O valor exato aparece no Gerenciador do WhatsApp.
+              </p>
+            </div>
           )}
 
           <dl className="mt-3 space-y-1 border-t border-border pt-3 text-xs">
