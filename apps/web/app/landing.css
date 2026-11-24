@@ -2415,3 +2415,187 @@
 .lp .cmp .ic {
   display: block;
 }
+
+/* ─── E tem mais (dentro de Recursos) ─────────────────────────────────────── */
+.lp .more {
+  margin-top: clamp(40px, 5vw, 72px);
+}
+.lp .more-h {
+  font: 600 clamp(26px, 2.4vw, 34px) / 1.1 var(--display);
+  letter-spacing: -0.018em;
+  color: var(--heading);
+}
+.lp .more-cols {
+  margin-top: var(--space-lg);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(20px, 3vw, 40px);
+}
+.lp .more-g {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+  margin-bottom: var(--space-md);
+}
+.lp .more ul {
+  display: grid;
+  gap: 12px;
+}
+.lp .more li {
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  gap: 12px;
+  align-items: start;
+  padding: 14px 16px;
+  border-radius: var(--r-component);
+  background: var(--surface1);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.lp .more-ic {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: var(--accent-subtle);
+  color: var(--accent-ink);
+  font-size: 19px;
+}
+.lp .more b {
+  display: block;
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--text1);
+}
+.lp .more li span:not(.more-ic) {
+  display: block;
+  margin-top: 2px;
+  font-size: 14.5px;
+  line-height: 1.42;
+  color: var(--text2);
+}
+
+/* ─── Anúncios da Meta ────────────────────────────────────────────────────── */
+.lp .ads-grid {
+  padding-bottom: clamp(120px, 14vw, 216px);
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+  gap: clamp(28px, 4vw, 64px);
+  align-items: center;
+}
+.lp .ads-head {
+  max-width: 54rem;
+}
+.lp .ads-head .lede {
+  margin-top: var(--space-md);
+}
+.lp .soon {
+  display: inline-block;
+  margin-bottom: var(--space-md);
+  padding: 6px 14px;
+  border-radius: var(--r-pill);
+  background: var(--glass-2);
+  box-shadow: inset 0 0 0 1px var(--glass-line);
+  color: var(--mint);
+  font-size: 14px;
+  font-weight: 600;
+}
+.lp .ads-board {
+  margin-right: 0;
+  margin-left: 0;
+}
+.lp .ads-board .app {
+  transform: rotateY(9deg) rotateX(4deg) rotateZ(-0.5deg);
+  transform-origin: right center;
+}
+.lp .ads-board:hover .app {
+  transform: rotateY(4deg) rotateX(2deg);
+}
+.lp .ads-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 9px;
+  padding: 14px 14px 0;
+  background: #f1f1eb;
+}
+.lp .ads-kpis div {
+  background: var(--white);
+  border-radius: 11px;
+  padding: 10px 12px;
+  box-shadow: 0 2px 8px -4px rgba(16, 32, 58, 0.3);
+}
+.lp .ads-kpis span {
+  display: block;
+  font-size: 12px;
+  color: #55606f;
+}
+.lp .ads-kpis b {
+  display: block;
+  margin-top: 2px;
+  font: 600 20px/1.1 var(--display);
+  color: var(--navy);
+}
+.lp .ads-kpis .hl {
+  background: var(--mint-100);
+}
+.lp .ads-kpis .hl b {
+  color: var(--teal-800);
+}
+.lp .ads-tb {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: #f1f1eb;
+  padding: 14px;
+}
+.lp .ads-tb th {
+  text-align: left;
+  font-weight: 600;
+  font-size: 12px;
+  color: #55606f;
+  padding: 6px 8px;
+}
+.lp .ads-tb td {
+  background: var(--white);
+  padding: 9px 8px;
+  font-size: 13px;
+  border-top: 1px solid #e7e7df;
+  white-space: nowrap;
+}
+.lp .ads-tb td.num,
+.lp .ads-tb th:not(:first-child) {
+  text-align: right;
+}
+.lp .ads-tb tr td:first-child {
+  font-weight: 600;
+  color: var(--navy);
+}
+.lp .ads-tb td b {
+  color: var(--teal-800);
+}
+@media (max-width: 1180px) {
+  .lp .ads-grid,
+  .lp .more-cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .lp .ads-board {
+    margin-left: 0;
+  }
+}
+@media (max-width: 640px) {
+  .lp .ads-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .lp .ads-board .app {
+    transform: none;
+    overflow-x: auto;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp .ads-board .app,
+  .lp .ads-board:hover .app {
+    transform: none;
+  }
+}
