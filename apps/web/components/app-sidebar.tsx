@@ -67,6 +67,7 @@ export const PATIENT_AGENDA_NAV: Record<string, NavItem[]> = {
     { href: '/agenda/confirmacoes', label: 'Confirmações', icon: CalendarCheck, capability: 'agenda', group: 'Atendimento' },
     { href: '/agenda/lista-de-espera', label: 'Lista de espera', icon: Hourglass, capability: 'agenda', group: 'Atendimento' },
     { href: '/agenda/meu-dia', label: 'Meu dia', icon: Sun, capability: 'agenda', group: 'Atendimento' },
+    { href: '/relatorios/agenda', label: 'Relatórios da agenda', icon: BarChart3, capability: 'agenda_config', group: 'Atendimento' },
   ],
   '/pacientes': [{ href: '/pacientes/aniversariantes', label: 'Aniversariantes', icon: Cake, capability: 'pacientes', group: 'Atendimento' }],
 };
