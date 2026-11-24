@@ -1,7 +1,8 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Check, CheckCheck, X, Ban, Clock, RotateCw, Armchair, Stethoscope, DollarSign } from 'lucide-react';
+import { Check, CheckCheck, X, Ban, Clock, RotateCw, Armchair, Stethoscope, DollarSign, Cake, Smartphone } from 'lucide-react';
+import { BADGE_LABEL, type Badge } from '@/lib/agenda-view';
 import { BILLING_LABEL, BILLING_TONE, type BillingStatus } from '@/lib/financeiro/billing';
 import { wallClockTime, wallClockMinutes } from '@/lib/tz';
 import { stageOf, STAGE_LABELS } from '@/lib/appointment-flow';
@@ -21,6 +22,8 @@ interface Appointment {
   arrivedAt?: Date | string | null;
   startedAt?: Date | string | null;
   label?: { id: string; name: string; color: string } | null;
+  /** Agenda nova: 1ª vez, aniversário, confirmou pelo WhatsApp ou link. */
+  badges?: string[];
 }
 
 interface AppointmentBlockProps {
@@ -67,6 +70,7 @@ export function AppointmentBlock({ appointment, onClick, billing }: AppointmentB
   const timeLabel = wallClockTime(start);
   const isCancelled = appointment.status === 'CANCELLED';
   const compact = heightPx < 34;
+  const selos = (appointment.badges ?? []) as Badge[];
 
   return (
     <button
@@ -85,7 +89,7 @@ export function AppointmentBlock({ appointment, onClick, billing }: AppointmentB
         borderLeftWidth: 3,
         borderLeftColor: appointment.professionalColor ?? '#94a3b8',
       }}
-      aria-label={`${timeLabel} ${appointment.patient.name}, ${appointment.professional.name}, ${statusLabel}${label ? `, rótulo ${label.name}` : ''}${billing ? `, financeiro: ${BILLING_LABEL[billing]}` : ''}`}
+      aria-label={`${timeLabel} ${appointment.patient.name}, ${appointment.professional.name}, ${statusLabel}${label ? `, rótulo ${label.name}` : ''}${billing ? `, financeiro: ${BILLING_LABEL[billing]}` : ''}${selos.length ? `, ${selos.map((b) => BADGE_LABEL[b]).join(', ')}` : ''}`}
     >
       <div className="flex min-w-0 items-center gap-1">
         <Icon className={`h-3.5 w-3.5 shrink-0 ${style.icon}`} aria-hidden="true" />
@@ -93,6 +97,13 @@ export function AppointmentBlock({ appointment, onClick, billing }: AppointmentB
         <span className={`truncate text-xs font-semibold leading-tight ${isCancelled ? 'line-through' : ''}`}>
           {appointment.patient.name}
         </span>
+        {selos.includes('primeira') && (
+          <span className="shrink-0 rounded bg-white/70 px-1 text-[10px] font-bold leading-4 text-foreground dark:bg-black/30" aria-hidden="true">
+            1ª
+          </span>
+        )}
+        {selos.includes('aniversario') && <Cake className="h-3.5 w-3.5 shrink-0 text-pink-600 dark:text-pink-400" aria-hidden="true" />}
+        {selos.includes('paciente') && <Smartphone className="h-3.5 w-3.5 shrink-0 text-emerald-700 dark:text-emerald-400" aria-hidden="true" />}
         {billing && billing !== 'NONE' && (
           <DollarSign className={`h-3.5 w-3.5 shrink-0 ${label ? '' : 'ml-auto'} ${CIFRAO[BILLING_TONE[billing]]}`} aria-hidden="true" />
         )}

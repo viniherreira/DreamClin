@@ -28,6 +28,7 @@ interface Appointment {
   patient: { id: string; name: string };
   professional: { id: string; name: string; specialty?: string | null };
   procedure?: { id: string; name: string; durationMinutes: number } | null;
+  badges?: string[];
 }
 
 interface CalendarGridProps {

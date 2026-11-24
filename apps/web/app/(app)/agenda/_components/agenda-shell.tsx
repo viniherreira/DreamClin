@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format, addDays, addMonths, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Plus, LayoutGrid, Columns2, CalendarDays, Lock, FileBarChart, AlertTriangle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, LayoutGrid, Columns2, CalendarDays, Lock, FileBarChart, AlertTriangle, List, Printer } from 'lucide-react';
 import { MiniCalendar } from './mini-calendar';
 import { ProfessionalFilter } from './professional-filter';
 import { CalendarGrid } from './calendar-grid';
@@ -15,6 +15,11 @@ import { WaitingRoom } from './waiting-room';
 import { MonthGrid } from './month-grid';
 import { BlockSlotModal } from './block-slot-modal';
 import { getAgendaData, deleteBlockedSlot } from '../actions';
+import { agendaMonthMarks } from '../view-actions';
+import { AgendaList } from './agenda-list';
+import { FindInAgenda } from './find-in-agenda';
+import { parsePrefs, PREFS_KEY, type ListSort } from '@/lib/agenda-view';
+import { owesMoney } from '@/lib/financeiro/billing';
 import { GridContext } from './grid-context';
 import { makeGrid } from '@/lib/agenda-rules';
 import { clinicToday, wallClockTime } from '@/lib/tz';
@@ -52,7 +57,9 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
 
   const [currentDate, setCurrentDate] = useState(initialDate);
   const [view, setView] = useState<AgendaView>(initialView);
-  const [mode, setMode] = useState<'grouped' | 'sidebyside'>('sidebyside');
+  const [mode, setMode] = useState<'grouped' | 'sidebyside' | 'list'>('sidebyside');
+  const [sort, setSort] = useState<ListSort>('horario');
+  const novaAgenda = Boolean(initialData.agendaNova);
   const [data, setData] = useState<AgendaData>(initialData);
   // Início, fim e intervalo da grade: Configurações → Agenda → Regras da agenda.
   const grid = useMemo(() => makeGrid(data.rules), [data.rules]);
@@ -87,6 +94,34 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
       return next;
     });
   }, [data.professionals]);
+
+  // Agenda nova: lembra profissionais escondidos, o layout, a ordem da lista e
+  // "só quem falta pagar" neste navegador. Sem acesso ao armazenamento, segue o padrão.
+  const [prefsLidas, setPrefsLidas] = useState(false);
+  useEffect(() => {
+    if (!novaAgenda) return;
+    let p = parsePrefs(null);
+    try {
+      p = parsePrefs(window.localStorage.getItem(PREFS_KEY));
+    } catch {
+      /* navegador sem armazenamento */
+    }
+    if (p.hidden.length) setVisibleProfessionals(new Set(initialData.professionals.map((x) => x.id).filter((id) => !p.hidden.includes(id))));
+    setMode(p.layout);
+    setSort(p.sort);
+    setSoDevendo(p.onlyOwing);
+    setPrefsLidas(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (!novaAgenda || !prefsLidas) return;
+    const hidden = data.professionals.map((p) => p.id).filter((id) => !visibleProfessionals.has(id));
+    try {
+      window.localStorage.setItem(PREFS_KEY, JSON.stringify({ hidden, layout: mode, onlyOwing: soDevendo, sort }));
+    } catch {
+      /* navegador sem armazenamento */
+    }
+  }, [novaAgenda, prefsLidas, visibleProfessionals, mode, soDevendo, sort, data.professionals]);
 
   async function navigate(dateStr: string, nextView?: AgendaView) {
     setLoading(true);
@@ -194,7 +229,17 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
       <div className="flex h-full overflow-hidden bg-background">
         {/* Sidebar — hidden on small screens; header arrows/mini date nav cover mobile */}
         <aside className="hidden w-60 shrink-0 flex-col gap-4 overflow-y-auto border-r border-border bg-surface p-4 lg:flex">
-          <MiniCalendar selectedDate={currentDate} onSelect={(d) => navigate(d)} />
+          <MiniCalendar selectedDate={currentDate} onSelect={(d) => navigate(d)} marksFor={novaAgenda ? agendaMonthMarks : undefined} />
+          {novaAgenda && (
+            <div className="border-t border-border pt-4">
+              <FindInAgenda
+                onPick={async (d, id) => {
+                  await navigate(d, view === 'month' ? 'day' : undefined);
+                  setDetailId(id);
+                }}
+              />
+            </div>
+          )}
           <div className="border-t border-border pt-4">
             <ProfessionalFilter
               professionals={data.professionals}
@@ -270,7 +315,19 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
               <button type="button" onClick={() => setMode('sidebyside')} title="Lado a lado" aria-label="Visualização lado a lado" aria-pressed={mode === 'sidebyside'} className="segmented-item !px-2">
                 <Columns2 className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
+              {novaAgenda && (
+                <button type="button" onClick={() => setMode('list')} title="Lista" aria-label="Visualização em lista" aria-pressed={mode === 'list'} className="segmented-item !px-2">
+                  <List className="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
+              )}
             </div>
+
+            {novaAgenda && (
+              <a href={`/agenda/imprimir?date=${currentDate}&view=${view === 'month' ? 'day' : view}`} target="_blank" rel="noreferrer" className="btn-ghost btn-sm !h-9 sm:px-3" aria-label="Imprimir a agenda" title="Imprimir a agenda">
+                <Printer className="h-4 w-4" aria-hidden="true" />
+                <span className="hidden 2xl:inline">Imprimir</span>
+              </a>
+            )}
 
             <Link
               href={`/financeiro?type=agendamentos&from=${currentDate}&to=${currentDate}#detalhe`}
@@ -337,7 +394,15 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
           {/* Grid / empty state. `isolate`: as camadas da grade (cabeçalhos fixos) ficam
               aqui dentro e não passam por cima do menu da unidade no topo. */}
           <div className="isolate flex-1 overflow-auto overscroll-contain bg-surface">
-            {hasProfessionals && view === 'month' ? (
+            {hasProfessionals && mode === 'list' ? (
+              <AgendaList
+                appointments={data.appointments.filter((a) => visibleProfessionals.has(a.professionalId) && (!soDevendo || owesMoney(data.finance?.billing?.[a.id])))}
+                sort={sort}
+                onSort={setSort}
+                onOpen={setDetailId}
+                showDate={view !== 'day'}
+              />
+            ) : hasProfessionals && view === 'month' ? (
               <MonthGrid
                 dateStr={currentDate}
                 appointments={data.appointments}
@@ -368,7 +433,7 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
                   blockedSlots={data.blockedSlots}
                   workingHours={data.workingHours}
                   visibleProfessionals={visibleProfessionals}
-                  mode={mode}
+                  mode={mode === 'list' ? 'sidebyside' : mode}
                   onAppointmentClick={(id) => setDetailId(id)}
                   onBlockedSlotClick={(id) => setRemovingBlockId(id)}
                   onSlotClick={(professionalId, slotDate, timeStr) => openNewModal(professionalId, timeStr, slotDate)}

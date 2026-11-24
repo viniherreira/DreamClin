@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   addDays, addMonths, subMonths, isSameMonth, isSameDay,
@@ -13,12 +13,27 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 interface MiniCalendarProps {
   selectedDate: string;
   onSelect: (dateStr: string) => void;
+  /** Agenda nova: os dias com agendamento ganham um ponto (busca o mês mostrado). */
+  marksFor?: (month: string) => Promise<Record<string, number>>;
 }
 
-export function MiniCalendar({ selectedDate, onSelect }: MiniCalendarProps) {
+export function MiniCalendar({ selectedDate, onSelect, marksFor }: MiniCalendarProps) {
   const selected = parseISO(selectedDate);
   const hoje = clinicToday();
   const [viewMonth, setViewMonth] = useState(() => new Date(selected.getFullYear(), selected.getMonth(), 1));
+
+  const [marks, setMarks] = useState<Record<string, number>>({});
+  const mes = format(viewMonth, 'yyyy-MM');
+  useEffect(() => {
+    if (!marksFor) return;
+    let vivo = true;
+    marksFor(mes)
+      .then((m) => vivo && setMarks(m))
+      .catch(() => undefined);
+    return () => {
+      vivo = false;
+    };
+  }, [mes, marksFor]);
 
   const calStart = startOfWeek(startOfMonth(viewMonth), { weekStartsOn: 1 });
   const calEnd = endOfWeek(endOfMonth(viewMonth), { weekStartsOn: 1 });
@@ -66,17 +81,20 @@ export function MiniCalendar({ selectedDate, onSelect }: MiniCalendarProps) {
               key={dateStr}
               type="button"
               onClick={() => onSelect(dateStr)}
-              aria-label={format(day, 'PPP', { locale: ptBR })}
+              aria-label={`${format(day, 'PPP', { locale: ptBR })}${marks[dateStr] ? `, ${marks[dateStr]} ${marks[dateStr] === 1 ? 'agendamento' : 'agendamentos'}` : ''}`}
               aria-pressed={isSelected}
               className={[
-                'mx-auto flex h-7 w-7 items-center justify-center rounded-full text-xs transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring',
-                !isCurrentMonth && 'text-muted-foreground/40',
+                'relative mx-auto flex h-7 w-7 items-center justify-center rounded-full text-xs transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring',
+                !isCurrentMonth && 'text-muted-foreground',
                 isCurrentMonth && !isSelected && !isTodayDay && 'text-foreground hover:bg-surface-alt',
                 isTodayDay && !isSelected && 'font-semibold text-primary ring-1 ring-primary/50',
                 isSelected && 'bg-primary font-semibold text-primary-foreground',
               ].filter(Boolean).join(' ')}
             >
               {day.getDate()}
+              {isCurrentMonth && marks[dateStr] ? (
+                <span className={`absolute bottom-0.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full ${isSelected ? 'bg-primary-foreground' : 'bg-primary'}`} aria-hidden="true" />
+              ) : null}
             </button>
           );
         })}
