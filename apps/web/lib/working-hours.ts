@@ -1,7 +1,8 @@
 import 'server-only';
 
-import { prisma } from '@clinicaiq/db';
-import type { WeekSchedule } from './schedule';
+import { getTenantClient, prisma } from '@clinicaiq/db';
+import type { DaySchedule, WeekSchedule } from './schedule';
+import { workingDay } from './schedule-rules';
 import { inUnit } from './unit-rules';
 
 // ─── Working hours ─────────────────────────────────────────────────────────────
@@ -80,3 +81,53 @@ export async function buildWorkingHoursMap(
   return map;
 }
 
+
+// ─── Escala por dia (spec 2026-11-18, F7) ─────────────────────────────────────
+
+/**
+ * O horário de cada profissional em cada dia de `from` a `to` (AAAA-MM-DD):
+ * a escala nova (`schedule_rules` e as folgas e plantões) e, para quem ainda
+ * não tem escala nova, o horário semanal de sempre. Com `unit`, só as regras
+ * desta unidade contam.
+ */
+export async function buildWorkingDaysMap(
+  tenantId: string,
+  professionalIds: string[],
+  from: string,
+  to: string,
+  unit?: UnitScope,
+  careTypeId?: string | null,
+): Promise<Record<string, Record<string, DaySchedule | null>>> {
+  if (professionalIds.length === 0) return {};
+  const ini = new Date(`${from}T00:00:00.000Z`);
+  const fim = new Date(`${to}T23:59:59.999Z`);
+  const db = getTenantClient(tenantId);
+  const [semanal, regras, excecoes] = await Promise.all([
+    buildWorkingHoursMap(tenantId, professionalIds, unit),
+    db.scheduleRule.findMany({
+      where: { professionalId: { in: professionalIds }, active: true, startsOn: { lte: fim }, OR: [{ endsOn: null }, { endsOn: { gte: ini } }] },
+    }),
+    db.scheduleException.findMany({ where: { professionalId: { in: professionalIds }, date: { gte: ini, lte: fim } } }),
+  ]);
+  // Quem tem alguma regra ativa (mesmo fora do período) usa só a escala nova.
+  const comEscala = new Set(
+    (await db.scheduleRule.findMany({ where: { professionalId: { in: professionalIds }, active: true }, select: { professionalId: true }, distinct: ['professionalId'] })).map((r) => r.professionalId),
+  );
+  const iso = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
+  const dias: string[] = [];
+  for (let t = ini.getTime(); t <= fim.getTime() && dias.length < 400; t += 86_400_000) dias.push(new Date(t).toISOString().slice(0, 10));
+
+  const out: Record<string, Record<string, DaySchedule | null>> = {};
+  for (const pid of professionalIds) {
+    const minhas = regras
+      .filter((r) => r.professionalId === pid && (!unit || inUnit(r.unitId, unit.unitId, unit.mainId)))
+      .map((r) => ({ ...r, startsOn: iso(r.startsOn)!, endsOn: iso(r.endsOn) }));
+    const folgas = excecoes.filter((e) => e.professionalId === pid).map((e) => ({ ...e, date: iso(e.date)! }));
+    const porDia: Record<string, DaySchedule | null> = {};
+    for (const d of dias) {
+      porDia[d] = workingDay({ rules: comEscala.has(pid) ? minhas : [], exceptions: folgas, fallback: comEscala.has(pid) ? undefined : semanal[pid], date: d, careTypeId });
+    }
+    out[pid] = porDia;
+  }
+  return out;
+}
