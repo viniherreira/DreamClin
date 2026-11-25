@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import Link from 'next/link';
 import * as Dialog from '@radix-ui/react-dialog';
-import { MessageCircle, PanelRight, Search, WifiOff, X } from 'lucide-react';
+import { Loader2, MessageCircle, PanelRight, Search, WifiOff, X } from 'lucide-react';
 import { colorClasses } from '@/crm/colors';
 import type { ConversationSummary, InboxTab } from '@/crm/conversations';
 import { chatListTime, initials } from '@/crm/format';
@@ -13,6 +13,8 @@ import type { QuickReplyOption } from '@/components/crm-chat/chat-composer';
 import { refreshInboxAction, type InboxSnapshot } from '../actions';
 import { ThreadSide, type LeadSideBasics } from './lead-side';
 import { StageChip } from '@/components/crm-stage-chip';
+import { ResizeHandle, usePanelWidth } from '@/components/crm-resize';
+import { INBOX_MAX, INBOX_PAGE } from '@/crm/inbox-limits';
 
 const TABS: { key: InboxTab; label: string }[] = [
   { key: 'all', label: 'Todas' },
@@ -60,31 +62,57 @@ export function Inbox({
   const [selectedId, setSelectedId] = useState(initialSelectedId);
   const [aviso, setAviso] = useState('');
   const [gaveta, setGaveta] = useState(false);
+  // Quantas conversas a lista mostra: cresce quando a pessoa rola até o fim.
+  const [limite, setLimite] = useState(INBOX_PAGE);
+  // Com quantas a lista na tela foi lida.
+  const [lido, setLido] = useState(INBOX_PAGE);
+  const lista = usePanelWidth('conversas-lista', 330, 260, 520);
+  const lado = usePanelWidth('conversas-lead', 350, 290, 560);
   const emVoo = useRef(false);
-  const estado = useRef({ tab, q, selectedId, tagId });
-  estado.current = { tab, q, selectedId, tagId };
+  // Pediram de novo enquanto uma leitura estava no caminho: lê de novo ao terminar.
+  const deNovo = useRef(false);
+  const estado = useRef({ tab, q, selectedId, tagId, limite });
+  estado.current = { tab, q, selectedId, tagId, limite };
   const snapRef = useRef(snap);
   snapRef.current = snap;
 
   const refresh = useCallback(async () => {
-    if (emVoo.current) return;
+    if (emVoo.current) {
+      deNovo.current = true;
+      return;
+    }
     emVoo.current = true;
     try {
       const pedido = { ...estado.current };
-      const r = await refreshInboxAction(pedido);
-      // Se a pessoa trocou de aba ou de conversa no meio, esta resposta já é velha.
+      const r = await refreshInboxAction({ ...pedido, take: pedido.limite });
+      // Se a pessoa trocou de aba, de conversa ou rolou a lista no meio, esta resposta já é velha.
       const agora = estado.current;
-      if (!r.ok || pedido.tab !== agora.tab || pedido.q !== agora.q || pedido.selectedId !== agora.selectedId || pedido.tagId !== agora.tagId) return;
+      if (
+        !r.ok ||
+        pedido.tab !== agora.tab ||
+        pedido.q !== agora.q ||
+        pedido.selectedId !== agora.selectedId ||
+        pedido.tagId !== agora.tagId ||
+        pedido.limite !== agora.limite
+      )
+        return;
       const novas = novasRecebidas(snapRef.current, r.snapshot);
       if (novas) setAviso(novas);
       // O número do menu acompanha sem recarregar a página: um router.refresh()
       // aqui cancelava a navegação em andamento numa clínica movimentada.
       if (r.snapshot.counts.unread !== snapRef.current.counts.unread) announceUnread(r.snapshot.counts.unread);
       setSnap(r.snapshot);
+      setLido(pedido.limite);
     } finally {
       emVoo.current = false;
+      if (deNovo.current) {
+        deNovo.current = false;
+        void refreshRef.current();
+      }
     }
   }, []);
+  const refreshRef = useRef(refresh);
+  refreshRef.current = refresh;
 
   // Filtros e conversa aberta moram na URL (sem recarregar a página).
   useEffect(() => {
@@ -105,7 +133,7 @@ export function Inbox({
       return;
     }
     void refresh();
-  }, [tab, q, selectedId, tagId, refresh]);
+  }, [tab, q, selectedId, tagId, limite, refresh]);
 
   useEffect(() => {
     const t = setInterval(() => {
@@ -121,11 +149,17 @@ export function Inbox({
 
   useEffect(() => {
     if (busca === q) return;
-    const t = setTimeout(() => setQ(busca.trim()), 350);
+    const t = setTimeout(() => {
+      setQ(busca.trim());
+      setLimite(INBOX_PAGE);
+    }, 350);
     return () => clearTimeout(t);
   }, [busca, q]);
 
   const thread = snap.thread && snap.thread.conversation.id === selectedId ? snap.thread : null;
+  // Pediu mais e a leitura maior ainda não chegou: "Carregando". A lista veio cheia: deve haver mais.
+  const carregandoMais = lido < limite;
+  const temMais = carregandoMais || (snap.list.length >= limite && limite < INBOX_MAX);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -141,10 +175,16 @@ export function Inbox({
         </div>
       )}
 
+      {/* A largura da lista e a do lead a pessoa ajusta pelas bordas; a conversa fica com o resto. */}
       <div
-        className={`grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(290px,330px)_1fr] ${thread ? 'xl:grid-cols-[330px_350px_1fr]' : ''}`}
+        style={{ '--lista': `${lista.width}px`, '--lado': `${lado.width}px` } as React.CSSProperties}
+        className={`grid min-h-0 min-w-0 flex-1 grid-cols-1 lg:grid-cols-[var(--lista)_minmax(0,1fr)] ${thread ? 'xl:grid-cols-[var(--lista)_var(--lado)_minmax(0,1fr)]' : ''}`}
       >
-        <aside aria-labelledby={`${id}-titulo`} className={`${selectedId ? 'hidden lg:flex' : 'flex'} min-h-0 flex-col border-r border-border bg-surface`}>
+        <aside
+          aria-labelledby={`${id}-titulo`}
+          className={`${selectedId ? 'hidden lg:flex' : 'flex'} relative min-h-0 min-w-0 flex-col border-r border-border bg-surface`}
+        >
+          <ResizeHandle label="Largura da lista de conversas" panel={lista} />
           <div className="space-y-3 border-b border-border p-4">
             <div className="flex items-baseline justify-between">
               <h1 id={`${id}-titulo`} className="text-base font-semibold uppercase tracking-wide">
@@ -172,7 +212,10 @@ export function Inbox({
                   key={t.key}
                   type="button"
                   aria-pressed={tab === t.key}
-                  onClick={() => setTab(t.key)}
+                  onClick={() => {
+                    setTab(t.key);
+                    setLimite(INBOX_PAGE);
+                  }}
                   className="segmented-item flex-1 whitespace-nowrap px-2"
                 >
                   {t.label}
@@ -187,7 +230,10 @@ export function Inbox({
                 <select
                   id={`${id}-tag`}
                   value={tagId ?? ''}
-                  onChange={(e) => setTagId(e.target.value || null)}
+                  onChange={(e) => {
+                    setTagId(e.target.value || null);
+                    setLimite(INBOX_PAGE);
+                  }}
                   className="h-8 w-full rounded-md border border-border bg-surface-alt px-2 text-xs focus-visible:outline-2 focus-visible:outline-ring"
                 >
                   <option value="">Todas as tags</option>
@@ -201,17 +247,32 @@ export function Inbox({
             )}
           </div>
 
-          <ConversationList items={snap.list} selectedId={selectedId} onSelect={setSelectedId} tab={tab} q={q} filtered={Boolean(tagId)} />
+          <ConversationList
+            items={snap.list}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            tab={tab}
+            q={q}
+            filtered={Boolean(tagId)}
+            hasMore={temMais}
+            loadingMore={carregandoMais}
+            onLoadMore={() => {
+              if (!carregandoMais && snap.list.length >= limite) setLimite(Math.min(INBOX_MAX, limite + INBOX_PAGE));
+            }}
+          />
         </aside>
 
         {/* O lead da conversa no meio, como no Kommo: tags, funil, etapa e campos à mão enquanto se conversa. */}
         {thread && (
-          <div className="hidden min-h-0 overflow-y-auto border-r border-border bg-surface xl:block">
-            <ThreadSide thread={thread} basics={basics} onChanged={() => void refresh()} />
+          <div className="relative hidden min-h-0 min-w-0 border-r border-border bg-surface xl:block">
+            <ResizeHandle label="Largura do painel do lead" panel={lado} />
+            <div className="h-full overflow-y-auto">
+              <ThreadSide thread={thread} basics={basics} onChanged={() => void refresh()} />
+            </div>
           </div>
         )}
 
-        <div className={`${selectedId ? 'flex' : 'hidden lg:flex'} min-h-0 flex-col`}>
+        <div className={`${selectedId ? 'flex' : 'hidden lg:flex'} min-h-0 min-w-0 flex-col`}>
           {thread ? (
             <ConversationPane
               key={thread.conversation.id}
@@ -286,6 +347,9 @@ function ConversationList({
   tab,
   q,
   filtered,
+  hasMore,
+  loadingMore,
+  onLoadMore,
 }: {
   items: ConversationSummary[];
   selectedId: string | null;
@@ -293,7 +357,26 @@ function ConversationList({
   tab: InboxTab;
   q: string;
   filtered: boolean;
+  hasMore: boolean;
+  loadingMore: boolean;
+  onLoadMore: () => void;
 }) {
+  const rolagem = useRef<HTMLUListElement>(null);
+  const fim = useRef<HTMLLIElement>(null);
+  const pedir = useRef(onLoadMore);
+  useEffect(() => {
+    pedir.current = onLoadMore;
+  }, [onLoadMore]);
+  // Chegando perto do fim da lista, pede a próxima leva (como no funil).
+  useEffect(() => {
+    if (!hasMore || loadingMore || !fim.current) return;
+    const obs = new IntersectionObserver((e) => {
+      if (e.some((x) => x.isIntersecting)) pedir.current();
+    }, { root: rolagem.current, rootMargin: '0px 0px 300px 0px' });
+    obs.observe(fim.current);
+    return () => obs.disconnect();
+  }, [hasMore, loadingMore, items.length]);
+
   if (items.length === 0) {
     return (
       <p className="p-6 text-center text-sm text-muted-foreground">
@@ -310,7 +393,7 @@ function ConversationList({
     );
   }
   return (
-    <ul className="min-h-0 flex-1 overflow-y-auto" aria-label="Lista de conversas">
+    <ul ref={rolagem} className="min-h-0 flex-1 overflow-y-auto" aria-label="Lista de conversas">
       {items.map((c) => {
         const ativa = c.id === selectedId;
         const lida = c.unread === 0;
@@ -386,6 +469,19 @@ function ConversationList({
           </li>
         );
       })}
+      {hasMore && (
+        <li ref={fim} className="flex justify-center py-3">
+          <button
+            type="button"
+            onClick={onLoadMore}
+            disabled={loadingMore}
+            className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-surface-alt hover:text-primary focus-visible:outline-2 focus-visible:outline-ring disabled:cursor-default"
+          >
+            {loadingMore && <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />}
+            {loadingMore ? 'Carregando…' : 'Carregar mais conversas'}
+          </button>
+        </li>
+      )}
     </ul>
   );
 }

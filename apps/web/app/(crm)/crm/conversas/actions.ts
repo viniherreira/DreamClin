@@ -13,6 +13,7 @@ import {
   inboxCounts,
   linkConversation,
   listConversations,
+  loadOlderMessages,
   loadThread,
   markRead,
   notALead,
@@ -23,6 +24,7 @@ import {
   type InboxTab,
 } from '@/crm/conversations';
 import { OPEN_LEAD } from '@/crm/leads';
+import { INBOX_MAX, INBOX_PAGE } from '@/crm/inbox-limits';
 import { readCrmPrefs } from '@/crm/crm-prefs';
 import { prisma } from '@clinicaiq/db';
 import { assignConversation } from '@/crm/assignment';
@@ -53,6 +55,8 @@ async function assinatura(g: { tenantId: string; userId: string }): Promise<stri
   return eu?.name.trim().split(/\s+/)[0] || null;
 }
 
+const inboxTake = (n: unknown) => (typeof n === 'number' && Number.isFinite(n) ? Math.min(INBOX_MAX, Math.max(INBOX_PAGE, Math.floor(n))) : INBOX_PAGE);
+
 const asTab = (t: string): InboxTab => ((INBOX_TABS as readonly string[]).includes(t) ? (t as InboxTab) : 'all');
 
 /**
@@ -64,13 +68,15 @@ export async function refreshInboxAction(input: {
   q: string;
   selectedId: string | null;
   tagId?: string | null;
+  /** Quantas conversas a lista já mostra (cresce conforme a pessoa rola). */
+  take?: number;
 }): Promise<Result<{ snapshot: InboxSnapshot }>> {
   const g = await guardCrmAction('crm', { write: false });
   if (!g.ok) return g;
   // A tela de Conversas aberta também dá o compasso do relógio do CRM.
   nudgeTick();
   const [list, counts, thread] = await Promise.all([
-    listConversations(g.db, g, asTab(input.tab), input.q, 60, input.tagId || null),
+    listConversations(g.db, g, asTab(input.tab), input.q, inboxTake(input.take), input.tagId || null),
     inboxCounts(g.db, g),
     input.selectedId ? loadThread(g.db, g.tenantId, input.selectedId, g, g.agenda) : Promise.resolve(null),
   ]);
@@ -100,6 +106,17 @@ export async function loadThreadAction(conversationId: string): Promise<Result<{
     thread.conversation.unread = 0;
   }
   return { ok: true, thread };
+}
+
+/** As mensagens de antes da primeira que a tela mostra (rolando a conversa para cima). */
+export async function olderMessagesAction(
+  conversationId: string,
+  beforeId: string,
+): Promise<Result<{ messages: ChatThread['messages']; hasMore: boolean }>> {
+  if (typeof conversationId !== 'string' || typeof beforeId !== 'string' || !beforeId) return { ok: false, message: 'Conversa inválida.' };
+  const g = await guardConversation('crm', conversationId, { write: false });
+  if (!g.ok) return g;
+  return { ok: true, ...(await loadOlderMessages(g.db, g.tenantId, conversationId, beforeId)) };
 }
 
 /** Sem a API oficial, em produção, não há por onde a mensagem sair. */

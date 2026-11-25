@@ -1,6 +1,7 @@
 import { requireCrm } from '@/crm/guard';
 import { INBOX_TABS, classifyPending, inboxCounts, listConversations, loadThread, markRead, type InboxTab } from '@/crm/conversations';
 import { activeCloudAccount } from '@/crm/cloud';
+import { INBOX_PAGE } from '@/crm/inbox-limits';
 import { loadCrmBasics } from '@/crm/page-data';
 import { can } from '@/lib/permissions';
 import { getTenantModules } from '@/lib/access';
@@ -30,7 +31,7 @@ export default async function ConversasPage({
   await classifyPending(ctx.db, ctx.tenantId);
 
   const [list, counts, thread, quickReplies, cloud, basics] = await Promise.all([
-    listConversations(ctx.db, ctx, tab, q, 60, tagId),
+    listConversations(ctx.db, ctx, tab, q, INBOX_PAGE, tagId),
     inboxCounts(ctx.db, ctx),
     selectedId ? loadThread(ctx.db, ctx.tenantId, selectedId, ctx, ctx.agenda) : Promise.resolve(null),
     ctx.db.quickReply.findMany({ orderBy: [{ order: 'asc' }, { title: 'asc' }], select: { id: true, title: true, body: true } }),

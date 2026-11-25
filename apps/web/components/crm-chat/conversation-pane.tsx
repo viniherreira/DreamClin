@@ -3,13 +3,14 @@
 import { useEffect, useId, useMemo, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Bot, Briefcase, Clock, FileText, Hand, Link2, Megaphone, MessageCircle, Plus, Search, Square, Stethoscope, UserRound } from 'lucide-react';
-import type { ChatThread } from '@/crm/conversations';
+import type { ChatLine, ChatThread } from '@/crm/conversations';
 import { initials } from '@/crm/format';
 import {
   acceptConversationAction,
   assignConversationAction,
   botOptionsAction,
   linkConversationAction,
+  olderMessagesAction,
   retryChatAction,
   searchLinkTargetsAction,
   sendChatAction,
@@ -64,6 +65,7 @@ export function ConversationPane({
   const c = thread.conversation;
   const [retrying, setRetrying] = useState<string | null>(null);
   const [aviso, setAviso] = useState('');
+  const antigas = useOlderMessages(thread, setAviso);
   // Os robôs do "/" (como o Salesbot do Kommo). Guardado por conversa: a tela atualiza a cada poucos segundos.
   const onChangedRef = useRef(onChanged);
   useEffect(() => {
@@ -103,8 +105,10 @@ export function ConversationPane({
       )}
 
       <ChatMessages
-        messages={thread.messages}
-        truncated={thread.truncated}
+        messages={antigas.messages}
+        truncated={antigas.truncated}
+        onLoadOlder={antigas.load}
+        loadingOlder={antigas.loading}
         contactName={c.contactName ?? c.name}
         retrying={retrying}
         onRetry={async (id) => {
@@ -127,6 +131,51 @@ export function ConversationPane({
       </p>
     </section>
   );
+}
+
+/**
+ * A conversa abre com as 200 mensagens mais recentes (e a tela relê essas a
+ * cada poucos segundos). Rolando para cima, as anteriores vêm de 100 em 100 e
+ * ficam guardadas aqui, na frente das recentes.
+ */
+function useOlderMessages(thread: ChatThread, onAnnounce: (s: string) => void) {
+  const [older, setOlder] = useState<ChatLine[]>([]);
+  // Sem leva anterior carregada, vale o que a leitura das recentes diz.
+  const [hasMore, setHasMore] = useState<boolean | null>(null);
+  const [loading, setLoading] = useState(false);
+  const recentes = thread.messages;
+
+  // Chegou mensagem nova e a mais velha das recentes saiu da leitura: guarda,
+  // senão abre um buraco entre as antigas e as recentes.
+  const antes = useRef(recentes);
+  useEffect(() => {
+    const anterior = antes.current;
+    antes.current = recentes;
+    if (hasMore === null || anterior === recentes) return;
+    const ficam = new Set(recentes.map((m) => m.id));
+    const sairam = anterior.filter((m) => !ficam.has(m.id) && (!recentes[0] || m.at <= recentes[0].at));
+    if (sairam.length) setOlder((o) => [...o, ...sairam.filter((m) => !o.some((x) => x.id === m.id))]);
+  }, [recentes, hasMore]);
+
+  const messages = useMemo(() => {
+    if (older.length === 0) return recentes;
+    const ids = new Set(recentes.map((m) => m.id));
+    return [...older.filter((m) => !ids.has(m.id)), ...recentes];
+  }, [older, recentes]);
+
+  const load = async () => {
+    const primeira = messages[0];
+    if (loading || !primeira) return;
+    setLoading(true);
+    const r = await olderMessagesAction(thread.conversation.id, primeira.id).catch(() => ({ ok: false as const, message: 'Confira a internet.' }));
+    setLoading(false);
+    if (!r.ok) return onAnnounce(`Não deu para carregar as mensagens anteriores. ${r.message}`);
+    setOlder((o) => [...r.messages, ...o]);
+    setHasMore(r.hasMore);
+    onAnnounce(r.messages.length ? `${r.messages.length} mensagens anteriores carregadas.` : 'Não há mensagens anteriores.');
+  };
+
+  return { messages, truncated: hasMore ?? thread.truncated, load, loading };
 }
 
 /**
