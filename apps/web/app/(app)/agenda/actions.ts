@@ -95,7 +95,7 @@ export async function getAgendaData(dateStr: string, view: 'day' | 'week' | 'mon
       include: {
         patient: { select: { id: true, name: true, socialName: true, birthDate: true } },
         professional: { select: { id: true, name: true, specialty: true } },
-        procedure: { select: { id: true, name: true, durationMinutes: true } },
+        procedure: { select: { id: true, name: true, durationMinutes: true, color: true, category: { select: { color: true } } } },
         label: { select: { id: true, name: true, color: true } },
       },
       orderBy: { startTime: 'asc' },
