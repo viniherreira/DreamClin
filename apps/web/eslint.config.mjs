@@ -22,7 +22,8 @@ const eslintConfig = [
       'jsx-a11y/no-autofocus': 'warn',
       'jsx-a11y/label-has-associated-control': [
         'error',
-        { required: { some: ['nesting', 'id'] } },
+        // DateField é um campo de texto por dentro (components/ui/date-field.tsx).
+        { required: { some: ['nesting', 'id'] }, controlComponents: ['DateField'] },
       ],
       // O que o efeito devolve vira a "limpeza" que o React chama depois. No
       // Chrome novo, `scrollIntoView()` devolve uma Promise e a tela quebrava
