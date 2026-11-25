@@ -1,8 +1,8 @@
 'use client';
 
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
-  AlertCircle, Bot, CalendarClock, Check, CircleDot, Megaphone, CheckCheck, Clock, FileText, Image as ImageIcon, MapPin, Mic, RotateCw,
+  AlertCircle, Bot, CalendarClock, Check, CircleDot, Megaphone, CheckCheck, Clock, FileText, Image as ImageIcon, Loader2, MapPin, Mic, RotateCw,
   Smartphone, StickyNote, Sticker, Trophy, User, Video, XCircle,
 } from 'lucide-react';
 import type { ChatLine } from '@/crm/conversations';
@@ -64,6 +64,8 @@ export function ChatMessages({
   onRetry,
   retrying,
   events,
+  onLoadOlder,
+  loadingOlder = false,
 }: {
   messages: ChatLine[];
   truncated: boolean;
@@ -71,10 +73,36 @@ export function ChatMessages({
   onRetry?: (id: string) => void;
   retrying?: string | null;
   events?: TimelineEntry[];
+  /** Há mensagens antes destas: busca a leva anterior (rolando até o topo ou pelo botão). */
+  onLoadOlder?: () => void;
+  loadingOlder?: boolean;
 }) {
   const boxRef = useRef<HTMLDivElement>(null);
   const grudado = useRef(true);
+  // Distância do fim antes de chegarem as antigas: a leitura não pula ao crescer para cima.
+  const ancora = useRef<number | null>(null);
   const ultimo = messages.at(-1)?.id;
+  const primeiro = messages[0]?.id;
+  const podeCarregar = truncated && Boolean(onLoadOlder);
+
+  const carregarAntigas = () => {
+    const box = boxRef.current;
+    if (!onLoadOlder || loadingOlder || !box) return;
+    ancora.current = box.scrollHeight - box.scrollTop;
+    onLoadOlder();
+  };
+
+  useLayoutEffect(() => {
+    const box = boxRef.current;
+    if (box && ancora.current !== null) {
+      box.scrollTop = box.scrollHeight - ancora.current;
+      ancora.current = null;
+    }
+  }, [primeiro]);
+  // Terminou sem trazer nada (erro, ou não havia mais): esquece a âncora.
+  useLayoutEffect(() => {
+    if (!loadingOlder) ancora.current = null;
+  }, [loadingOlder]);
   const itens: Item[] = [
     ...messages.map((m) => ({ kind: 'msg' as const, at: new Date(m.at), m })),
     ...(events ?? []).map((e) => ({ kind: 'ev' as const, at: new Date(e.at), e })),
@@ -85,12 +113,26 @@ export function ChatMessages({
     if (box && grudado.current) box.scrollTop = box.scrollHeight;
   }, [ultimo, messages.length, events?.length]);
 
+  // A tela ainda se arrumando (letras, fotos, painel ajustado): quem está no fim continua no fim.
+  useEffect(() => {
+    const box = boxRef.current;
+    if (!box || typeof ResizeObserver === 'undefined') return;
+    const obs = new ResizeObserver(() => {
+      if (grudado.current && ancora.current === null) box.scrollTop = box.scrollHeight;
+    });
+    obs.observe(box);
+    for (const filho of Array.from(box.children)) obs.observe(filho);
+    return () => obs.disconnect();
+  }, []);
+
   return (
     <div
       ref={boxRef}
       onScroll={(e) => {
         const b = e.currentTarget;
         grudado.current = b.scrollHeight - b.scrollTop - b.clientHeight < 80;
+        // Chegou perto do topo: traz as anteriores, como no WhatsApp.
+        if (podeCarregar && b.scrollTop < 150) carregarAntigas();
       }}
       className="min-h-0 flex-1 overflow-y-auto bg-board px-4 py-4 sm:px-6"
       // Área que rola precisa receber foco, senão quem usa só o teclado não lê o
@@ -100,8 +142,20 @@ export function ChatMessages({
       role="region"
       aria-label="Mensagens"
     >
-      {truncated && (
-        <p className="mb-4 text-center text-xs text-muted-foreground">Mostrando as 200 mensagens mais recentes.</p>
+      {podeCarregar ? (
+        <div className="mb-4 flex justify-center">
+          <button
+            type="button"
+            onClick={carregarAntigas}
+            disabled={loadingOlder}
+            className="inline-flex items-center gap-1.5 rounded-full bg-surface px-3 py-1 text-xs text-muted-foreground shadow-sm hover:text-primary focus-visible:outline-2 focus-visible:outline-ring disabled:cursor-default"
+          >
+            {loadingOlder && <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />}
+            {loadingOlder ? 'Carregando mensagens anteriores…' : 'Ver mensagens anteriores'}
+          </button>
+        </div>
+      ) : (
+        truncated && <p className="mb-4 text-center text-xs text-muted-foreground">Mostrando as 200 mensagens mais recentes.</p>
       )}
       {itens.length === 0 ? (
         <p className="mt-10 text-center text-sm text-muted-foreground">

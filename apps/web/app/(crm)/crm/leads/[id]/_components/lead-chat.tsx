@@ -69,6 +69,7 @@ export function LeadRightPane({
       <PendingTasks lead={lead} />
       {thread ? (
         <ConversationPane
+          key={thread.conversation.id}
           thread={thread}
           quickReplies={quickReplies}
           onChanged={() => void refresh()}

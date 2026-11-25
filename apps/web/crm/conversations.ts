@@ -9,6 +9,7 @@ import { createLead, OPEN_LEAD, setTags, softDeleteLead, type Actor } from './le
 import { conversationHash, conversationHashes, decryptPhone, leadHashesForChat, maskPhone } from './phone';
 import { conversationScope, type Viewer } from './scope-rules';
 import { needsSignature, readCrmPrefs, signText } from './crm-prefs';
+import { INBOX_PAGE } from './inbox-limits';
 
 /**
  * As conversas do WhatsApp no CRM. O webhook da Meta grava o que entra na linha
@@ -268,7 +269,7 @@ export async function listConversations(
   ctx: { tenantId: string; agenda?: boolean } & Viewer,
   tab: InboxTab,
   q = '',
-  take = 60,
+  take = INBOX_PAGE,
   tagId: string | null = null,
 ): Promise<ConversationSummary[]> {
   const rows = await db.conversation.findMany({
@@ -376,6 +377,61 @@ function adCard(raw: unknown): ChatLine['ad'] {
   };
 }
 
+// Duas mensagens no mesmo milissegundo: a criada depois vem depois.
+const THREAD_ORDER: Prisma.ChatMessageOrderByWithRelationInput[] = [{ at: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }];
+
+type ChatMessageRow = Prisma.ChatMessageGetPayload<{ include: { sentBy: { select: { name: true } } } }>;
+
+function toChatLine(m: ChatMessageRow, tenantId: string): ChatLine {
+  return {
+    id: m.id,
+    direction: m.direction,
+    origin: m.origin,
+    kind: m.kind,
+    text: open(m.textEncrypted, tenantId),
+    at: m.at.toISOString(),
+    status: m.status,
+    accepted: Boolean(m.acceptedAt),
+    error: m.errorMessage,
+    sentBy: m.sentBy?.name ?? null,
+    hasMedia: Boolean(m.mediaRef),
+    mimeType: m.mimeType,
+    templateName: m.templateName,
+    buttons: Array.isArray(m.buttons) ? (m.buttons as { title?: unknown }[]).map((b) => String(b?.title ?? '')).filter(Boolean) : [],
+    ad: adCard(m.ad),
+  };
+}
+
+/**
+ * As mensagens de antes de `beforeId`, para quem rola a conversa para cima
+ * (a conversa abre com as 200 mais recentes). Vêm da mais antiga para a mais nova.
+ */
+export async function loadOlderMessages(
+  db: TenantPrismaClient,
+  tenantId: string,
+  conversationId: string,
+  beforeId: string,
+  take = 100,
+): Promise<{ messages: ChatLine[]; hasMore: boolean }> {
+  const ref = await db.chatMessage.findFirst({ where: { id: beforeId, conversationId }, select: { id: true } });
+  if (!ref) return { messages: [], hasMore: false };
+  const rows = await db.chatMessage.findMany({
+    where: { conversationId },
+    orderBy: THREAD_ORDER,
+    cursor: { id: beforeId },
+    skip: 1,
+    take: take + 1,
+    include: { sentBy: { select: { name: true } } },
+  });
+  return {
+    messages: rows
+      .slice(0, take)
+      .reverse()
+      .map((m) => toChatLine(m, tenantId)),
+    hasMore: rows.length > take,
+  };
+}
+
 export async function loadThread(
   db: TenantPrismaClient,
   tenantId: string,
@@ -390,8 +446,7 @@ export async function loadThread(
   if (!conv) return null;
   const rows = await db.chatMessage.findMany({
     where: { conversationId },
-    // Duas mensagens no mesmo milissegundo: a criada depois vem depois.
-    orderBy: [{ at: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }],
+    orderBy: THREAD_ORDER,
     take: THREAD_LIMIT + 1,
     include: { sentBy: { select: { name: true } } },
   });
@@ -399,23 +454,7 @@ export async function loadThread(
   const messages = rows
     .slice(0, THREAD_LIMIT)
     .reverse()
-    .map<ChatLine>((m) => ({
-      id: m.id,
-      direction: m.direction,
-      origin: m.origin,
-      kind: m.kind,
-      text: open(m.textEncrypted, tenantId),
-      at: m.at.toISOString(),
-      status: m.status,
-      accepted: Boolean(m.acceptedAt),
-      error: m.errorMessage,
-      sentBy: m.sentBy?.name ?? null,
-      hasMedia: Boolean(m.mediaRef),
-      mimeType: m.mimeType,
-      templateName: m.templateName,
-      buttons: Array.isArray(m.buttons) ? (m.buttons as { title?: unknown }[]).map((b) => String(b?.title ?? '')).filter(Boolean) : [],
-      ad: adCard(m.ad),
-    }));
+    .map((m) => toChatLine(m, tenantId));
   const [cloud, bot, janela] = await Promise.all([
     activeCloudAccount(tenantId),
     conv.botFlowId ? db.chatbotFlow.findFirst({ where: { id: conv.botFlowId }, select: { id: true, name: true } }) : null,

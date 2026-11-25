@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { ResizableSplit } from '@/components/crm-resize';
 import { notFound } from 'next/navigation';
 import { ChevronLeft } from 'lucide-react';
 import { requireCrm } from '@/crm/guard';
@@ -40,8 +41,15 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           <ChevronLeft className="h-4 w-4" aria-hidden="true" /> Funil
         </Link>
       </div>
-      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(320px,380px)_1fr]">
-        <div className="overflow-y-auto bg-surface lg:border-r lg:border-border">
+      <ResizableSplit
+        storageKey="ficha-lead"
+        fallback={360}
+        min={300}
+        max={560}
+        label="Largura dos dados do lead"
+        leftClassName="bg-surface lg:border-r lg:border-border"
+        left={
+        <div className="h-full overflow-y-auto">
           <LeadPanel
             lead={lead}
             pipelines={basics.pipelines}
@@ -56,6 +64,8 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           />
           {ctx.manager && <EraseLeadData leadId={lead.id} leadName={lead.name} />}
         </div>
+        }
+      >
         <LeadRightPane
           lead={lead}
           team={basics.team}
@@ -65,7 +75,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           channel={cloud ? 'cloud' : 'none'}
           canManage={ctx.manager}
         />
-      </div>
+      </ResizableSplit>
     </div>
   );
 }
