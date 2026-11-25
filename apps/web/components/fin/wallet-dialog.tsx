@@ -9,6 +9,7 @@ import { formatCents } from '@/lib/financeiro/money';
 import { PatientPicker } from './patient-picker';
 import { ErrorText, Field, inputCls, Modal, MoneyInput } from './ui';
 
+import { DateField } from '@/components/ui/date-field';
 /**
  * Adicionar crédito na carteira do paciente (entra dinheiro, sai recibo) ou
  * devolver crédito (sai dinheiro, até o saldo).
@@ -98,7 +99,7 @@ export function WalletDialog({
                 </select>
               )}
             </Field>
-            <Field label="Data">{(id) => <input id={id} type="date" max={today} value={dia} onChange={(e) => setDia(e.target.value)} className={inputCls} />}</Field>
+            <Field label="Data">{(id) => <DateField id={id} max={today} value={dia} onChange={(v) => setDia(v)} className={inputCls} />}</Field>
             <Field label="Observação (opcional)">{(id) => <input id={id} maxLength={300} value={nota} onChange={(e) => setNota(e.target.value)} className={inputCls} />}</Field>
           </div>
           <ErrorText>{erro}</ErrorText>

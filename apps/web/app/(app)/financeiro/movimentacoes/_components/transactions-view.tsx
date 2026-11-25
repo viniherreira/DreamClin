@@ -10,6 +10,7 @@ import { formatCents } from '@/lib/financeiro/money';
 import { listTransactions, updateTransactionAction, type TxFilters, type TxList, type TxRow } from '../../fin-actions';
 import type { FinOptions } from '../../contas/_components/types';
 
+import { DateField } from '@/components/ui/date-field';
 const TIPO: Record<string, string> = {
   RECEIPT: 'Recebimento',
   PAYMENT: 'Pagamento',
@@ -75,8 +76,8 @@ export function TransactionsView({ options, range, canReverse, onlyReversals = f
               </select>
             )}
           </Field>
-          <Field label="De" className="w-40">{(id) => <input id={id} type="date" value={from} onChange={(e) => muda(setFrom)(e.target.value)} className={inputCls} />}</Field>
-          <Field label="Até" className="w-40">{(id) => <input id={id} type="date" value={to} onChange={(e) => muda(setTo)(e.target.value)} className={inputCls} />}</Field>
+          <Field label="De" className="w-40">{(id) => <DateField id={id} value={from} onChange={(v) => muda(setFrom)(v)} className={inputCls} />}</Field>
+          <Field label="Até" className="w-40">{(id) => <DateField id={id} value={to} onChange={(v) => muda(setTo)(v)} className={inputCls} />}</Field>
           {!onlyReversals && (
             <Field label="Tipo" className="w-36">
               {(id) => (
@@ -279,7 +280,7 @@ function EditDialog({ row, options, onOpenChange, onDone }: { row: TxRow | null;
         }}
       >
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Data do pagamento">{(id) => <input id={id} type="date" value={paidOn} onChange={(e) => setPaidOn(e.target.value)} className={inputCls} />}</Field>
+          <Field label="Data do pagamento">{(id) => <DateField id={id} value={paidOn} onChange={(v) => setPaidOn(v)} className={inputCls} />}</Field>
           <Field label="Mês de competência">{(id) => <input id={id} type="month" value={competence} onChange={(e) => setCompetence(e.target.value)} className={inputCls} />}</Field>
           <Field label="Categoria">
             {(id) => (

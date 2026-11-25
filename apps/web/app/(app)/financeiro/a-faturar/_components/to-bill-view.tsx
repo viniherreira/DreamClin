@@ -12,6 +12,7 @@ import { wallClockTime, wallDateBR } from '@/lib/tz';
 import { billAppointmentAction, discardReceiveAction, noChargeAction, receiveAppointmentAction, undoNoChargeAction } from '../../../agenda/finance-actions';
 import { billBatchAction, listToBillAction } from '../actions';
 
+import { DateField } from '@/components/ui/date-field';
 /**
  * A faturar: os atendimentos com valor que ainda não viraram conta nem foram
  * recebidos. Abre no dia de hoje. Receber, Faturar e Não cobrar por linha, e
@@ -105,8 +106,8 @@ export function ToBillView({ today, options, canReceive }: { today: Day; options
     <div>
       <div className="rounded-xl border border-border bg-surface p-3 shadow-card">
         <div className="flex flex-wrap items-end gap-3">
-          <Field label="De" className="w-40">{(id) => <input id={id} type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={inputCls} />}</Field>
-          <Field label="Até" className="w-40">{(id) => <input id={id} type="date" value={to} onChange={(e) => setTo(e.target.value)} className={inputCls} />}</Field>
+          <Field label="De" className="w-40">{(id) => <DateField id={id} value={from} onChange={(v) => setFrom(v)} className={inputCls} />}</Field>
+          <Field label="Até" className="w-40">{(id) => <DateField id={id} value={to} onChange={(v) => setTo(v)} className={inputCls} />}</Field>
           <Field label="Profissional" className="w-48">
             {(id) => (
               <select id={id} value={professionalId} onChange={(e) => setProfessionalId(e.target.value)} className={inputCls}>
@@ -359,7 +360,7 @@ function FaturarDialog({ ids, today, onClose, onDone }: { ids: string[]; today: 
         }}
       >
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label={parcelas > 1 ? 'Vencimento da 1ª parcela' : 'Vencimento'}>{(id) => <input id={id} type="date" min={today} value={vence} onChange={(e) => setVence(e.target.value)} className={inputCls} />}</Field>
+          <Field label={parcelas > 1 ? 'Vencimento da 1ª parcela' : 'Vencimento'}>{(id) => <DateField id={id} min={today} value={vence} onChange={(v) => setVence(v)} className={inputCls} />}</Field>
           {um && <Field label="Parcelas">{(id) => <input id={id} type="number" min={1} max={24} value={parcelas} onChange={(e) => setParcelas(Math.min(24, Math.max(1, Number(e.target.value) || 1)))} className={inputCls} />}</Field>}
         </div>
         <p className="text-xs text-muted-foreground">Convênio sem o convênio escolhido fica de fora: escolha o convênio na janela do agendamento.</p>

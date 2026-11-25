@@ -6,6 +6,7 @@ import type { BulkChange } from '@/lib/bulk-change';
 import { STATUS_LABEL } from '@/lib/appointment-audit';
 import { bulkApply, bulkSearch } from '../operacao-actions';
 
+import { DateField } from '@/components/ui/date-field';
 type Opt = { id: string; name: string };
 type Row = Awaited<ReturnType<typeof bulkSearch>>[number];
 const field = 'h-9 w-full rounded-lg border border-border bg-background px-2 text-sm';
@@ -63,11 +64,11 @@ export function BulkView({ professionals, rooms, labels }: { professionals: Opt[
         <div className="mt-2 grid gap-2 sm:grid-cols-3 lg:grid-cols-6">
           <label className="text-xs">
             <span className="text-muted-foreground">De</span>
-            <input type="date" value={f.from} onChange={(e) => setF({ ...f, from: e.target.value })} className={field} />
+            <DateField value={f.from} onChange={(v) => setF({ ...f, from: v })} className={field} />
           </label>
           <label className="text-xs">
             <span className="text-muted-foreground">Até</span>
-            <input type="date" value={f.to} onChange={(e) => setF({ ...f, to: e.target.value })} className={field} />
+            <DateField value={f.to} onChange={(v) => setF({ ...f, to: v })} className={field} />
           </label>
           <label className="text-xs">
             <span className="text-muted-foreground">Profissional</span>
@@ -228,7 +229,7 @@ export function BulkView({ professionals, rooms, labels }: { professionals: Opt[
               </label>
               <label className="inline-flex items-center gap-1.5">
                 <input type="radio" name="mover" checked={ch.mover === 'data'} onChange={() => setCh({ ...ch, mover: 'data' })} className="accent-primary" /> Mover para o dia
-                <input type="date" value={ch.moveToDate} onChange={(e) => setCh({ ...ch, moveToDate: e.target.value, mover: 'data' })} aria-label="Novo dia" className="h-8 rounded-md border border-border bg-background px-2" />
+                <DateField value={ch.moveToDate} onChange={(v) => setCh({ ...ch, moveToDate: v, mover: 'data' })} aria-label="Novo dia" className="h-8 rounded-md border border-border bg-background px-2" />
               </label>
             </div>
           </fieldset>

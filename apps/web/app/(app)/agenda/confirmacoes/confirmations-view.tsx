@@ -8,6 +8,7 @@ import { wallClockTime, wallDateBR } from '@/lib/tz';
 import { setStatusDirectAction } from '../actions';
 import { resendReminders, type listConfirmations } from '../operacao-actions';
 
+import { DateField } from '@/components/ui/date-field';
 type Row = Awaited<ReturnType<typeof listConfirmations>>[number];
 
 const WA: Record<string, { label: string; cls: string }> = {
@@ -47,11 +48,11 @@ export function ConfirmationsView({ rows, filters, professionals }: { rows: Row[
       <div className="flex flex-wrap items-end gap-2 rounded-xl border border-border bg-surface p-3">
         <label className="text-xs">
           <span className="block text-muted-foreground">De</span>
-          <input type="date" value={f.from} onChange={(e) => setF({ ...f, from: e.target.value })} className={field} />
+          <DateField value={f.from} onChange={(v) => setF({ ...f, from: v })} className={field} />
         </label>
         <label className="text-xs">
           <span className="block text-muted-foreground">Até</span>
-          <input type="date" value={f.to} onChange={(e) => setF({ ...f, to: e.target.value })} className={field} />
+          <DateField value={f.to} onChange={(v) => setF({ ...f, to: v })} className={field} />
         </label>
         <label className="text-xs">
           <span className="block text-muted-foreground">Profissional</span>

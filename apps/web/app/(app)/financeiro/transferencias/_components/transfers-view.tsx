@@ -9,6 +9,7 @@ import { addDays, dayBR, type Day } from '@/lib/financeiro/dates';
 import { formatCents } from '@/lib/financeiro/money';
 import { reverseTransferAction, transferAction, transferListAction } from '../../f5-actions';
 
+import { DateField } from '@/components/ui/date-field';
 /** Transferências entre contas (e as sangrias e reforços com conta), com estorno das duas pontas. */
 export function TransfersView({ options, today, canTransfer, canReverse }: { options: FinOptions; today: Day; canTransfer: boolean; canReverse: boolean }) {
   const [from, setFrom] = useState<string>(addDays(today, -30));
@@ -29,8 +30,8 @@ export function TransfersView({ options, today, canTransfer, canReverse }: { opt
     <div>
       <div className="flex flex-wrap items-end justify-between gap-3 rounded-xl border border-border bg-surface p-3 shadow-card">
         <div className="flex flex-wrap items-end gap-3">
-          <Field label="De" className="w-40">{(id) => <input id={id} type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={inputCls} />}</Field>
-          <Field label="Até" className="w-40">{(id) => <input id={id} type="date" value={to} onChange={(e) => setTo(e.target.value)} className={inputCls} />}</Field>
+          <Field label="De" className="w-40">{(id) => <DateField id={id} value={from} onChange={(v) => setFrom(v)} className={inputCls} />}</Field>
+          <Field label="Até" className="w-40">{(id) => <DateField id={id} value={to} onChange={(v) => setTo(v)} className={inputCls} />}</Field>
           <Field label="Conta" className="w-48">
             {(id) => (
               <select id={id} value={conta} onChange={(e) => setConta(e.target.value)} className={inputCls}>
@@ -171,7 +172,7 @@ function NovaTransferencia({ options, today, onClose, onDone }: { options: FinOp
           <Field label="Conta de origem">{(id) => <select id={id} value={de} onChange={(e) => setDe(e.target.value)} className={inputCls}>{opcoes}</select>}</Field>
           <Field label="Conta de destino">{(id) => <select id={id} value={para} onChange={(e) => setPara(e.target.value)} className={inputCls}>{opcoes}</select>}</Field>
           <Field label="Valor">{(id) => <MoneyInput id={id} value={valor} onChange={setValor} />}</Field>
-          <Field label="Data">{(id) => <input id={id} type="date" max={today} value={dia} onChange={(e) => setDia(e.target.value)} className={inputCls} />}</Field>
+          <Field label="Data">{(id) => <DateField id={id} max={today} value={dia} onChange={(v) => setDia(v)} className={inputCls} />}</Field>
           <Field label="Descrição (opcional)" className="sm:col-span-2">{(id) => <input id={id} maxLength={300} value={nota} onChange={(e) => setNota(e.target.value)} className={inputCls} />}</Field>
         </div>
         <ErrorText>{erro}</ErrorText>

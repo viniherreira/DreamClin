@@ -5,6 +5,7 @@ import { CalendarClock } from 'lucide-react';
 import { STATUS_CHOICES } from '@/lib/appointment-status';
 import { cancelAppointmentFull, cancelOptionsAction, rescheduleAppointmentAction, setStatusDirectAction } from '../actions';
 
+import { DateField } from '@/components/ui/date-field';
 const field = 'h-9 w-full rounded-md border border-border bg-surface px-2 text-sm focus-visible:outline-2 focus-visible:outline-ring';
 
 /**
@@ -177,7 +178,7 @@ export function AppointmentStatusPanel({
           <div className="grid gap-2 sm:grid-cols-3">
             <label className="block text-xs">
               <span className="text-muted-foreground">Data</span>
-              <input type="date" value={rem.date} onChange={(e) => setRem({ ...rem, date: e.target.value })} className={field} />
+              <DateField value={rem.date} onChange={(v) => setRem({ ...rem, date: v })} className={field} />
             </label>
             <label className="block text-xs">
               <span className="text-muted-foreground">Início</span>

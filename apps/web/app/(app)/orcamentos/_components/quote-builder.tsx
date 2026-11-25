@@ -13,6 +13,7 @@ import { ProcedurePicker, type ProcedureOption } from './procedure-picker';
 import { ToothPicker } from './tooth-picker';
 import { clinicToday } from '@/lib/tz';
 
+import { DateField } from '@/components/ui/date-field';
 /** O Select do Radix não aceita valor vazio; isto faz o papel de "nenhum". */
 const NENHUM = 'none';
 
@@ -374,7 +375,7 @@ export function QuoteBuilder({
 
           <div className="space-y-1.5">
             <label htmlFor="q-valid" className="text-xs font-medium text-muted-foreground">Válido até</label>
-            <input id="q-valid" type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} className={inputCls} />
+            <DateField id="q-valid" value={validUntil} onChange={(v) => setValidUntil(v)} className={inputCls} />
           </div>
 
           {professionals.length > 0 && (

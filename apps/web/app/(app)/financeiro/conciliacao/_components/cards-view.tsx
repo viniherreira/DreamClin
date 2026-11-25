@@ -8,6 +8,7 @@ import { addDays, dayBR, type Day } from '@/lib/financeiro/dates';
 import { formatCents } from '@/lib/financeiro/money';
 import { anticipateAction, checkReturnedAction, previewCardFileAction, receivablesAction, reconcileReceivablesAction } from '../actions';
 
+import { DateField } from '@/components/ui/date-field';
 /**
  * Cartões e cheques: os recebíveis de cada venda no cartão (uma linha por
  * parcela) e os cheques, para conferir com o que a operadora pagou. Concilia
@@ -86,8 +87,8 @@ export function CardsView({ today }: { today: Day }) {
               </select>
             )}
           </Field>
-          <Field label="De" className="w-36">{(id) => <input id={id} type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={inputCls} />}</Field>
-          <Field label="Até" className="w-36">{(id) => <input id={id} type="date" value={to} onChange={(e) => setTo(e.target.value)} className={inputCls} />}</Field>
+          <Field label="De" className="w-36">{(id) => <DateField id={id} value={from} onChange={(v) => setFrom(v)} className={inputCls} />}</Field>
+          <Field label="Até" className="w-36">{(id) => <DateField id={id} value={to} onChange={(v) => setTo(v)} className={inputCls} />}</Field>
           <Field label="Mostrar" className="w-40">
             {(id) => (
               <select id={id} value={status} onChange={(e) => setStatus(e.target.value as typeof status)} className={inputCls}>
@@ -259,7 +260,7 @@ function AnteciparDialog({ rows, today, onClose, onDone }: { rows: ReceivableRow
         }}
       >
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Data do crédito">{(id) => <input id={id} type="date" max={today} value={dia} onChange={(e) => setDia(e.target.value)} className={inputCls} />}</Field>
+          <Field label="Data do crédito">{(id) => <DateField id={id} max={today} value={dia} onChange={(v) => setDia(v)} className={inputCls} />}</Field>
           <Field label="Valor recebido" hint={`Custo da antecipação: ${formatCents(Math.max(0, liquido - recebido))}`}>{(id) => <MoneyInput id={id} value={recebido} onChange={setRecebido} />}</Field>
         </div>
         <ErrorText>{erro}</ErrorText>

@@ -9,6 +9,7 @@ import { REPORTS, reportDef } from '@/lib/agenda-reports';
 import { DIMENSIONS, runReport } from '@/lib/agenda-reports-server';
 import { readReportFilters } from './filters';
 
+import { DateField } from '@/components/ui/date-field';
 export const metadata = { title: 'Relatórios da agenda' };
 
 const field = 'h-9 rounded-lg border border-border bg-background px-2 text-sm';
@@ -75,11 +76,11 @@ export default async function RelatoriosAgendaPage({ searchParams }: { searchPar
               <>
                 <label className="text-xs">
                   <span className="block text-muted-foreground">De</span>
-                  <input type="date" name="de" defaultValue={filtros.from} className={field} />
+                  <DateField name="de" defaultValue={filtros.from} className={field} />
                 </label>
                 <label className="text-xs">
                   <span className="block text-muted-foreground">Até</span>
-                  <input type="date" name="ate" defaultValue={filtros.to} className={field} />
+                  <DateField name="ate" defaultValue={filtros.to} className={field} />
                 </label>
               </>
             )}

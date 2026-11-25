@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format, addDays, addMonths, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Plus, LayoutGrid, Columns2, CalendarDays, Lock, FileBarChart, AlertTriangle, List, Printer } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Plus, LayoutGrid, Columns2, CalendarDays, Loader2, Lock, FileBarChart, AlertTriangle, List, Printer } from 'lucide-react';
+import { DatePickerButton } from '@/components/ui/date-field';
 import { MiniCalendar } from './mini-calendar';
 import { ProfessionalFilter } from './professional-filter';
 import { CalendarGrid } from './calendar-grid';
@@ -51,6 +52,9 @@ interface AgendaShellProps {
   /** Abre o "Novo agendamento" neste horário (telas Horários livres e Lista de espera). */
   prefillSlot?: { time: string; professionalId?: string } | null;
 }
+
+/** "Qui, 26 nov 2026": o dia no topo da agenda quando a tela não é bem larga. */
+const DIAS_CURTOS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
 export function AgendaShell({ initialDate, initialView, initialData, prefillPatient = null, prefillSlot = null }: AgendaShellProps) {
   const router = useRouter();
@@ -219,6 +223,7 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentDate, view, modal.open, detailId]);
 
+  const diaCurto = (iso: string) => `${DIAS_CURTOS[parseISO(iso).getDay()]}, ${format(parseISO(iso), 'd MMM yyyy', { locale: ptBR })}`;
   const dateLabel = format(parseISO(currentDate), "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR });
   // O dia da clínica (igual no servidor e no navegador), comparado como texto.
   const todayActive = currentDate === clinicToday();
@@ -282,24 +287,30 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
               </button>
             </div>
 
-            {/* Date — own centered row on mobile (tap opens the native picker),
-                inline on desktop. */}
-            <div className="relative order-last min-w-full text-center sm:order-none sm:min-w-0 sm:flex-1 sm:text-left">
-              <h1 className="inline-flex items-center gap-1.5 text-[15px] font-semibold text-foreground first-letter:uppercase sm:text-sm" aria-live="polite">
-                <CalendarDays className="h-4 w-4 text-primary sm:hidden" aria-hidden="true" />
-                <span className="sm:hidden">{format(parseISO(currentDate), 'EEEE, dd/MM/yyyy', { locale: ptBR })}</span>
-                <span className="hidden sm:inline">
-                  {view === 'month' ? format(parseISO(currentDate), "MMMM 'de' yyyy", { locale: ptBR }) : dateLabel}
-                </span>
-                {loading && <span className="text-xs font-normal text-muted-foreground" aria-hidden="true">…</span>}
+            {/* O dia, numa linha só: na tela estreita em linha própria; clicar abre o calendário. */}
+            <div className="order-last flex min-w-full justify-center sm:order-none sm:mr-auto sm:min-w-0 sm:shrink-0 sm:justify-start">
+              <h1 className="max-w-full" aria-live="polite">
+                <DatePickerButton
+                  value={currentDate}
+                  onPick={(d) => navigate(d)}
+                  className="group inline-flex h-9 max-w-full items-center gap-2 rounded-lg px-2.5 text-sm font-semibold text-foreground hover:bg-surface-alt focus-visible:outline-2 focus-visible:outline-ring"
+                >
+                  <CalendarDays className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                  <span className="truncate whitespace-nowrap first-letter:uppercase">
+                    {view === 'month' ? (
+                      format(parseISO(currentDate), "MMMM 'de' yyyy", { locale: ptBR })
+                    ) : (
+                      <>
+                        <span className="2xl:hidden">{diaCurto(currentDate)}</span>
+                        <span className="hidden 2xl:inline">{dateLabel}</span>
+                      </>
+                    )}
+                  </span>
+                  <span className="sr-only">, escolher outra data</span>
+                  <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" aria-hidden="true" />
+                  {loading && <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground motion-reduce:animate-none" aria-hidden="true" />}
+                </DatePickerButton>
               </h1>
-              <input
-                type="date"
-                value={currentDate}
-                onChange={(e) => e.target.value && navigate(e.target.value)}
-                aria-label="Escolher data"
-                className="absolute inset-0 h-full w-full cursor-pointer opacity-0 sm:hidden"
-              />
             </div>
 
             <div className="segmented" role="group" aria-label="Modo de visualização">
@@ -336,7 +347,7 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
               title="Ver este dia no relatório"
             >
               <FileBarChart className="h-4 w-4" aria-hidden="true" />
-              <span className="hidden lg:inline">Relatório</span>
+              <span className="hidden 2xl:inline">Relatório</span>
             </Link>
 
             <button
@@ -348,7 +359,7 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
               title="Bloquear horário (almoço, férias, feriado)"
             >
               <Lock className="h-4 w-4" aria-hidden="true" />
-              <span className="hidden sm:inline">Bloquear</span>
+              <span className="hidden 2xl:inline">Bloquear</span>
             </button>
 
             <button
@@ -358,7 +369,8 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
               aria-label="Novo agendamento (N)"
             >
               <Plus className="h-4 w-4" aria-hidden="true" />
-              <span className="hidden sm:inline">Novo agendamento</span>
+              <span className="hidden 2xl:inline">Novo agendamento</span>
+              <span className="hidden sm:inline 2xl:hidden">Agendar</span>
               <span className="sm:hidden">Novo</span>
             </button>
           </header>

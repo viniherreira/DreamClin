@@ -6,6 +6,7 @@ import { SCHEDULE_REPEATS, type RepeatKind } from '@/lib/schedule-rules';
 import { clinicToday, wallDateBR } from '@/lib/tz';
 import { archiveScheduleRule, listSchedules, removeScheduleException, saveScheduleException, saveScheduleRule } from '../schedule-actions';
 
+import { DateField } from '@/components/ui/date-field';
 type Data = NonNullable<Awaited<ReturnType<typeof listSchedules>>>;
 const field = 'h-9 w-full rounded-lg border border-border bg-background px-3 text-sm';
 const DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -158,11 +159,11 @@ export function SchedulesPanel() {
           <div className="grid gap-3 sm:grid-cols-4">
             <label className="text-xs">
               <span className="text-muted-foreground">Vale a partir de</span>
-              <input type="date" required value={form.startsOn} onChange={(e) => setForm({ ...form, startsOn: e.target.value })} className={field} />
+              <DateField required value={form.startsOn} onChange={(v) => setForm({ ...form, startsOn: v })} className={field} />
             </label>
             <label className="text-xs">
               <span className="text-muted-foreground">Até (vazio = sem fim)</span>
-              <input type="date" value={form.endsOn} onChange={(e) => setForm({ ...form, endsOn: e.target.value })} className={field} />
+              <DateField value={form.endsOn} onChange={(v) => setForm({ ...form, endsOn: v })} className={field} />
             </label>
             <label className="text-xs">
               <span className="text-muted-foreground">Repetição</span>
@@ -314,7 +315,7 @@ export function SchedulesPanel() {
         >
           <label className="text-xs">
             <span className="block text-muted-foreground">Dia</span>
-            <input type="date" required value={exc.date} onChange={(e) => setExc({ ...exc, date: e.target.value })} className={field} />
+            <DateField required value={exc.date} onChange={(v) => setExc({ ...exc, date: v })} className={field} />
           </label>
           <label className="text-xs">
             <span className="block text-muted-foreground">Tipo</span>

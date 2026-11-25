@@ -20,6 +20,7 @@ import {
   type RequirableKey,
 } from '@/lib/patient-fields';
 
+import { DateField } from '@/components/ui/date-field';
 // ─── Máscaras ────────────────────────────────────────────────────────────────
 
 function maskCpf(v: string) {
@@ -371,7 +372,7 @@ export function PatientFormFull({
           </Field>
           <Field id="birthDate" label="Data de nascimento" required error={err('birthDate')}>
             <div className="flex items-center gap-2">
-              <input {...aria('birthDate', err('birthDate'))} name="birthDate" type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} className={inputCls} />
+              <DateField {...aria('birthDate', err('birthDate'))} name="birthDate" value={birthDate} onChange={(v) => setBirthDate(v)} className={inputCls} />
               {birthDate && ageFromBirth(birthDate) !== null && <span className="shrink-0 text-xs text-muted-foreground">{ageFromBirth(birthDate)} anos</span>}
             </div>
           </Field>
@@ -581,7 +582,7 @@ export function PatientFormFull({
                   <label className="text-xs text-muted-foreground" htmlFor={`${baseId}-val-${i}`}>
                     Validade
                   </label>
-                  <input id={`${baseId}-val-${i}`} type="date" value={ins.validUntil ?? ''} onChange={(e) => setInsurances(insurances.map((x, j) => (j === i ? { ...x, validUntil: e.target.value } : x)))} className={inputCls} />
+                  <DateField id={`${baseId}-val-${i}`} value={ins.validUntil ?? ''} onChange={(v) => setInsurances(insurances.map((x, j) => (j === i ? { ...x, validUntil: v } : x)))} className={inputCls} />
                 </div>
                 <div className="flex items-center justify-between gap-2 sm:col-span-5">
                   <label className="inline-flex items-center gap-2 text-xs">

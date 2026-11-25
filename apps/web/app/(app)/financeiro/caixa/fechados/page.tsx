@@ -6,6 +6,7 @@ import { addDays, isDay, type Day } from '@/lib/financeiro/dates';
 import { clinicToday } from '@/lib/tz';
 import { CashTable } from '../_components/cash-view';
 
+import { DateField } from '@/components/ui/date-field';
 export const metadata = { title: 'Caixas fechados' };
 
 const campo = 'h-9 rounded-lg border border-border bg-surface px-2.5 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring';
@@ -41,13 +42,13 @@ export default async function CaixasFechadosPage({ searchParams }: { searchParam
           <label htmlFor="cx-de" className="block text-sm font-medium">
             Fechado de
           </label>
-          <input id="cx-de" name="de" type="date" defaultValue={from} className={`${campo} mt-1 w-40`} />
+          <DateField id="cx-de" name="de" defaultValue={from} wrapperClassName="mt-1 w-40" className={`${campo} w-full`} />
         </div>
         <div>
           <label htmlFor="cx-ate" className="block text-sm font-medium">
             Até
           </label>
-          <input id="cx-ate" name="ate" type="date" defaultValue={to} className={`${campo} mt-1 w-40`} />
+          <DateField id="cx-ate" name="ate" defaultValue={to} wrapperClassName="mt-1 w-40" className={`${campo} w-full`} />
         </div>
         {canManage && users.length > 0 && (
           <div>

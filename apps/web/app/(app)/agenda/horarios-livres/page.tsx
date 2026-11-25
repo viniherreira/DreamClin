@@ -7,6 +7,7 @@ import { clinicToday, wallDateBR } from '@/lib/tz';
 import { findFreeSlots } from '../operacao-actions';
 import { AgendaOpsNav } from '../_components/agenda-ops-nav';
 
+import { DateField } from '@/components/ui/date-field';
 export const metadata = { title: 'Horários livres' };
 
 const field = 'h-9 rounded-lg border border-border bg-background px-2 text-sm';
@@ -33,7 +34,7 @@ export default async function HorariosLivresPage({ searchParams }: { searchParam
       <form method="get" className="flex flex-wrap items-end gap-2 rounded-xl border border-border bg-surface p-3">
         <label className="text-xs">
           <span className="block text-muted-foreground">A partir de</span>
-          <input type="date" name="de" defaultValue={de} className={field} />
+          <DateField name="de" defaultValue={de} className={field} />
         </label>
         <label className="text-xs">
           <span className="block text-muted-foreground">Profissional</span>
