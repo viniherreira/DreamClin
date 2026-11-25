@@ -60,40 +60,49 @@ function weekdayOf(iso: string): number {
 
 const HEADER_H = 44;
 
-/** Hour + half-hour lines as two repeating gradients — a single painted layer
- *  per column instead of ~84 absolutely-positioned divs, which keeps wheel
- *  scrolling smooth even with many professionals. */
-function gridBackground(hourPx: number): React.CSSProperties {
+/**
+ * De quantos em quantos minutos vai uma linha (e um horário escrito) na grade:
+ * o intervalo da agenda, ou o múltiplo dele que dá pelo menos 15px de altura
+ * (intervalo de 5 min viraria um risco por cima do outro).
+ */
+function rowMinutes(slotMinutes: number, hourPx: number): number {
+  let step = Math.max(5, slotMinutes);
+  while ((step * hourPx) / 60 < 15 && step < 60) step += slotMinutes;
+  return Math.min(step, 60);
+}
+
+/** As linhas da grade numa camada pintada só (sem centenas de divs): fina a cada linha, mais forte na hora cheia. */
+function gridBackground(hourPx: number, rowPx: number): React.CSSProperties {
   return {
     backgroundImage: [
       `repeating-linear-gradient(to bottom, hsl(var(--border)) 0 1px, transparent 1px ${hourPx}px)`,
-      `repeating-linear-gradient(to bottom, transparent 0 ${hourPx / 2}px, hsl(var(--border) / 0.45) ${hourPx / 2}px calc(${hourPx / 2}px + 1px), transparent calc(${hourPx / 2}px + 1px) ${hourPx}px)`,
+      `repeating-linear-gradient(to bottom, hsl(var(--border) / 0.5) 0 1px, transparent 1px ${rowPx}px)`,
     ].join(', '),
   };
 }
 
+/** Os horários à esquerda, um por linha da grade, como uma tabela: a hora cheia em destaque. */
 function TimeColumn() {
-  const { startHour, endHour, hourPx, totalHeight } = useGrid();
-  const hours: React.ReactNode[] = [];
-  for (let h = startHour; h <= endHour; h++) {
-    const top = (h - startHour) * hourPx;
-    // Clamp first/last labels inside the column so they don't get clipped by
-    // the sticky header above or the scroll edge below.
-    const labelTop = h === startHour ? top + 3 : h === endHour ? top - 16 : top - 7;
-    hours.push(
+  const { startHour, endHour, hourPx, totalHeight, slotMinutes } = useGrid();
+  const passo = rowMinutes(slotMinutes, hourPx);
+  const rowPx = (passo * hourPx) / 60;
+  const linhas: React.ReactNode[] = [];
+  for (let m = startHour * 60; m < endHour * 60; m += passo) {
+    const cheia = m % 60 === 0;
+    linhas.push(
       <span
-        key={h}
-        className="absolute right-2.5 select-none font-mono text-[10px] font-medium tabular-nums text-muted-foreground"
-        style={{ top: labelTop }}
+        key={m}
+        className={`absolute inset-x-0 flex select-none items-center justify-end pr-2 tabular-nums ${cheia ? 'text-[11px] font-semibold text-foreground/80' : 'text-[10.5px] text-muted-foreground'}`}
+        style={{ top: ((m - startHour * 60) * hourPx) / 60, height: rowPx }}
         aria-hidden="true"
       >
-        {String(h).padStart(2, '0')}:00
-      </span>
+        {String(Math.floor(m / 60)).padStart(2, '0')}:{String(m % 60).padStart(2, '0')}
+      </span>,
     );
   }
   return (
-    <div className="relative w-14 shrink-0 border-r border-border" style={{ height: totalHeight }}>
-      {hours}
+    <div className="relative w-14 shrink-0 border-r border-border bg-surface" style={{ height: totalHeight, ...gridBackground(hourPx, rowPx) }}>
+      {linhas}
     </div>
   );
 }
@@ -125,7 +134,10 @@ export function CalendarGrid({
 }: CalendarGridProps) {
   const grid = useGrid();
   const TOTAL_HEIGHT_PX = grid.totalHeight;
-  const GRID_BG = useMemo(() => gridBackground(grid.hourPx), [grid.hourPx]);
+  const GRID_BG = useMemo(
+    () => gridBackground(grid.hourPx, (rowMinutes(grid.slotMinutes, grid.hourPx) * grid.hourPx) / 60),
+    [grid.hourPx, grid.slotMinutes],
+  );
   const visibleProfs = professionals.filter((p) => visibleProfessionals.has(p.id));
   const todayStr = clinicToday();
 
@@ -219,7 +231,7 @@ export function CalendarGrid({
                   .filter((b) => new Date(b.startTime).toISOString().slice(0, 10) === iso)
                   .map((b) => <BlockedSlotBlock key={b.id} slot={b} onClick={onBlockedSlotClick} />)}
                 {dayApts.map((apt) => (
-                  <AppointmentBlock key={apt.id} appointment={apt} onClick={onAppointmentClick} billing={billing?.[apt.id]} />
+                  <AppointmentBlock key={apt.id} appointment={apt} onClick={onAppointmentClick} billing={billing?.[apt.id]} narrow />
                 ))}
               </div>
             </div>
