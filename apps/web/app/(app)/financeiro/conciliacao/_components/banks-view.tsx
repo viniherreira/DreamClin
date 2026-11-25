@@ -21,6 +21,7 @@ import {
   undoLineAction,
 } from '../actions';
 
+import { DateField } from '@/components/ui/date-field';
 /**
  * Conciliação bancária: importar o extrato (OFX ou CSV), casar cada linha com
  * um movimento (as exatas casam sozinhas; as aproximadas aparecem como
@@ -137,8 +138,8 @@ export function BanksView({ options, today }: { options: FinOptions; today: Day 
               </div>
             ) : (
               <div className="flex flex-wrap items-end gap-2">
-                <Field label="De" className="w-36">{(id) => <input id={id} type="date" value={de} onChange={(e) => setDe(e.target.value)} className={inputCls} />}</Field>
-                <Field label="Até" className="w-36">{(id) => <input id={id} type="date" value={ate} onChange={(e) => setAte(e.target.value)} className={inputCls} />}</Field>
+                <Field label="De" className="w-36">{(id) => <DateField id={id} value={de} onChange={(v) => setDe(v)} className={inputCls} />}</Field>
+                <Field label="Até" className="w-36">{(id) => <DateField id={id} value={ate} onChange={(v) => setAte(v)} className={inputCls} />}</Field>
               </div>
             )}
           </div>

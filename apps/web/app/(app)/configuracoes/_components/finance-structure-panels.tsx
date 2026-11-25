@@ -21,6 +21,7 @@ import {
   type CostCenterRow,
 } from '../finance-actions';
 
+import { DateField } from '@/components/ui/date-field';
 const iconBtn = 'rounded-md p-1.5 text-muted-foreground hover:bg-surface-alt hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring';
 
 // ─── Contas ──────────────────────────────────────────────────────────────────
@@ -89,7 +90,7 @@ export function FinanceAccountsPanel({ units }: { units: { id: string; name: str
           <Field label="Saldo inicial" hint="Quanto havia nesta conta no dia abaixo.">
             {(id) => <MoneyInput id={id} allowNegative value={form.openingBalanceCents} onChange={(c) => setForm({ ...form, openingBalanceCents: c })} />}
           </Field>
-          <Field label="Data do saldo inicial">{(id) => <input id={id} type="date" value={form.openingDate} onChange={(e) => setForm({ ...form, openingDate: e.target.value })} className={inputCls} />}</Field>
+          <Field label="Data do saldo inicial">{(id) => <DateField id={id} value={form.openingDate} onChange={(v) => setForm({ ...form, openingDate: v })} className={inputCls} />}</Field>
           {units.length > 1 && (
             <Field label="Unidade" hint="Deixe em branco para a clínica toda.">
               {(id) => (

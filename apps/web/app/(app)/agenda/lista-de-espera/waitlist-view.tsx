@@ -9,6 +9,7 @@ import { ageFromBirth, wallClockTime, wallDateBR } from '@/lib/tz';
 import { pickPatientsAction } from '../../pacientes/actions';
 import { addToWaitlist, setWaitlistStatus, type listWaitlist, type waitlistForSlot } from '../operacao-actions';
 
+import { DateField } from '@/components/ui/date-field';
 type Data = NonNullable<Awaited<ReturnType<typeof listWaitlist>>>;
 type Slot = Awaited<ReturnType<typeof waitlistForSlot>>;
 const field = 'h-9 w-full rounded-lg border border-border bg-background px-2 text-sm';
@@ -166,7 +167,7 @@ export function WaitlistView({ data, history, slot }: { data: Data; history: boo
             </label>
             <label className="text-xs">
               <span className="text-muted-foreground">Pode a partir de</span>
-              <input type="date" value={form.fromDate} onChange={(e) => setForm({ ...form, fromDate: e.target.value })} className={field} />
+              <DateField value={form.fromDate} onChange={(v) => setForm({ ...form, fromDate: v })} className={field} />
             </label>
           </div>
           <fieldset>

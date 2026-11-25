@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { clinicToday } from '@/lib/tz';
 
+import { DateField } from '@/components/ui/date-field';
 interface Option { id: string; name: string }
 
 interface Props {
@@ -83,9 +84,9 @@ export function FinanceFilters({ from, to, professionalId, procedureId, professi
         </div>
 
         <div className="flex items-center gap-1.5">
-          <input type="date" value={from} max={to} onChange={(e) => e.target.value && setParams({ from: e.target.value })} aria-label="Data inicial" className={dateCls} />
+          <DateField value={from} max={to} onChange={(v) => v && setParams({ from: v })} aria-label="Data inicial" className={dateCls} />
           <span className="text-sm text-muted-foreground">até</span>
-          <input type="date" value={to} min={from} onChange={(e) => e.target.value && setParams({ to: e.target.value })} aria-label="Data final" className={dateCls} />
+          <DateField value={to} min={from} onChange={(v) => v && setParams({ to: v })} aria-label="Data final" className={dateCls} />
         </div>
 
         {isPending && <span aria-live="polite" className="text-xs text-muted-foreground">Atualizando…</span>}

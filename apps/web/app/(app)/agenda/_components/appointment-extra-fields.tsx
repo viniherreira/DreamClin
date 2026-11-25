@@ -6,6 +6,7 @@ import { REPEAT_OPTIONS } from '@/lib/recurrence';
 import { wallDateBR } from '@/lib/tz';
 import { previewSeriesAction } from '../actions';
 
+import { DateField } from '@/components/ui/date-field';
 export interface AgendaNewOptions {
   careTypes: { id: string; name: string; color: string; durationMinutes: number; allowOverlap: boolean }[];
   resources: { id: string; name: string; color: string }[];
@@ -137,7 +138,7 @@ export function AppointmentExtraFields({
                   <label htmlFor="repeat-until" className="text-xs font-medium text-foreground">
                     Ou até
                   </label>
-                  <input id="repeat-until" name="repeatUntil" type="date" value={until} onChange={(e) => setUntil(e.target.value)} className={field} />
+                  <DateField id="repeat-until" name="repeatUntil" value={until} onChange={(v) => setUntil(v)} className={field} />
                 </div>
               </>
             )}

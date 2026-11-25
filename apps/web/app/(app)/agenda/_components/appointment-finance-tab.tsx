@@ -11,6 +11,7 @@ import { formatCents } from '@/lib/financeiro/money';
 import { TITLE_STATUS_LABEL, type TitleDisplay } from '@/lib/financeiro/title-status';
 import { appointmentBilling, billAppointmentAction, discardReceiveAction, noChargeAction, receiveAppointmentAction, undoNoChargeAction } from '../finance-actions';
 
+import { DateField } from '@/components/ui/date-field';
 /**
  * A aba Financeiro do agendamento: os procedimentos com valor, o que já foi
  * faturado e recebido, e os botões Receber, Faturar, Não cobrar e Recibo.
@@ -265,7 +266,7 @@ function FaturarDialog({ appointmentId, today, detail, onClose, onDone }: { appo
         }}
       >
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label={parcelas > 1 ? 'Vencimento da 1ª parcela' : 'Vencimento'}>{(id) => <input id={id} type="date" min={today} value={vence} onChange={(e) => setVence(e.target.value)} className={inputCls} />}</Field>
+          <Field label={parcelas > 1 ? 'Vencimento da 1ª parcela' : 'Vencimento'}>{(id) => <DateField id={id} min={today} value={vence} onChange={(v) => setVence(v)} className={inputCls} />}</Field>
           <Field label="Parcelas" hint={parcelas > 1 ? `${parcelas}x, uma por mês.` : undefined}>
             {(id) => <input id={id} type="number" min={1} max={24} value={parcelas} onChange={(e) => setParcelas(Math.min(24, Math.max(1, Number(e.target.value) || 1)))} className={inputCls} />}
           </Field>

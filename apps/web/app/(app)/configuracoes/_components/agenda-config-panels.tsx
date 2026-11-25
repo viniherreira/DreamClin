@@ -17,6 +17,7 @@ import {
   type CareTypeInput,
 } from '../agenda-config-actions';
 
+import { DateField } from '@/components/ui/date-field';
 type Data = NonNullable<Awaited<ReturnType<typeof listAgendaConfig>>>;
 const field = 'h-9 w-full rounded-lg border border-border bg-background px-3 text-sm';
 
@@ -273,7 +274,7 @@ export function HolidaysPanel() {
         <label className="sr-only" htmlFor={`${id}-d`}>
           Data do feriado
         </label>
-        <input id={`${id}-d`} type="date" value={novo.date} onChange={(e) => setNovo({ ...novo, date: e.target.value })} className={`${field} w-44`} />
+        <DateField id={`${id}-d`} value={novo.date} onChange={(v) => setNovo({ ...novo, date: v })} wrapperClassName="w-44" className={field} />
         <label className="sr-only" htmlFor={`${id}-n`}>
           Nome do feriado
         </label>

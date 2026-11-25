@@ -14,6 +14,7 @@ import { NewTitleDialog } from './new-title-dialog';
 import { originHref, StatusBadge, TitleDetailDialog } from './title-detail-dialog';
 import type { FinOptions } from './types';
 
+import { DateField } from '@/components/ui/date-field';
 type Tab = 'RECEIVABLE' | 'PAYABLE' | 'ALL';
 type View = 'open' | 'overdue' | 'paid' | 'all';
 
@@ -190,8 +191,8 @@ export function TitlesView({
               </select>
             )}
           </Field>
-          <Field label="De" className="w-40">{(id) => <input id={id} type="date" value={from} onChange={(e) => muda(setFrom)(e.target.value)} className={inputCls} />}</Field>
-          <Field label="Até" className="w-40">{(id) => <input id={id} type="date" value={to} onChange={(e) => muda(setTo)(e.target.value)} className={inputCls} />}</Field>
+          <Field label="De" className="w-40">{(id) => <DateField id={id} value={from} onChange={(v) => muda(setFrom)(v)} className={inputCls} />}</Field>
+          <Field label="Até" className="w-40">{(id) => <DateField id={id} value={to} onChange={(v) => muda(setTo)(v)} className={inputCls} />}</Field>
           <button type="button" onClick={() => (setRascunho(extra), setFiltrosAbertos(true))} className="btn-outline btn-md inline-flex items-center gap-1.5">
             <Filter className="h-4 w-4" aria-hidden="true" /> Mais filtros
           </button>
@@ -551,7 +552,7 @@ function BatchDialog({ open, onOpenChange, rows, options, today, onDone }: { ope
               </select>
             )}
           </Field>
-          <Field label="Data do pagamento">{(id) => <input id={id} type="date" max={today} value={paidOn} onChange={(e) => setPaidOn(e.target.value)} className={inputCls} />}</Field>
+          <Field label="Data do pagamento">{(id) => <DateField id={id} max={today} value={paidOn} onChange={(v) => setPaidOn(v)} className={inputCls} />}</Field>
           <Field label="Nº do documento (opcional)">{(id) => <input id={id} maxLength={60} value={documentNumber} onChange={(e) => setDocumentNumber(e.target.value)} className={inputCls} />}</Field>
         </div>
         <ErrorText>{erro}</ErrorText>

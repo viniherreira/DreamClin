@@ -9,6 +9,7 @@ import { addDays, dayBR, type Day } from '@/lib/financeiro/dates';
 import { formatCents } from '@/lib/financeiro/money';
 import { adjustCommissionAction, approveCommissionsAction, invoiceCommissionsAction, listCommissionsAction } from '../actions';
 
+import { DateField } from '@/components/ui/date-field';
 /**
  * Comissões e repasses: confere as linhas do período, ajusta com motivo,
  * aprova e fatura (gera a conta a pagar de cada pessoa). O profissional, se a
@@ -70,8 +71,8 @@ export function CommissionsView({ today, professionals, methods, manage }: { tod
   return (
     <div>
       <div className="flex flex-wrap items-end gap-3 rounded-xl border border-border bg-surface p-3 shadow-card">
-        <Field label="De" className="w-40">{(id) => <input id={id} type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={inputCls} />}</Field>
-        <Field label="Até" className="w-40">{(id) => <input id={id} type="date" value={to} onChange={(e) => setTo(e.target.value)} className={inputCls} />}</Field>
+        <Field label="De" className="w-40">{(id) => <DateField id={id} value={from} onChange={(v) => setFrom(v)} className={inputCls} />}</Field>
+        <Field label="Até" className="w-40">{(id) => <DateField id={id} value={to} onChange={(v) => setTo(v)} className={inputCls} />}</Field>
         {manage && (
           <Field label="Profissional" className="w-48">
             {(id) => (
@@ -329,7 +330,7 @@ function FaturarDialog({ rows, today, methods, onClose, onDone }: { rows: Commis
         }}
       >
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Vencimento">{(id) => <input id={id} type="date" value={vence} onChange={(e) => setVence(e.target.value)} className={inputCls} />}</Field>
+          <Field label="Vencimento">{(id) => <DateField id={id} value={vence} onChange={(v) => setVence(v)} className={inputCls} />}</Field>
           <Field label="Forma de pagamento (opcional)">
             {(id) => (
               <select id={id} value={forma} onChange={(e) => setForma(e.target.value)} className={inputCls}>

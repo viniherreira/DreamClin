@@ -12,6 +12,7 @@ import { formatCents, percentOf } from '@/lib/financeiro/money';
 import { discountPercent, planSettlement } from '@/lib/financeiro/settlement';
 import { ErrorText, Field, inputCls, Modal, MoneyInput, PercentInput } from './ui';
 
+import { DateField } from '@/components/ui/date-field';
 /**
  * Receber ou pagar uma conta: um ou mais meios no mesmo lançamento, desconto,
  * juros de atraso, troco e recibo. É a mesma tela na agenda, no orçamento, na
@@ -342,7 +343,7 @@ export function SettleDialog({ titleId, open, onOpenChange, onDone }: { titleId:
                       )}
                     </Field>
                     <Field label="Valor">{(id) => <MoneyInput id={id} value={l.amountCents} onChange={(c) => muda(l.key, { amountCents: c })} />}</Field>
-                    <Field label="Data">{(id) => <input id={id} type="date" max={ctx.today} value={l.paidOn} onChange={(e) => muda(l.key, { paidOn: e.target.value })} className={inputCls} />}</Field>
+                    <Field label="Data">{(id) => <DateField id={id} max={ctx.today} value={l.paidOn} onChange={(v) => muda(l.key, { paidOn: v })} className={inputCls} />}</Field>
                     {lines.length > 1 && (
                       <button type="button" aria-label={`Remover o meio ${i + 1}`} onClick={() => setLines((ls) => ls.filter((x) => x.key !== l.key))} className="mt-6 self-start rounded-md p-2 text-muted-foreground hover:bg-surface-alt hover:text-destructive focus-visible:outline-2 focus-visible:outline-ring">
                         <Trash2 className="h-4 w-4" aria-hidden="true" />
@@ -388,7 +389,7 @@ export function SettleDialog({ titleId, open, onOpenChange, onDone }: { titleId:
                         <Field label="Banco">{(id) => <input id={id} maxLength={40} value={l.checkBank} onChange={(e) => muda(l.key, { checkBank: e.target.value })} className={inputCls} />}</Field>
                         <Field label="Número do cheque">{(id) => <input id={id} maxLength={40} value={l.checkNumber} onChange={(e) => muda(l.key, { checkNumber: e.target.value })} className={inputCls} />}</Field>
                         <Field label="Titular">{(id) => <input id={id} maxLength={80} value={l.checkHolder} onChange={(e) => muda(l.key, { checkHolder: e.target.value })} className={inputCls} />}</Field>
-                        <Field label="Bom para">{(id) => <input id={id} type="date" value={l.checkDate} onChange={(e) => muda(l.key, { checkDate: e.target.value })} className={inputCls} />}</Field>
+                        <Field label="Bom para">{(id) => <DateField id={id} value={l.checkDate} onChange={(v) => muda(l.key, { checkDate: v })} className={inputCls} />}</Field>
                       </>
                     )}
                     {(forma?.requireDocNumber || k === 'PIX' || k === 'TRANSFER' || k === 'BOLETO') && (

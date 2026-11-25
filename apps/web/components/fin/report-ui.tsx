@@ -8,6 +8,7 @@ import { PERIOD_LABEL, presetRange, type PeriodPreset } from '@/lib/financeiro/r
 import { downloadCsv, type Cell } from '@/lib/xlsx';
 import { inputCls } from './ui';
 
+import { DateField } from '@/components/ui/date-field';
 /**
  * Peças dos relatórios: o seletor de período com atalhos, o "Esconder
  * valores", um gráfico de barras em SVG (com dica ao passar o mouse e tabela
@@ -48,13 +49,13 @@ export function PeriodPicker({ from, to, today, presets, onChange }: { from: str
         <label htmlFor={`${id}-de`} className="block text-sm font-medium">
           De
         </label>
-        <input id={`${id}-de`} type="date" value={from} onChange={(e) => e.target.value && onChange(e.target.value, e.target.value > to ? e.target.value : to)} className={`${inputCls} mt-1 w-40`} />
+        <DateField id={`${id}-de`} value={from} onChange={(v) => v && onChange(v, v > to ? v : to)} wrapperClassName="mt-1 w-40" className={`${inputCls} w-full`} />
       </div>
       <div>
         <label htmlFor={`${id}-ate`} className="block text-sm font-medium">
           Até
         </label>
-        <input id={`${id}-ate`} type="date" value={to} onChange={(e) => e.target.value && onChange(e.target.value < from ? e.target.value : from, e.target.value)} className={`${inputCls} mt-1 w-40`} />
+        <DateField id={`${id}-ate`} value={to} onChange={(v) => v && onChange(v < from ? v : from, v)} wrapperClassName="mt-1 w-40" className={`${inputCls} w-full`} />
       </div>
     </div>
   );

@@ -7,6 +7,7 @@ import { addQuotePayment, type QuotePaymentState } from '../actions';
 import { formatBRL, maskBRLInput, brlToNumber } from './constants';
 import { paymentNote, type ScheduleLine } from '@/lib/payment-schedule';
 
+import { DateField } from '@/components/ui/date-field';
 const dia = (d: string) => d.split('-').reverse().join('/');
 const centavos = (n: number) => maskBRLInput(String(Math.round(n * 100)));
 
@@ -189,12 +190,11 @@ export function PaymentDialog({
                   <label htmlFor={`${id}-dia`} className="text-xs font-medium text-muted-foreground">
                     Dia do pagamento
                   </label>
-                  <input
+                  <DateField
                     id={`${id}-dia`}
-                    type="date"
                     max={today}
                     value={paidOn}
-                    onChange={(e) => setPaidOn(e.target.value)}
+                    onChange={(v) => setPaidOn(v)}
                     aria-invalid={!!errors.paidOn}
                     className="mt-1 h-11 w-full rounded-lg border border-border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                   />

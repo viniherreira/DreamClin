@@ -13,6 +13,7 @@ import { TITLE_STATUS_LABEL, type TitleDisplay } from '@/lib/financeiro/title-st
 import { cancelTitleAction, getTitle, updateTitleAction, type TitleDetail } from '../../fin-actions';
 import type { FinOptions } from './types';
 
+import { DateField } from '@/components/ui/date-field';
 const TOM: Record<TitleDisplay, 'gray' | 'green' | 'amber' | 'red' | 'blue'> = { OPEN: 'blue', PARTIAL: 'amber', PAID: 'green', CANCELLED: 'gray', RENEGOTIATED: 'gray', OVERDUE: 'red' };
 
 export const StatusBadge = ({ display }: { display: TitleDisplay }) => <Badge tone={TOM[display]}>{TITLE_STATUS_LABEL[display]}</Badge>;
@@ -171,7 +172,7 @@ export function TitleDetailDialog({
               <Field label="Valor" hint={t.paidCents > 0 ? 'Com pagamento, o valor não muda. Estorne o pagamento primeiro.' : undefined}>
                 {(id) => <MoneyInput id={id} disabled={t.paidCents > 0} value={form.amountCents} onChange={(c) => setForm({ ...form, amountCents: c })} />}
               </Field>
-              <Field label="Vencimento">{(id) => <input id={id} type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} className={inputCls} />}</Field>
+              <Field label="Vencimento">{(id) => <DateField id={id} value={form.dueDate} onChange={(v) => setForm({ ...form, dueDate: v })} className={inputCls} />}</Field>
               <Field label="Mês de competência">{(id) => <input id={id} type="month" value={form.competence} onChange={(e) => setForm({ ...form, competence: e.target.value })} className={inputCls} />}</Field>
               <Field label="Forma de pagamento">
                 {(id) => (

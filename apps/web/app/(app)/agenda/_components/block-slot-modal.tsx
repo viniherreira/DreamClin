@@ -5,6 +5,7 @@ import { Lock } from 'lucide-react';
 import { createBlockedSlot, type BlockFormState, type BlockedSlotDTO } from '../actions';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
+import { DateField } from '@/components/ui/date-field';
 interface ProfessionalOption {
   id: string;
   name: string;
@@ -124,7 +125,7 @@ export function BlockSlotModal({
 
           <div className="space-y-1.5">
             <label htmlFor="block-date" className="text-sm font-medium">Data</label>
-            <input id="block-date" name="date" type="date" defaultValue={defaultDate} required className={inputCls} />
+            <DateField id="block-date" name="date" defaultValue={defaultDate} required className={inputCls} />
           </div>
 
           <div className="grid grid-cols-2 gap-3">

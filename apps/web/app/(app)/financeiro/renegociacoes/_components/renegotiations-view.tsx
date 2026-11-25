@@ -13,6 +13,7 @@ import { planRenegotiation } from '@/lib/financeiro/renegotiation';
 import { CLINIC_TZ } from '@/lib/tz';
 import { renegotiateAction, renegotiationCandidates, renegotiationListAction, undoRenegotiationAction } from '../../f5-actions';
 
+import { DateField } from '@/components/ui/date-field';
 /**
  * Renegociações: a lista e o assistente em dois passos (escolher as contas,
  * negociar). As contas antigas ficam "Renegociada" e nascem as novas.
@@ -296,7 +297,7 @@ function Wizard({ options, today, defaults, initialPatient, onClose, onDone }: {
           <div className="grid gap-3 sm:grid-cols-3">
             <Field label="Desconto" hint={`Seu limite: ${String(defaults.discountLimitPercent).replace('.', ',')}%`}>{(id) => <MoneyInput id={id} value={desconto} onChange={setDesconto} />}</Field>
             <Field label="Entrada">{(id) => <MoneyInput id={id} value={entrada} onChange={setEntrada} />}</Field>
-            {entrada > 0 && <Field label="Data da entrada">{(id) => <input id={id} type="date" min={today} value={entradaDia} onChange={(e) => setEntradaDia(e.target.value)} className={inputCls} />}</Field>}
+            {entrada > 0 && <Field label="Data da entrada">{(id) => <DateField id={id} min={today} value={entradaDia} onChange={(v) => setEntradaDia(v)} className={inputCls} />}</Field>}
             {entrada > 0 && entradaDia === today && (
               <Field label="Entrada paga agora com" hint="Em branco, a entrada fica em aberto para receber depois.">
                 {(id) => (
@@ -321,7 +322,7 @@ function Wizard({ options, today, defaults, initialPatient, onClose, onDone }: {
               )}
             </Field>
             {intervalo === 'days' && <Field label="Dias">{(id) => <input id={id} type="number" min={1} max={365} value={dias} onChange={(e) => setDias(Math.max(1, Number(e.target.value) || 1))} className={inputCls} />}</Field>}
-            <Field label="Primeiro vencimento">{(id) => <input id={id} type="date" min={today} value={primeiro} onChange={(e) => setPrimeiro(e.target.value)} className={inputCls} />}</Field>
+            <Field label="Primeiro vencimento">{(id) => <DateField id={id} min={today} value={primeiro} onChange={(v) => setPrimeiro(v)} className={inputCls} />}</Field>
             <Field label="Juros ao mês (%)" hint={defaults.manager ? undefined : 'Definido pela clínica.'}>{(id) => <PercentInput id={id} value={juros} onChange={setJuros} disabled={!defaults.manager} />}</Field>
             <Field label="Cálculo dos juros">
               {(id) => (

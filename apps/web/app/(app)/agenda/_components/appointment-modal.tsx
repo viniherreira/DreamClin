@@ -11,6 +11,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { firstLetters } from '@/lib/initials';
 import { AppointmentItems, type ItemRow, type ItemsFinance } from './appointment-items';
 
+import { DateField } from '@/components/ui/date-field';
 interface Professional {
   id: string;
   name: string;
@@ -273,7 +274,7 @@ export function AppointmentModal({
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   <div className="col-span-2 space-y-1.5 sm:col-span-1">
                     <label className={labelCls} htmlFor="date">Data <span className="text-destructive">*</span></label>
-                    <input id="date" name="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} />
+                    <DateField id="date" name="date" value={date} onChange={(v) => setDate(v)} className={inputCls} />
                     {errorFor('date') && <p className="text-xs text-destructive">{errorFor('date')}</p>}
                   </div>
                   <div className="space-y-1.5">

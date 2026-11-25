@@ -11,6 +11,7 @@ import { formatCents } from '@/lib/financeiro/money';
 import { createTitleAction } from '../../fin-actions';
 import type { FinOptions } from './types';
 
+import { DateField } from '@/components/ui/date-field';
 /**
  * Novo lançamento: uma conta a receber ou a pagar, à vista, parcelada (com a
  * tabela simulada antes de salvar) ou recorrente.
@@ -229,9 +230,9 @@ export function NewTitleDialog({
             )}
           </Field>
           <Field label="Valor">{(id) => <MoneyInput id={id} value={amount} onChange={(c) => (setAmount(c), limpa())} />}</Field>
-          <Field label="Emissão">{(id) => <input id={id} type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} className={inputCls} />}</Field>
+          <Field label="Emissão">{(id) => <DateField id={id} value={issueDate} onChange={(v) => setIssueDate(v)} className={inputCls} />}</Field>
           <Field label={modo === 'parcelado' ? 'Vencimento da 1ª parcela' : modo === 'recorrente' ? 'Primeiro vencimento' : 'Vencimento'}>
-            {(id) => <input id={id} type="date" value={dueDate} onChange={(e) => (setDueDate(e.target.value), limpa())} className={inputCls} />}
+            {(id) => <DateField id={id} value={dueDate} onChange={(v) => (setDueDate(v), limpa())} className={inputCls} />}
           </Field>
           <Field label="Forma de pagamento (opcional)">
             {(id) => (
@@ -337,7 +338,7 @@ export function NewTitleDialog({
                         <tr key={i}>
                           <td className="px-3 py-1.5 tabular-nums">{i + 1}</td>
                           <td className="px-3 py-1.5">
-                            <input type="date" aria-label={`Vencimento da parcela ${i + 1}`} value={l.dueDate} onChange={(e) => setTabela(linhas.map((x, j) => (j === i ? { ...x, dueDate: e.target.value } : x)))} className={`${inputCls} max-w-[11rem]`} />
+                            <DateField aria-label={`Vencimento da parcela ${i + 1}`} value={l.dueDate} onChange={(v) => setTabela(linhas.map((x, j) => (j === i ? { ...x, dueDate: v } : x)))} wrapperClassName="w-full max-w-[11rem]" className={inputCls} />
                           </td>
                           <td className="px-3 py-1.5">
                             <MoneyInput ariaLabel={`Valor da parcela ${i + 1}`} value={l.amountCents} onChange={(c) => setTabela(linhas.map((x, j) => (j === i ? { ...x, amountCents: c } : x)))} className="ml-auto max-w-[10rem]" />
@@ -382,7 +383,7 @@ export function NewTitleDialog({
                     </select>
                   )}
                 </Field>
-                {fim === 'data' && <Field label="Até">{(id) => <input id={id} type="date" value={fimData} onChange={(e) => setFimData(e.target.value)} className={inputCls} />}</Field>}
+                {fim === 'data' && <Field label="Até">{(id) => <DateField id={id} value={fimData} onChange={(v) => setFimData(v)} className={inputCls} />}</Field>}
                 {fim === 'vezes' && <Field label="Vezes">{(id) => <input id={id} type="number" min={1} max={240} value={vezes} onChange={(e) => setVezes(Math.max(1, Number(e.target.value) || 1))} className={inputCls} />}</Field>}
               </div>
               <p className="text-xs text-muted-foreground">

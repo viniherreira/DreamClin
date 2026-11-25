@@ -10,6 +10,7 @@ import { activeFilterCount, filtersToQuery, type PatientFilters } from '@/lib/pa
 import { priorityLabel, SEX_OPTIONS } from '@/lib/patient-fields';
 import { ageFromBirth, wallDateBR } from '@/lib/tz';
 
+import { DateField } from '@/components/ui/date-field';
 interface Row {
   id: string;
   controlNumber: number;
@@ -134,13 +135,13 @@ export function PatientListFull({
               <label htmlFor="f-nasc-de" className="text-xs font-medium text-muted-foreground">
                 Nascido de
               </label>
-              <input id="f-nasc-de" type="date" value={f.nascDe} onChange={(e) => set('nascDe', e.target.value)} className={sel} />
+              <DateField id="f-nasc-de" value={f.nascDe} onChange={(v) => set('nascDe', v)} className={sel} />
             </div>
             <div>
               <label htmlFor="f-nasc-ate" className="text-xs font-medium text-muted-foreground">
                 até
               </label>
-              <input id="f-nasc-ate" type="date" value={f.nascAte} onChange={(e) => set('nascAte', e.target.value)} className={sel} />
+              <DateField id="f-nasc-ate" value={f.nascAte} onChange={(v) => set('nascAte', v)} className={sel} />
             </div>
             <div>
               <label htmlFor="f-cidade" className="text-xs font-medium text-muted-foreground">
