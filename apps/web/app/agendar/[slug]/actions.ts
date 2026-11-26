@@ -20,6 +20,7 @@ import { mainUnit } from '@/lib/unit-rules';
 import { prepareAppointmentMessage, deliverPrepared, type Preparation } from '@/lib/whatsapp';
 import { notifyCrm } from '@/crm/notify';
 import { clientIp, rateLimit } from '@/lib/rate-limit';
+import { tenantReadonly } from '@/lib/tenant-standing';
 
 /**
  * O agendamento online, aberto ao público (sem login): o paciente escolhe o
@@ -33,11 +34,25 @@ import { clientIp, rateLimit } from '@/lib/rate-limit';
 type Clinic = { id: string; name: string; settings: unknown };
 
 async function clinicBySlug(slug: string): Promise<{ clinic: Clinic; rules: OnlineBookingSettings } | null> {
+  const found = await clinicOrPaused(slug);
+  return found && !found.paused ? found : null;
+}
+
+/**
+ * A clínica do endereço. `paused` quando o agendamento online está ligado mas a
+ * clínica está em só leitura (teste acabou sem plano, fatura vencida): ela não
+ * conseguiria nem ver direito nem remarcar o que entrasse, então a página avisa
+ * para ligar em vez de aceitar o horário.
+ */
+async function clinicOrPaused(
+  slug: string,
+): Promise<({ clinic: Clinic; rules: OnlineBookingSettings; paused: boolean }) | null> {
   if (!/^[a-z0-9-]{1,80}$/.test(slug)) return null;
   const clinic = await prisma.tenant.findUnique({ where: { slug }, select: { id: true, name: true, settings: true } });
   if (!clinic) return null;
   const rules = readOnlineBooking(clinic.settings);
-  return rules.enabled ? { clinic, rules } : null;
+  if (!rules.enabled) return null;
+  return { clinic, rules, paused: await tenantReadonly(clinic.id) };
 }
 
 async function allowedProfessionals(tenantId: string, rules: OnlineBookingSettings) {
@@ -72,8 +87,13 @@ async function unitFor(tenantId: string, unitId: string | null | undefined) {
 
 /** O que a página pública mostra: a clínica, quem atende e o que dá para marcar. */
 export async function getBookingInfo(slug: string) {
-  const found = await clinicBySlug(slug);
-  if (!found) return null;
+  const achada = await clinicOrPaused(slug);
+  if (!achada) return null;
+  if (achada.paused) {
+    const contato = await prisma.tenant.findUnique({ where: { id: achada.clinic.id }, select: { address: true, phone: true } });
+    return { paused: true as const, name: achada.clinic.name, address: contato?.address ?? null, phone: contato?.phone ?? null };
+  }
+  const found = achada;
   const { clinic, rules } = found;
   const [professionals, procedures, endereco, { ativas, main }] = await Promise.all([
     allowedProfessionals(clinic.id, rules),
@@ -91,6 +111,7 @@ export async function getBookingInfo(slug: string) {
     return dias.length ? [...new Set(dias.map((e) => e.unitId ?? main?.id ?? ''))] : ativas.map((u) => u.id);
   };
   return {
+    paused: false as const,
     name: clinic.name,
     address: endereco?.address ?? null,
     phone: endereco?.phone ?? null,

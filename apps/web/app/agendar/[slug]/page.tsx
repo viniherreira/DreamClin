@@ -35,16 +35,33 @@ export default async function AgendarPage({ params }: { params: Promise<{ slug: 
       </header>
 
       <main id="main-content" className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
-        <h1 className="text-2xl font-bold tracking-tight">Agende seu horário</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Escolha o profissional, o dia e o horário. A confirmação chega pelo WhatsApp.</p>
-        <BookingFlow
-          slug={slug}
-          units={info.units}
-          professionals={info.professionals}
-          procedures={info.procedures}
-          today={clinicNow().date}
-          maxDaysAhead={info.maxDaysAhead}
-        />
+        {info.paused ? (
+          <div className="rounded-xl border border-border bg-surface p-6">
+            <h1 className="text-xl font-bold tracking-tight">Agendamento online indisponível no momento</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Para marcar seu horário, fale direto com a clínica
+              {info.phone ? (
+                <>
+                  {' '}pelo telefone <span className="font-medium text-foreground tabular-nums">{info.phone}</span>
+                </>
+              ) : null}
+              .
+            </p>
+          </div>
+        ) : (
+          <>
+            <h1 className="text-2xl font-bold tracking-tight">Agende seu horário</h1>
+            <p className="mt-1 text-sm text-muted-foreground">Escolha o profissional, o dia e o horário. A confirmação chega pelo WhatsApp.</p>
+            <BookingFlow
+              slug={slug}
+              units={info.units}
+              professionals={info.professionals}
+              procedures={info.procedures}
+              today={clinicNow().date}
+              maxDaysAhead={info.maxDaysAhead}
+            />
+          </>
+        )}
       </main>
 
       <footer className="mx-auto flex max-w-3xl items-center justify-center gap-2 px-4 pb-8 text-xs text-muted-foreground">

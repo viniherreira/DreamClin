@@ -24,7 +24,7 @@ process.env.ENCRYPTION_MASTER_KEY ??= 'unit-test-master-key-not-a-real-secret';
 
 describe.skipIf(!process.env.DATABASE_URL)('bookOnline: travas (banco)', async () => {
   const { prisma } = await import('@clinicaiq/db');
-  const { bookOnline } = await import('./actions');
+  const { bookOnline, getBookingInfo } = await import('./actions');
   const { ONLINE_BOOKING_DAILY_CAP } = await import('@/lib/availability');
 
   const suffix = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -39,6 +39,12 @@ describe.skipIf(!process.env.DATABASE_URL)('bookOnline: travas (banco)', async (
     });
   const cheia = await clinica('cheia');
   const livre = await clinica('livre');
+  // Teste grátis acabou ontem sem plano: só leitura.
+  const vencida = await clinica('vencida');
+  const ontem = new Date(Date.now() - 86_400_000);
+  await prisma.subscription.create({
+    data: { tenantId: vencida.id, tier: 'ESSENCIAL', status: 'SUSPENDED', trialEndsAt: ontem, currentPeriodEnd: ontem },
+  });
 
   const pedido = (fone: string) => ({
     professionalId: 'qualquer',
@@ -51,7 +57,8 @@ describe.skipIf(!process.env.DATABASE_URL)('bookOnline: travas (banco)', async (
   });
 
   afterAll(async () => {
-    for (const t of [cheia, livre]) {
+    await prisma.subscription.deleteMany({ where: { tenantId: vencida.id } });
+    for (const t of [cheia, livre, vencida]) {
       await prisma.auditLog.deleteMany({ where: { tenantId: t.id } });
       await prisma.clinicUnit.deleteMany({ where: { tenantId: t.id } });
       await prisma.$executeRaw`DELETE FROM "rate_limits" WHERE "key" LIKE ${`%${t.id}%`}`;
@@ -81,5 +88,14 @@ describe.skipIf(!process.env.DATABASE_URL)('bookOnline: travas (banco)', async (
     const quarto = await bookOnline(livre.slug, pedido('(11) 98765-0002'));
     expect(quarto.ok).toBe(false);
     expect(quarto.ok === false && quarto.message).toContain('muitos pedidos');
+  });
+
+  it('clínica em só leitura: a página avisa para ligar e o pedido é recusado', async () => {
+    const info = await getBookingInfo(vencida.slug);
+    expect(info?.paused).toBe(true);
+    const r = await bookOnline(vencida.slug, pedido('11987650003'));
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.message).toContain('não está disponível');
+    expect(await prisma.appointment.count({ where: { tenantId: vencida.id } })).toBe(0);
   });
 });
