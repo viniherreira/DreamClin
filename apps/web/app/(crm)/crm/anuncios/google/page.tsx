@@ -1,14 +1,17 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Search, UsersRound } from 'lucide-react';
+import { CloudOff, Search, UsersRound } from 'lucide-react';
 import { requireCrm } from '@/crm/guard';
-import { googleAdsConnection } from '@/crm/google-ads-account';
+import { loadGoogleAdsPage } from '@/crm/google-ads-report';
 import { googleAdsConfigured } from '@/crm/google-ads-api';
 import { googleAdsEnabled } from '@/lib/feature-flags';
 import { asReportPeriod, DEFAULT_REPORT_PERIOD, REPORT_PERIODS } from '@/crm/report-period';
 import { ReportFrame } from '../../_components/report/frame';
 import { EmptyState } from '../../_components/report/parts';
 import { adsTabs } from '../_components/ads-tabs';
+import { AdsReportView } from '../_components/report-view';
+import { GOOGLE_SOURCE } from '../_components/ad-source';
+import { refreshGoogleAdsAction } from '../../whatsapp/google-ads-actions';
 
 export const metadata = { title: 'Anúncios · Google' };
 
@@ -21,6 +24,7 @@ export default async function GoogleAdsPage({ searchParams }: { searchParams: Pr
   if (!(await googleAdsEnabled(ctx.tenantId))) notFound();
   const sp = await searchParams;
   const period = asReportPeriod(typeof sp.periodo === 'string' ? sp.periodo : undefined);
+  const campanha = typeof sp.campanha === 'string' && /^\d{1,25}$/.test(sp.campanha) ? sp.campanha : null;
   const frame = {
     title: 'Anúncios',
     basePath: '/crm/anuncios/google',
@@ -40,8 +44,9 @@ export default async function GoogleAdsPage({ searchParams }: { searchParams: Pr
     );
   }
 
-  const conexao = await googleAdsConnection(ctx.tenantId);
-  if (conexao.state !== 'connected') {
+  const data = await loadGoogleAdsPage(ctx.tenantId, period, campanha);
+  const conexao = data.connection;
+  if (data.state === 'not_connected' || data.state === 'choosing') {
     return (
       <ReportFrame {...frame}>
         <div className="mx-auto grid max-w-4xl gap-5 lg:grid-cols-[1.1fr_1fr] lg:items-start">
@@ -82,11 +87,42 @@ export default async function GoogleAdsPage({ searchParams }: { searchParams: Pr
     );
   }
 
+  if (data.state === 'error') {
+    const reconectar = data.kind === 'auth' || data.kind === 'permission';
+    return (
+      <ReportFrame {...frame} refresh={refreshGoogleAdsAction}>
+        <EmptyState
+          icon={<CloudOff className="h-5 w-5" />}
+          title={data.kind === 'rate' ? 'O Google pediu uma pausa' : reconectar ? 'A conexão com o Google Ads precisa de atenção' : 'Não deu para buscar os números'}
+          action={
+            reconectar && ctx.manager ? (
+              <Link href="/crm/whatsapp#google-ads" className="btn-primary btn-md">
+                Abrir Canais
+              </Link>
+            ) : undefined
+          }
+        >
+          <p>{data.message}</p>
+          {!reconectar && <p>Use o botão Atualizar, ali em cima, para tentar de novo. Nada foi perdido: os números continuam no Google e no CRM.</p>}
+          {reconectar && !ctx.manager && <p>Peça a um gestor do CRM para reconectar o Google Ads.</p>}
+        </EmptyState>
+      </ReportFrame>
+    );
+  }
+
+  if (data.state !== 'ok') return null;
+
   return (
-    <ReportFrame {...frame}>
-      <EmptyState icon={<Search className="h-5 w-5" />} title={`Conectado à conta ${conexao.accountName ?? ''}`}>
-        <p>Os gráficos do Google Ads aparecem aqui assim que a próxima atualização do DreamClin entrar no ar.</p>
-      </EmptyState>
-    </ReportFrame>
+    <AdsReportView
+      report={data.report}
+      breakdowns={data.breakdowns}
+      period={period}
+      accountName={data.connection.accountName}
+      range={data.range}
+      fetchedAt={data.fetchedAt}
+      tabs={frame.tabs}
+      source={GOOGLE_SOURCE}
+      refresh={refreshGoogleAdsAction}
+    />
   );
 }
