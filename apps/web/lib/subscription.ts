@@ -133,7 +133,14 @@ export function resolveAccess(snapshot: SubscriptionSnapshot, now: Date = new Da
     };
   }
 
-  if (snapshot.status === 'TRIALING' && snapshot.trialEndsAt) {
+  // O teste vale pelas datas, não pelo status gravado. A reconciliação diária
+  // grava SUSPENDED quando o teste acaba sem plano; se só o status TRIALING
+  // contasse aqui, no dia seguinte a clínica caía na conta da mensalidade
+  // (vencimento = fim do teste) e ganhava 7 dias de "pagamento em atraso" de
+  // um plano que nunca assinou, e depois "falta de pagamento".
+  const testeSemPlano =
+    snapshot.billingLinked === false && snapshot.status !== 'ACTIVE' && snapshot.status !== 'TRIALING';
+  if (snapshot.trialEndsAt && (snapshot.status === 'TRIALING' || testeSemPlano)) {
     const left = daysBetween(now, snapshot.trialEndsAt);
     if (left > 0) {
       return {
@@ -192,7 +199,9 @@ export function resolveAccess(snapshot: SubscriptionSnapshot, now: Date = new Da
       level: 'full',
       status: 'PAST_DUE',
       daysLeft: left,
-      warning: `Pagamento em atraso. O acesso será limitado em ${left} ${plural(left, 'dia', 'dias')}.`,
+      // "Em aberto", não "em atraso": quem acabou de escolher o plano depois do
+      // teste tem a primeira fatura vencendo hoje, e ainda não atrasou nada.
+      warning: `Fatura em aberto. Pague em até ${left} ${plural(left, 'dia', 'dias')} para o acesso não ser limitado.`,
       inGrace: true,
       complimentary: false,
       trialEnded: false,
@@ -222,3 +231,25 @@ export const NO_SUBSCRIPTION: Access = {
 };
 
 export const canWrite = (access: Access): boolean => access.level === 'full';
+
+export type StandingTone = 'ok' | 'warn' | 'blocked';
+
+/**
+ * A situação da clínica em poucas palavras, para o cartão dela no menu. Fica à
+ * vista em toda tela, então é ali que a clínica acompanha os dias do teste sem
+ * precisar abrir a tela do plano.
+ */
+export function standingLabel(access: Access): { label: string; tone: StandingTone } {
+  if (access.level === 'readonly') return { label: access.trialEnded ? 'Teste encerrado' : 'Só leitura', tone: 'blocked' };
+  if (access.status === 'TRIALING') {
+    const n = access.daysLeft;
+    return {
+      label: n === null ? 'Teste grátis' : `Teste grátis · ${n === 1 ? 'último dia' : `faltam ${n} dias`}`,
+      tone: n !== null && n <= 5 ? 'warn' : 'ok',
+    };
+  }
+  if (access.inGrace) return { label: 'Fatura em aberto', tone: 'warn' };
+  if (access.status === 'CANCELLED') return { label: 'Cancelada', tone: 'warn' };
+  return { label: 'Ativo', tone: 'ok' };
+}
+
