@@ -33,6 +33,7 @@ describe.skipIf(!process.env.DATABASE_URL)('API oficial (banco)', async () => {
     await prisma.chatMessage.deleteMany({ where: t });
     await prisma.conversation.deleteMany({ where: t });
     await prisma.whatsAppCloudAccount.deleteMany({ where: t });
+    await prisma.subscription.deleteMany({ where: t });
     await prisma.tenant.delete({ where: { id: tenant.id } });
     await prisma.$disconnect();
   });
@@ -133,5 +134,24 @@ describe.skipIf(!process.env.DATABASE_URL)('API oficial (banco)', async () => {
     expect((await prisma.whatsAppCloudAccount.findUnique({ where: { tenantId: tenant.id } }))?.status).toBe('ERROR');
     expect(await activeCloudAccount(tenant.id)).toBeNull();
     void encrypt;
+  });
+
+  it('clínica em só leitura: nada sai pela Meta e a mensagem fica "não enviada" com o motivo', async () => {
+    const r = await chegou('5511911110005', 'Oi');
+    if (!r.recorded) throw new Error(r.reason);
+    const w = await writeChatMessage(db, { tenantId: tenant.id, userId: null }, r.conversationId, 'Promoção!');
+    if (!w.ok) throw new Error(w.message);
+    // Teste grátis acabou ontem, sem plano.
+    const ontem = new Date(Date.now() - 86_400_000);
+    await prisma.subscription.create({
+      data: { tenantId: tenant.id, tier: 'ESSENCIAL', status: 'SUSPENDED', trialEndsAt: ontem, currentPeriodEnd: ontem },
+    });
+    meta({ messages: [{ id: 'wamid.NAO' }] });
+    const res = await sendViaCloud(account, w.messageId);
+    expect(res.ok).toBe(false);
+    expect(fetch).not.toHaveBeenCalled();
+    const row = await db.chatMessage.findFirst({ where: { id: w.messageId } });
+    expect(row?.status).toBe('FAILED');
+    expect(row?.errorMessage).toContain('plano da clínica');
   });
 });

@@ -3,6 +3,7 @@ import { CloudApiError } from '@clinicaiq/whatsapp';
 import { activeCloudAccount, cloudClient, windowOpen, type CloudAccount } from './cloud';
 import { previewText } from './chat-ingest';
 import { fileNameOf, isStoredRef, readChatMedia } from './media-store';
+import { READONLY_SEND_MESSAGE, tenantReadonly } from '@/lib/tenant-standing';
 
 const CLOUD_KIND = { IMAGE: 'image', VIDEO: 'video', AUDIO: 'audio', DOCUMENT: 'document' } as const;
 
@@ -76,6 +77,10 @@ export async function sendViaCloud(
   };
 
   if (now.getTime() - row.at.getTime() > GIVE_UP_AFTER_MS) return fail('Não foi enviada a tempo. Tente de novo.');
+  // Clínica em só leitura (teste acabou sem plano, fatura vencida): o robô, a
+  // transmissão e as automações param aqui, num lugar só. Vira "não enviada"
+  // em vez de ficar na fila e sair semanas depois, quando ela pagar.
+  if (await tenantReadonly(tenantId, now)) return fail(READONLY_SEND_MESSAGE);
 
   let text = '';
   let phone = '';

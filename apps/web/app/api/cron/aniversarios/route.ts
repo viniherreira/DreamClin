@@ -4,6 +4,7 @@ import { WHATSAPP_TEMPLATES } from '@clinicaiq/whatsapp';
 import { dispatchBirthdayMessage } from '@/lib/whatsapp';
 import { clinicToday } from '@/lib/tz';
 import { bearerMatches } from '@/lib/bearer';
+import { readonlyTenants } from '@/lib/tenant-standing';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -26,10 +27,13 @@ export async function GET(req: Request) {
   const today = clinicToday(); // yyyy-MM-dd in the clinic timezone
   const [, month, day] = today.split('-').map(Number);
 
-  const tenants = await prisma.whatsAppSession.findMany({
+  const conectadas = await prisma.whatsAppSession.findMany({
     where: { status: 'CONNECTED', notifyBirthday: true },
     select: { tenantId: true },
   });
+  // Clínica em só leitura (teste acabou sem plano, fatura vencida) não manda parabéns.
+  const semPlano = await readonlyTenants(conectadas.map((t) => t.tenantId));
+  const tenants = conectadas.filter((t) => !semPlano.has(t.tenantId));
   if (tenants.length === 0) {
     return NextResponse.json({ ok: true, date: today, tenants: 0, candidates: 0, sent: 0, failed: 0 });
   }

@@ -5,6 +5,7 @@ import { WHATSAPP_TEMPLATES } from '@clinicaiq/whatsapp';
 import { readReminderDays } from './agenda-options';
 import { dispatchAppointmentMessage } from './whatsapp';
 import { clinicToday } from './tz';
+import { readonlyTenants } from './tenant-standing';
 
 /** Marcada há menos que isto não recebe lembrete hoje: o aviso do agendamento acabou de sair. */
 const JUST_BOOKED_MS = 12 * 60 * 60 * 1000;
@@ -70,8 +71,14 @@ export async function sendDueReminders(opts: { tenantId?: string } = {}): Promis
       take: 500,
     });
 
+    // Clínica em só leitura (teste acabou sem plano, fatura vencida) não manda
+    // lembrete: o paciente responderia "quero remarcar" e ninguém conseguiria
+    // remarcar pelo sistema. Pagou, os lembretes voltam na manhã seguinte.
+    const semPlano = await readonlyTenants(appointments.map((a) => a.tenantId));
+
     const rodada: ReminderRound = { days, date, candidates: 0, sent: 0, failed: 0 };
     for (const appt of appointments) {
+      if (semPlano.has(appt.tenantId)) continue;
       // Marcou há pouco: acabou de receber o aviso do agendamento.
       const avisada = !diasDe.has(appt.tenantId) || avisaAoMarcar.has(appt.tenantId);
       if (avisada && appt.createdAt > recemMarcada) continue;
