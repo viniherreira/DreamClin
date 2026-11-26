@@ -154,6 +154,8 @@ export const cachedFetchers: MetaFetchers = {
 /** Onde, para quem e a que horas o anúncio rendeu. Vazio se a Meta não devolveu o recorte. */
 export interface AdsBreakdowns {
   platforms: ReturnType<typeof buildPlatforms>;
+  /** Celular, computador… (o Google informa; a Meta, por enquanto, não). */
+  devices?: ReturnType<typeof buildPlatforms>;
   audience: ReturnType<typeof buildAudience>;
   hours: ReturnType<typeof buildAdHours>;
 }

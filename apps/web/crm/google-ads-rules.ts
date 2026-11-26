@@ -1,4 +1,4 @@
-import type { InsightRow, MetaErrorKind } from './ads-rules';
+import type { Audience, BreakdownMetric, BreakdownRow, InsightRow, MetaErrorKind } from './ads-rules';
 
 /**
  * Regras puras do Google Ads (testadas por tabela): o que fica guardado da
@@ -118,3 +118,86 @@ export function classifyGoogleError(status: number, body: unknown): { kind: Meta
   }
   return { kind: 'other', message: 'Não foi possível buscar os números do Google Ads agora. Tente de novo.' };
 }
+
+// ─── Recortes: rede, aparelho, idade, gênero e hora ─────────────────────────
+
+export type GoogleBreakdownKind = 'network' | 'device' | 'age' | 'gender' | 'hour';
+
+const NETWORK: Record<string, string> = {
+  SEARCH: 'Pesquisa Google',
+  SEARCH_PARTNERS: 'Parceiros de pesquisa',
+  CONTENT: 'Rede de Display',
+  YOUTUBE: 'YouTube',
+  YOUTUBE_SEARCH: 'YouTube',
+  YOUTUBE_WATCH: 'YouTube',
+  GOOGLE_TV: 'Google TV',
+  MIXED: 'Várias redes (Performance Max)',
+};
+
+const DEVICE: Record<string, string> = {
+  MOBILE: 'Celular',
+  DESKTOP: 'Computador',
+  TABLET: 'Tablet',
+  CONNECTED_TV: 'TV',
+};
+
+/** AGE_RANGE_25_34 → "25-34"; AGE_RANGE_65_UP → "65+". */
+export function ageKey(v: unknown): string {
+  const m = typeof v === 'string' ? v.match(/^AGE_RANGE_(\d{2})_(\d{2}|UP)$/) : null;
+  if (!m) return 'unknown';
+  return m[2] === 'UP' ? `${m[1]}+` : `${m[1]}-${m[2]}`;
+}
+
+export const genderKey = (v: unknown): string => (v === 'FEMALE' ? 'female' : v === 'MALE' ? 'male' : 'unknown');
+
+/** Uma linha de recorte do Google → a linha de recorte que os gráficos já leem (as chaves da Meta). */
+export function parseGoogleBreakdown(raw: unknown, kind: GoogleBreakdownKind): BreakdownRow {
+  const base = parseGoogleRow(raw);
+  const keys: Record<string, string> = {};
+  if (kind === 'network') {
+    const n = at(raw, 'segments.adNetworkType');
+    keys.publisher_platform = (typeof n === 'string' && NETWORK[n]) || 'unknown';
+  } else if (kind === 'device') {
+    const d = at(raw, 'segments.device');
+    keys.publisher_platform = (typeof d === 'string' && DEVICE[d]) || 'unknown';
+  } else if (kind === 'age') {
+    keys.age = ageKey(at(raw, 'adGroupCriterion.ageRange.type'));
+    keys.gender = 'unknown';
+  } else if (kind === 'gender') {
+    keys.age = 'unknown';
+    keys.gender = genderKey(at(raw, 'adGroupCriterion.gender.type'));
+  } else {
+    const h = Number(at(raw, 'segments.hour'));
+    keys.hourly_stats_aggregated_by_advertiser_time_zone = Number.isInteger(h) && h >= 0 && h <= 23 ? `${String(h).padStart(2, '0')}:00:00` : 'unknown';
+  }
+  return { keys, spendCents: base.spendCents, impressions: base.impressions, clicks: base.clicks, conversations: base.conversations };
+}
+
+const AGE_ORDER = ['18-24', '25-34', '35-44', '45-54', '55-64', '65+'];
+
+/**
+ * Idade e gênero do Google vêm separados (não dá para cruzar): as faixas de
+ * idade ficam na coluna "não informado" e o gênero, só nos totais. A tela
+ * mostra os dois lado a lado, sem a pirâmide.
+ */
+export function buildGoogleAudience(ageRows: readonly BreakdownRow[], genderRows: readonly BreakdownRow[]): Audience {
+  const todas = [...ageRows, ...genderRows];
+  const metric: BreakdownMetric = todas.some((r) => r.conversations > 0) ? 'conversations' : todas.some((r) => r.clicks > 0) ? 'clicks' : 'impressions';
+  const porIdade = new Map<string, number>();
+  for (const r of ageRows) {
+    const age = r.keys.age ?? 'unknown';
+    if (age === 'unknown' || r[metric] <= 0) continue;
+    porIdade.set(age, (porIdade.get(age) ?? 0) + r[metric]);
+  }
+  const totals = { female: 0, male: 0, unknown: 0 };
+  for (const r of genderRows) {
+    const g = r.keys.gender === 'female' ? 'female' : r.keys.gender === 'male' ? 'male' : 'unknown';
+    totals[g] += Math.max(0, r[metric]);
+  }
+  const ordem = (a: string) => (AGE_ORDER.indexOf(a) === -1 ? 99 : AGE_ORDER.indexOf(a));
+  const ages = [...porIdade.entries()]
+    .map(([age, v]) => ({ age, female: 0, male: 0, unknown: v }))
+    .sort((a, b) => ordem(a.age) - ordem(b.age));
+  return { metric, ages, totals, top: null };
+}
+

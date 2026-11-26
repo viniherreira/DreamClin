@@ -55,7 +55,7 @@ const hide = (c: { hideOnMobile?: boolean }) => (c.hideOnMobile ? 'hidden md:tab
 
 const NUM = 'viz-num whitespace-nowrap text-[12px] sm:text-[13px]';
 
-function Cells({ l, share }: { l: ReportLine; share?: number }) {
+function Cells({ l, share, crm }: { l: ReportLine; share?: number; crm: boolean }) {
   return (
     <>
       <td className="px-2 py-3 text-right align-middle sm:px-3">
@@ -71,12 +71,16 @@ function Cells({ l, share }: { l: ReportLine; share?: number }) {
       <td className={`hidden px-3 py-3 text-right md:table-cell ${NUM}`}>
         {l.costPerConversationCents == null ? <span className="text-muted-foreground">–</span> : formatMoney(l.costPerConversationCents)}
       </td>
-      <td className={`hidden px-3 py-3 text-right md:table-cell ${NUM}`}>{formatCount(l.scheduled)}</td>
-      <td className={`hidden px-3 py-3 text-right md:table-cell ${NUM}`}>{formatCount(l.won)}</td>
-      <td className={`hidden px-3 py-3 text-right md:table-cell ${NUM}`}>{formatCents(l.revenueCents)}</td>
-      <td className="whitespace-nowrap py-3 pl-2 text-right sm:pl-3">
-        <Roas line={l} />
-      </td>
+      {crm && (
+        <>
+          <td className={`hidden px-3 py-3 text-right md:table-cell ${NUM}`}>{formatCount(l.scheduled)}</td>
+          <td className={`hidden px-3 py-3 text-right md:table-cell ${NUM}`}>{formatCount(l.won)}</td>
+          <td className={`hidden px-3 py-3 text-right md:table-cell ${NUM}`}>{formatCents(l.revenueCents)}</td>
+          <td className="whitespace-nowrap py-3 pl-2 text-right sm:pl-3">
+            <Roas line={l} />
+          </td>
+        </>
+      )}
     </>
   );
 }
@@ -105,7 +109,20 @@ function Thumb({ ad }: { ad: AdLine }) {
   return <img src={ad.thumbnailUrl} alt="" width={40} height={40} loading="lazy" referrerPolicy="no-referrer" onError={() => setQuebrou(true)} className="h-10 w-10 shrink-0 rounded-lg object-cover ring-1 ring-foreground/10" />;
 }
 
-export function CampaignTable({ lines }: { lines: CampaignLine[] }) {
+export function CampaignTable({
+  lines,
+  resultLabel = 'Conversas',
+  costLabel = 'Custo por conversa',
+  crm = true,
+}: {
+  lines: CampaignLine[];
+  /** O nome do resultado da fonte ("Conversas" na Meta, "Conversões" no Google). */
+  resultLabel?: string;
+  costLabel?: string;
+  /** Sem os leads ligados ao CRM, as colunas de agendou, fechou e retorno somem. */
+  crm?: boolean;
+}) {
+  const colunas = COLS.filter((c) => crm || !['scheduled', 'won', 'revenueCents', 'roas'].includes(c.key)).map((c) => (c.key === 'conversations' ? { ...c, label: resultLabel } : c.key === 'costPerConversationCents' ? { ...c, label: costLabel } : c));
   const [sort, setSort] = useState<{ key: Key; dir: 'asc' | 'desc' }>({ key: 'spendCents', dir: 'desc' });
   const [abertas, setAbertas] = useState<Set<string>>(new Set());
 
@@ -131,7 +148,7 @@ export function CampaignTable({ lines }: { lines: CampaignLine[] }) {
         <caption className="sr-only">Resultado por campanha. Abra uma campanha para ver os anúncios dela.</caption>
         <thead>
           <tr className="border-b border-border/70 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-            {COLS.map((c, i) => (
+            {colunas.map((c, i) => (
               <th
                 key={c.key}
                 scope="col"
@@ -176,7 +193,7 @@ export function CampaignTable({ lines }: { lines: CampaignLine[] }) {
                       </span>
                     </button>
                   </th>
-                  <Cells l={l} share={gastoTotal > 0 ? l.spendCents / gastoTotal : 0} />
+                  <Cells l={l} share={gastoTotal > 0 ? l.spendCents / gastoTotal : 0} crm={crm} />
                 </tr>
                 {aberta &&
                   l.ads.map((ad) => (
@@ -189,7 +206,7 @@ export function CampaignTable({ lines }: { lines: CampaignLine[] }) {
                           <span className="min-w-0"><Nome texto={ad.name} /></span>
                         </span>
                       </th>
-                      <Cells l={ad} />
+                      <Cells l={ad} crm={crm} />
                     </tr>
                   ))}
               </Fragment>
