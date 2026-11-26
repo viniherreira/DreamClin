@@ -1,6 +1,6 @@
 import { prisma, type LeadSource, type TenantPrismaClient } from '@clinicaiq/db';
 import { readCrmPrefs } from './crm-prefs';
-import { CHANNEL_TAG, CHANNEL_TAG_NAMES, matchProcedures } from './auto-tags-rules';
+import { CHANNEL_TAG, CHANNEL_TAG_NAMES, matchProcedures, procedureForTag, sameTag } from './auto-tags-rules';
 import type { CrmColor } from './defaults';
 
 /**
@@ -23,9 +23,9 @@ export async function autoTagsOn(tenantId: string): Promise<boolean> {
   return readCrmPrefs(t?.settings).autoTags;
 }
 
-/** A tag com esse nome (sem diferenciar maiúscula), ou cria. */
+/** A tag com esse nome (acento, hífen e maiúscula não contam: `tagKey`), ou cria. */
 export async function ensureTag(db: TenantPrismaClient, tenantId: string, name: string, color: CrmColor): Promise<string> {
-  const achar = () => db.leadTag.findFirst({ where: { name: { equals: name, mode: 'insensitive' } }, select: { id: true } });
+  const achar = async () => sameTag(await db.leadTag.findMany({ select: { id: true, name: true } }), name);
   const tem = await achar();
   if (tem) return tem.id;
   try {
@@ -100,3 +100,53 @@ export async function applyProcedureTags(db: TenantPrismaClient, tenantId: strin
   }
   return novas;
 }
+
+/**
+ * A tag de procedimento preenche o interesse do lead, se ainda estiver vazio:
+ * pôr "implante" na mão, por automação, robô ou planilha dá ao lead o
+ * interesse no procedimento de implante da clínica. Nunca troca um interesse
+ * que já existe e nunca derruba quem chamou.
+ */
+export async function fillInterestFromTags(db: TenantPrismaClient, leadId: string, tagIds: readonly string[]): Promise<void> {
+  if (!tagIds.length) return;
+  try {
+    const lead = await db.lead.findFirst({ where: { id: leadId, interestProcedureId: null }, select: { id: true } });
+    if (!lead) return;
+    const [tags, procedures] = await Promise.all([
+      db.leadTag.findMany({ where: { id: { in: [...tagIds] } }, select: { id: true, name: true } }),
+      db.procedure.findMany({ where: { active: true, deletedAt: null }, select: { id: true, name: true } }),
+    ]);
+    if (!procedures.length) return;
+    // Na ordem em que vieram: a primeira tag que é procedimento decide.
+    for (const id of tagIds) {
+      const tag = tags.find((t) => t.id === id);
+      const proc = tag ? procedureForTag(tag.name, procedures) : null;
+      if (proc) {
+        await db.lead.updateMany({ where: { id: leadId, interestProcedureId: null }, data: { interestProcedureId: proc } });
+        return;
+      }
+    }
+  } catch (e) {
+    console.error('[crm] interesse pela tag falhou', e instanceof Error ? e.message : e);
+  }
+}
+
+/**
+ * O assunto do anúncio ("Implante") vira a tag do procedimento nos leads que
+ * vieram por ele, a mesma tag que a conversa põe: um filtro só acha os dois.
+ * Respeita a chave das tags automáticas. Nunca derruba quem chamou.
+ */
+export async function tagAdTopic(db: TenantPrismaClient, tenantId: string, leadIds: readonly string[], topic: string): Promise<void> {
+  const nome = topic.trim().toLowerCase().slice(0, 30);
+  if (!nome || !leadIds.length) return;
+  try {
+    if (!(await autoTagsOn(tenantId))) return;
+    const tagId = await ensureTag(db, tenantId, nome, 'violet');
+    for (const leadId of leadIds) {
+      if (await tagLead(db, tenantId, leadId, tagId)) await fillInterestFromTags(db, leadId, [tagId]);
+    }
+  } catch (e) {
+    console.error('[crm] tag do assunto do anúncio falhou', e instanceof Error ? e.message : e);
+  }
+}
+

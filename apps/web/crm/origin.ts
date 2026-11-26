@@ -6,6 +6,7 @@ import { fetchAdInfo } from './ads-meta';
 import type { AdInfo } from './ads-rules';
 import type { ProcedureLite } from './auto-tags-rules';
 import { adMetaOf, cleanTopic, topicFor, type TopicRule } from './origin-rules';
+import { tagAdTopic } from './auto-tags';
 
 /**
  * A origem do lead pelo anúncio: gravada uma vez, no primeiro contato que
@@ -79,6 +80,7 @@ export async function captureOrigin(db: TenantPrismaClient, tenantId: string, le
   if (count && assunto?.procedureId) {
     await db.lead.updateMany({ where: { id: leadId, interestProcedureId: null }, data: { interestProcedureId: assunto.procedureId } });
   }
+  if (count && assunto?.topic) await tagAdTopic(db, tenantId, [leadId], assunto.topic);
   return count > 0;
 }
 
@@ -125,7 +127,7 @@ export async function backfillOriginsSometimes(tenantId: string): Promise<void> 
  * Recalcula o assunto dos leads que vieram por anúncio (depois que a clínica
  * escolhe ou tira o assunto de um anúncio ou campanha, ou chegam os nomes da Meta).
  */
-async function recomputeTopics(db: TenantPrismaClient, where: Prisma.LeadWhereInput): Promise<number> {
+async function recomputeTopics(db: TenantPrismaClient, tenantId: string, where: Prisma.LeadWhereInput): Promise<number> {
   const leads = await db.lead.findMany({
     where: { ...where, originAt: { not: null }, deletedAt: null },
     select: { id: true, originAdId: true, originCampaignId: true, originCampaignName: true, originAdName: true, originHeadline: true, originTopic: true },
@@ -152,6 +154,7 @@ async function recomputeTopics(db: TenantPrismaClient, where: Prisma.LeadWhereIn
   for (const g of grupos.values()) {
     n += (await db.lead.updateMany({ where: { id: { in: g.ids } }, data: { originTopic: g.topic } })).count;
     if (g.procedureId) await db.lead.updateMany({ where: { id: { in: g.ids }, interestProcedureId: null }, data: { interestProcedureId: g.procedureId } });
+    if (g.topic) await tagAdTopic(db, tenantId, g.ids, g.topic);
   }
   return n;
 }
@@ -170,7 +173,7 @@ export async function fillMissingAdNames(tenantId: string): Promise<number> {
       data: { originCampaignId: i.campaignId, originCampaignName: i.campaignName, originAdName: i.name, ...(i.thumbnailUrl ? { originImageUrl: i.thumbnailUrl } : {}) },
     });
   }
-  return recomputeTopics(db, { originAdId: { in: [...info.keys()] } });
+  return recomputeTopics(db, tenantId, { originAdId: { in: [...info.keys()] } });
 }
 
 export interface AdOriginRow {
@@ -251,7 +254,7 @@ export async function setAdTopic(
       await db.adTopic.updateMany({ where: { scope: input.scope, externalId: input.externalId }, data: { topic, procedureId } });
     }
   }
-  const leads = await recomputeTopics(db, input.scope === 'AD' ? { originAdId: input.externalId } : { originCampaignId: input.externalId });
+  const leads = await recomputeTopics(db, tenantId, input.scope === 'AD' ? { originAdId: input.externalId } : { originCampaignId: input.externalId });
   return { ok: true, leads };
 }
 
