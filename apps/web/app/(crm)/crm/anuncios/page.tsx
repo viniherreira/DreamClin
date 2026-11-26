@@ -12,6 +12,8 @@ import { ReportFrame } from '../_components/report/frame';
 import { EmptyState } from '../_components/report/parts';
 import { AdsReportView } from './_components/report-view';
 import { AdTopics } from './_components/ad-topics';
+import { adsTabs } from './_components/ads-tabs';
+import { googleAdsEnabled } from '@/lib/feature-flags';
 import { after } from 'next/server';
 import { adOrigins, backfillOriginsSometimes } from '@/crm/origin';
 
@@ -28,7 +30,8 @@ export default async function AnunciosPage({ searchParams }: { searchParams: Pro
   const period = asReportPeriod(typeof sp.periodo === 'string' ? sp.periodo : undefined);
   const campanha = typeof sp.campanha === 'string' && /^\d{5,25}$/.test(sp.campanha) ? sp.campanha : null;
 
-  const frame = { title: 'Anúncios', basePath: '/crm/anuncios', periods: REPORT_PERIODS, period, defaultPeriod: DEFAULT_REPORT_PERIOD };
+  const tabs = adsTabs('meta', await googleAdsEnabled(ctx.tenantId));
+  const frame = { title: 'Anúncios', basePath: '/crm/anuncios', periods: REPORT_PERIODS, period, defaultPeriod: DEFAULT_REPORT_PERIOD, tabs };
 
   // O gasto é da clínica inteira: quem vê só os próprios leads não tem como ler estes números direito.
   if (ctx.ownOnly) {
@@ -124,6 +127,7 @@ export default async function AnunciosPage({ searchParams }: { searchParams: Pro
       range={data.range}
       fetchedAt={data.fetchedAt}
       extra={assuntos}
+      tabs={tabs}
     />
   );
 }

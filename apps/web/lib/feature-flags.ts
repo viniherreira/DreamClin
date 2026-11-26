@@ -18,3 +18,17 @@ export const pacienteAgendaEnabled = cache(async (tenantId: string): Promise<boo
     .catch(() => null);
   return Boolean(sub?.complimentary);
 });
+
+/**
+ * Bandeira do Google Ads (conexão em Canais e a aba Google em Anúncios).
+ * Primeiro só na conta em cortesia do dono; `GOOGLE_ADS=todos` na Vercel
+ * libera para todas as clínicas.
+ */
+export const googleAdsEnabled = cache(async (tenantId: string): Promise<boolean> => {
+  if (process.env.GOOGLE_ADS === 'todos') return true;
+  const sub = await prisma.subscription
+    .findUnique({ where: { tenantId }, select: { complimentary: true } })
+    .catch(() => null);
+  return Boolean(sub?.complimentary);
+});
+
