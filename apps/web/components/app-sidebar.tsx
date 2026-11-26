@@ -129,8 +129,11 @@ export function AppSidebar({
   crmManager,
   finance = false,
   patientAgenda = false,
+  standing,
 }: {
   clinicName: string;
+  /** A situação do plano, no cartão da clínica. */
+  standing?: { label: string; tone: 'ok' | 'warn' | 'blocked' };
   /** Financeiro completo ligado nesta clínica. */
   finance?: boolean;
   /** Paciente e agenda novos ligados nesta clínica. */
@@ -157,5 +160,5 @@ export function AppSidebar({
       <CrmRail items={itens} active={ativo} counts={contagem} clinicName={clinicName} showSwitcher={showSwitcher} clinicHome={clinicHomeFor(crmOnly)} crmOnly={crmOnly} />
     );
   }
-  return <ClinicSidebar items={itens} active={ativo} clinicName={clinicName} showSwitcher={showSwitcher} clinicHome={clinicHomeFor(crmOnly)} />;
+  return <ClinicSidebar items={itens} active={ativo} clinicName={clinicName} showSwitcher={showSwitcher} clinicHome={clinicHomeFor(crmOnly)} standing={standing} />;
 }

@@ -8,6 +8,7 @@ import { AppHeader } from '@/components/app-header';
 import { SubscriptionBanner } from '@/components/subscription-banner';
 import type { Space } from '@/components/module-switcher';
 import { getTenantAccess, getTenantModules } from '@/lib/access';
+import { standingLabel } from '@/lib/subscription';
 import { can } from '@/lib/permissions';
 import { effectiveRights } from '@/lib/crm-rights';
 import { conversationScope } from '@/crm/scope-rules';
@@ -114,6 +115,7 @@ export async function AppShell({
         crmManager={crmManager}
         finance={finance}
         patientAgenda={patientAgenda}
+        standing={standingLabel(access)}
       />
       <div className="flex min-w-0 flex-1 flex-col">
         <AppHeader
@@ -133,7 +135,7 @@ export async function AppShell({
           patientPalette={patientAgenda}
           finance={finance}
         />
-        <SubscriptionBanner access={access} />
+        <SubscriptionBanner access={access} canManage={can(me?.role, 'planos')} />
         <main id="main-content" className="flex-1 overflow-auto bg-canvas">
           {children}
         </main>
