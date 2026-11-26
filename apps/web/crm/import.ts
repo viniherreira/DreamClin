@@ -9,6 +9,7 @@ import { createLead, moveLead, OPEN_LEAD, renumberStage, type Actor } from './le
 import { mainPipeline } from './pipeline';
 import { phoneHashes } from './phone';
 import { createPipeline, createStage } from './settings';
+import { fillInterestFromTags } from './auto-tags';
 
 /** A primeira coluna aberta de um funil: a entrada de quem não tem "Novo" (Agendados). */
 const primeiraColuna = <T extends { role: string | null; order: number }>(etapas: readonly T[]): T | undefined =>
@@ -146,7 +147,8 @@ export async function importBatch(ctx: CrmContext, records: ImportRecord[], opti
 
   let funis = await db.pipeline.findMany({ select: { id: true, name: true, order: true, createdAt: true } });
   let etapas: Stage[] = await db.pipelineStage.findMany({ select: { id: true, name: true, pipelineId: true, role: true, order: true } });
-  const tags = new Map((await db.leadTag.findMany({ select: { id: true, name: true } })).map((t) => [t.name, t.id]));
+  // Pela "cara" do nome: "Prótese" da planilha cai na tag "protese" que já existe.
+  const tags = new Map((await db.leadTag.findMany({ select: { id: true, name: true } })).map((t) => [chave(t.name), t.id]));
   const users = await db.user.findMany({ where: { active: true }, select: { id: true, name: true, email: true } });
   const motivos = await db.lostReason.findMany({ select: { id: true, name: true, order: true } });
   const defs = new Map((await listFieldDefs(db, { activeOnly: true })).map((d) => [d.id, d]));
@@ -203,11 +205,11 @@ export async function importBatch(ctx: CrmContext, records: ImportRecord[], opti
   async function tagIds(nomes: string[]) {
     const ids: string[] = [];
     for (const nome of nomes) {
-      let id = tags.get(nome);
+      let id = tags.get(chave(nome));
       if (!id) {
         const cor = CRM_COLORS[tags.size % CRM_COLORS.length];
         id = (await db.leadTag.create({ data: { tenantId, name: nome, color: cor }, select: { id: true } })).id;
-        tags.set(nome, id);
+        tags.set(chave(nome), id);
       }
       ids.push(id);
     }
@@ -240,6 +242,7 @@ export async function importBatch(ctx: CrmContext, records: ImportRecord[], opti
     const ids = await tagIds(rec.tags);
     if (ids.length) {
       await db.leadTagOnLead.createMany({ data: ids.map((tagId) => ({ tenantId, leadId, tagId })), skipDuplicates: true });
+      await fillInterestFromTags(db, leadId, ids);
     }
     if (rec.notes.length) {
       await db.leadActivity.createMany({

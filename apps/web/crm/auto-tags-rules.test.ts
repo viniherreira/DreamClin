@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CHANNEL_TAG, matchProcedures } from './auto-tags-rules';
+import { CHANNEL_TAG, matchProcedures, procedureForTag, sameTag, tagKey } from './auto-tags-rules';
 
 const tags = (text: string, procs: { id: string; name: string }[] = []) => matchProcedures(text, procs).map((m) => m.tag);
 
@@ -62,3 +62,40 @@ describe('tags de canal', () => {
     expect(CHANNEL_TAG.OUTRO).toBeUndefined();
   });
 });
+
+describe('nome da tag', () => {
+  it('acento, maiúscula, hífen e espaço não fazem outra tag', () => {
+    expect(tagKey('Prótese')).toBe(tagKey('protese'));
+    expect(tagKey('carga-imediata')).toBe(tagKey('Carga  Imediata'));
+    expect(tagKey('harmonização_facial')).toBe('harmonizacao facial');
+    expect(tagKey('implante')).not.toBe(tagKey('implantes de dente'));
+  });
+
+  it('acha a tag que já existe', () => {
+    const lista = [{ id: 'a', name: 'prótese' }, { id: 'b', name: 'carga imediata' }];
+    expect(sameTag(lista, 'PROTESE')?.id).toBe('a');
+    expect(sameTag(lista, 'carga-imediata')?.id).toBe('b');
+    expect(sameTag(lista, 'implante')).toBeUndefined();
+    expect(sameTag(lista, '  ')).toBeUndefined();
+  });
+});
+
+describe('tag vira interesse', () => {
+  const procs = [
+    { id: 'imp', name: 'Implante unitário' },
+    { id: 'ozo', name: 'Ozonioterapia' },
+    { id: 'pro', name: 'Prótese total' },
+  ];
+  it('pelo dicionário e pelo nome do procedimento', () => {
+    expect(procedureForTag('implante', procs)).toBe('imp');
+    expect(procedureForTag('Implante', procs)).toBe('imp');
+    expect(procedureForTag('protese', procs)).toBe('pro');
+    expect(procedureForTag('ozonioterapia', procs)).toBe('ozo');
+  });
+  it('tag que não é procedimento não vira nada', () => {
+    expect(procedureForTag('facebook', procs)).toBeNull();
+    expect(procedureForTag('follow-up', procs)).toBeNull();
+    expect(procedureForTag('clareamento', procs)).toBeNull();
+  });
+});
+

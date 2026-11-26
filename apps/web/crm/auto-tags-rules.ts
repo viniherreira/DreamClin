@@ -108,3 +108,31 @@ function semPalavra(texto: string, palavra: string): string {
   if (!k) return texto;
   return texto.replace(new RegExp(`(^| )${k}(s|es)?(?= |$)`, 'g'), ' ').replace(/ +/g, ' ').trim();
 }
+
+/**
+ * A "cara" do nome da tag, para saber se duas são a mesma: sem acento, sem
+ * maiúscula, hífen e sublinhado viram espaço. "Prótese", "protese" e
+ * "PROTESE" são uma tag só; "carga-imediata" é "carga imediata".
+ */
+export const tagKey = (name: string): string => normalize(name);
+
+/** A tag da lista com o mesmo nome (pela `tagKey`), se houver. */
+export function sameTag<T extends { name: string }>(tags: readonly T[], name: string): T | undefined {
+  const k = tagKey(name);
+  return k ? tags.find((t) => tagKey(t.name) === k) : undefined;
+}
+
+/**
+ * O procedimento da clínica que a tag representa, para virar o interesse do
+ * lead: a tag do dicionário ("implante") acha o procedimento cadastrado com
+ * uma das palavras dela ("Implante unitário"); fora do dicionário, o
+ * procedimento com o mesmo nome da tag ("ozonioterapia").
+ */
+export function procedureForTag(tagName: string, procedures: readonly ProcedureLite[]): string | null {
+  const k = tagKey(tagName);
+  if (!k) return null;
+  const item = PROCEDURE_DICTIONARY.find((i) => tagKey(i.tag) === k || i.words.some((w) => tagKey(w) === k));
+  if (item) return clinicProcedureFor(item.words, procedures);
+  return procedures.find((p) => tagKey(p.name) === k)?.id ?? null;
+}
+
