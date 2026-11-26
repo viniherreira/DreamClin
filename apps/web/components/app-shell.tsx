@@ -6,7 +6,7 @@ import { financeEnabled } from '@/fin/flag';
 import { pacienteAgendaEnabled } from '@/lib/feature-flags';
 import { AppHeader } from '@/components/app-header';
 import { SubscriptionBanner } from '@/components/subscription-banner';
-import type { Space } from '@/components/module-switcher';
+import { planScreens, type Space } from '@/components/module-switcher';
 import { getTenantAccess, getTenantModules } from '@/lib/access';
 import { standingLabel } from '@/lib/subscription';
 import { can } from '@/lib/permissions';
@@ -71,15 +71,16 @@ export async function AppShell({
   const finance = space === 'clinic' && (await financeEnabled(tenant.id));
   const patientAgenda = space === 'clinic' && (await pacienteAgendaEnabled(tenant.id));
 
-  // O seletor só aparece para quem consegue entrar no CRM.
-  const showSwitcher = modules.crm && seat && can(role, 'crm');
+  const entraNoCrm = modules.crm && seat && can(role, 'crm');
+  // Cada plano vê só o que comprou (ver planScreens).
+  const { showSwitcher, shownSpace } = planScreens({ clinic: modules.clinic, crm: modules.crm, entraNoCrm, space });
   // O quadro de permissões manda (o cargo é só o ponto de partida dele).
   const rights = effectiveRights(role, me?.crmRole, me?.crmRights);
   const crmManager = rights.config;
 
   // Conversas não lidas, no menu do CRM.
   const unread =
-    space === 'crm' && showSwitcher
+    shownSpace === 'crm' && entraNoCrm
       ? await prisma.conversation
           .count({
             where: {
@@ -108,7 +109,7 @@ export async function AppShell({
       <AppSidebar
         clinicName={tenant.name}
         role={role}
-        space={space}
+        space={shownSpace}
         showSwitcher={showSwitcher}
         counts={{ '/crm/conversas': unread }}
         crmOnly={crmOnly}
@@ -126,12 +127,13 @@ export async function AppShell({
           roleLabel={ROLE_LABEL[role] ?? 'Sem perfil'}
           canConfig={can(me?.role, 'configuracoes')}
           canPlanos={can(me?.role, 'planos')}
-          space={space}
+          space={shownSpace}
+          crmTheme={space === 'crm'}
           showSwitcher={showSwitcher}
           units={units}
           crmOnly={crmOnly}
           crmManager={crmManager}
-          crmAvailable={space === 'crm' && showSwitcher ? (me?.crmAvailable ?? true) : undefined}
+          crmAvailable={shownSpace === 'crm' && entraNoCrm ? (me?.crmAvailable ?? true) : undefined}
           patientPalette={patientAgenda}
           finance={finance}
         />

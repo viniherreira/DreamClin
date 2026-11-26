@@ -25,6 +25,7 @@ export function AppHeader({
   canPlanos,
   space = 'clinic',
   showSwitcher = false,
+  crmTheme,
   units = null,
   crmOnly = false,
   crmManager,
@@ -50,6 +51,8 @@ export function AppHeader({
   canPlanos: boolean;
   space?: Space;
   showSwitcher?: boolean;
+  /** O tema do CRM vale só nas telas do CRM (no plano só CRM, Configurações usa o menu do CRM e o tema normal). */
+  crmTheme?: boolean;
   /** Mais de uma unidade que a pessoa vê: o seletor de unidade. */
   units?: UnitChoice | null;
   /** A clínica contratou só o CRM. */
@@ -134,7 +137,7 @@ export function AppHeader({
 
         {crmAvailable !== undefined && <AvailabilityToggle initial={crmAvailable} />}
         {/* O CRM guarda o tema dele, à parte do resto (components/crm-theme.tsx). */}
-        {space === 'crm' ? <CrmThemeToggle /> : <ThemeToggle />}
+        {(crmTheme ?? space === 'crm') ? <CrmThemeToggle /> : <ThemeToggle />}
         <div className="mx-1 h-6 w-px bg-border" aria-hidden="true" />
 
         <UserMenu

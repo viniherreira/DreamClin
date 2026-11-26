@@ -139,7 +139,7 @@ export function PatientOriginsPanel() {
   if (!data) return <p className="text-sm text-muted-foreground">Carregando…</p>;
   const ativas = data.origins.filter((o) => o.active);
   return (
-    <Box title="Origens do paciente" desc="De onde o paciente veio. Aparece no cadastro, nos filtros e nos relatórios. Quem chega pelo CRM já vem com a origem.">
+    <Box title="Origens do paciente" desc="De onde o paciente veio. Aparece no cadastro, nos filtros e nos relatórios.">
       <ul className="divide-y divide-border rounded-lg border border-border">
         {ativas.map((o) => (
           <li key={o.id} className="flex items-center gap-2 px-3 py-2 text-sm">
