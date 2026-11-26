@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { createHash } from 'node:crypto';
-import { classifyGoogleError, customerNumber, streamResults } from './google-ads-rules';
+import { classifyGoogleError, customerNumber, googleErrorCodes, streamResults } from './google-ads-rules';
 import type { MetaErrorKind } from './ads-rules';
 
 /**
@@ -26,8 +26,11 @@ export class GoogleAdsError extends Error {
 
 export const GOOGLE_ADS_SCOPE = 'https://www.googleapis.com/auth/adwords';
 
+// Sem espaço nem quebra de linha que venham junto ao colar a chave na Vercel.
+const env = (nome: 'GOOGLE_ADS_CLIENT_ID' | 'GOOGLE_ADS_CLIENT_SECRET' | 'GOOGLE_ADS_DEVELOPER_TOKEN') => process.env[nome]?.trim() ?? '';
+
 export function googleAdsConfigured(): boolean {
-  return Boolean(process.env.GOOGLE_ADS_CLIENT_ID && process.env.GOOGLE_ADS_CLIENT_SECRET && process.env.GOOGLE_ADS_DEVELOPER_TOKEN);
+  return Boolean(env('GOOGLE_ADS_CLIENT_ID') && env('GOOGLE_ADS_CLIENT_SECRET') && env('GOOGLE_ADS_DEVELOPER_TOKEN'));
 }
 
 const apiVersion = () => (process.env.GOOGLE_ADS_API_VERSION?.trim().match(/^v\d{2,3}$/) ? process.env.GOOGLE_ADS_API_VERSION.trim() : 'v22');
@@ -36,7 +39,7 @@ const adsBase = () => `https://googleads.googleapis.com/${apiVersion()}`;
 /** O endereço da janela de login do Google. `state` amarra a volta a esta clínica e pessoa. */
 export function googleAuthUrl(state: string, redirectUri: string): string {
   const url = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-  url.searchParams.set('client_id', process.env.GOOGLE_ADS_CLIENT_ID ?? '');
+  url.searchParams.set('client_id', env('GOOGLE_ADS_CLIENT_ID'));
   url.searchParams.set('redirect_uri', redirectUri);
   url.searchParams.set('response_type', 'code');
   url.searchParams.set('scope', GOOGLE_ADS_SCOPE);
@@ -54,7 +57,7 @@ async function tokenRequest(params: Record<string, string>): Promise<{ access_to
     res = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ client_id: process.env.GOOGLE_ADS_CLIENT_ID ?? '', client_secret: process.env.GOOGLE_ADS_CLIENT_SECRET ?? '', ...params }),
+      body: new URLSearchParams({ client_id: env('GOOGLE_ADS_CLIENT_ID'), client_secret: env('GOOGLE_ADS_CLIENT_SECRET'), ...params }),
       signal: AbortSignal.timeout(20_000),
       cache: 'no-store',
     });
@@ -99,7 +102,7 @@ export function forgetGoogleAccess(refreshToken: string): void {
 function adsHeaders(accessToken: string, loginCustomerId?: string | null): Record<string, string> {
   return {
     Authorization: `Bearer ${accessToken}`,
-    'developer-token': process.env.GOOGLE_ADS_DEVELOPER_TOKEN ?? '',
+    'developer-token': env('GOOGLE_ADS_DEVELOPER_TOKEN'),
     'Content-Type': 'application/json',
     ...(loginCustomerId ? { 'login-customer-id': loginCustomerId } : {}),
   };
@@ -121,8 +124,8 @@ async function adsFetch(path: string, init: { method: 'GET' | 'POST'; accessToke
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
     const e = classifyGoogleError(res.status, body);
-    // Só o status e o tipo do erro: a resposta do Google pode trazer nome de conta e e-mail.
-    console.error('[crm] google ads recusou', { status: res.status, tipo: e.kind, caminho: path.replace(/\d{10}/g, 'N') });
+    // Só o status, o tipo e os nomes dos códigos: a mensagem do Google pode trazer nome de conta e e-mail.
+    console.error('[crm] google ads recusou', { status: res.status, tipo: e.kind, codigos: googleErrorCodes(body), caminho: path.replace(/\d{10}/g, 'N') });
     throw new GoogleAdsError(e.kind, e.message);
   }
   return body;

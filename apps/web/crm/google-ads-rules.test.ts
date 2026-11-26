@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ageKey, buildGoogleAudience, classifyGoogleError, customerLabel, customerNumber, genderKey, microsToCents, parseGoogleBreakdown, parseGoogleRow, readGoogleAdsSettings, streamResults } from './google-ads-rules';
+import { ageKey, buildGoogleAudience, classifyGoogleError, customerLabel, googleErrorCodes, customerNumber, genderKey, microsToCents, parseGoogleBreakdown, parseGoogleRow, readGoogleAdsSettings, streamResults } from './google-ads-rules';
 import { buildAdHours, buildPlatforms } from './ads-rules';
 
 describe('Google Ads: regras', () => {
@@ -62,6 +62,22 @@ describe('Google Ads: regras', () => {
     expect(classifyGoogleError(403, { error: { details: [{ errors: [{ errorCode: { authorizationError: 'DEVELOPER_TOKEN_NOT_APPROVED' } }] }] } }).message).toContain('aprovação');
     expect(classifyGoogleError(403, {}).kind).toBe('permission');
     expect(classifyGoogleError(500, {}).kind).toBe('other');
+    expect(classifyGoogleError(401, { error: { details: [{ errors: [{ errorCode: { authenticationError: 'NOT_ADS_USER' } }] }] } }).message).toContain('não tem conta no Google Ads');
+    expect(classifyGoogleError(400, { error: { details: [{ errors: [{ errorCode: { authenticationError: 'DEVELOPER_TOKEN_INVALID' } }] }] } }).message).toContain('chave do DreamClin');
+  });
+
+  it('o registro leva só os nomes dos códigos, nunca a mensagem do Google', () => {
+    const body = {
+      error: {
+        code: 400,
+        status: 'INVALID_ARGUMENT',
+        message: 'Conta Clínica Sorriso (dono@clinica.com) não pode',
+        details: [{ '@type': 'x', errors: [{ errorCode: { requestError: 'INVALID_INPUT' }, message: 'dono@clinica.com' }] }],
+      },
+    };
+    expect(googleErrorCodes(body)).toEqual(['INVALID_ARGUMENT', 'requestError.INVALID_INPUT']);
+    expect(googleErrorCodes({ error: { status: 'dono@clinica.com' } })).toEqual([]);
+    expect(googleErrorCodes(null)).toEqual([]);
   });
 });
 

@@ -101,9 +101,37 @@ export function streamResults(body: unknown): unknown[] {
   });
 }
 
+/**
+ * Só os nomes dos códigos de erro do Google (ex. "authenticationError.NOT_ADS_USER"),
+ * para o registro. A mensagem do Google fica de fora: pode trazer nome de conta e e-mail.
+ */
+export function googleErrorCodes(body: unknown): string[] {
+  const codigos = new Set<string>();
+  const nome = (s: unknown) => typeof s === 'string' && /^[A-Z][A-Z0-9_]{1,80}$/.test(s);
+  const visitar = (v: unknown, chave: string, fundo: number) => {
+    if (fundo > 8 || codigos.size >= 6 || !v || typeof v !== 'object') return;
+    if (chave === 'errorCode' && !Array.isArray(v)) {
+      for (const [k, val] of Object.entries(v)) if (/^[a-zA-Z]{1,60}$/.test(k) && nome(val)) codigos.add(`${k}.${val as string}`);
+      return;
+    }
+    for (const [k, val] of Object.entries(v)) {
+      if ((k === 'status' || k === 'reason') && nome(val)) codigos.add(val as string);
+      else visitar(val, k, fundo + 1);
+    }
+  };
+  visitar(body, '', 0);
+  return [...codigos];
+}
+
 /** O motivo do erro do Google em português, sem nada da resposta que possa ter dado sensível. */
 export function classifyGoogleError(status: number, body: unknown): { kind: MetaErrorKind; message: string } {
   const txt = JSON.stringify(body ?? {}).slice(0, 4000);
+  if (/NOT_ADS_USER/.test(txt)) {
+    return { kind: 'permission', message: 'Este e-mail não tem conta no Google Ads. Conecte de novo com o e-mail que entra na conta de anúncios da clínica.' };
+  }
+  if (/DEVELOPER_TOKEN_(INVALID|HEADER_MISSING|HEADER_INVALID)|DEVELOPER_TOKEN_PARAMETER_MISSING/.test(txt)) {
+    return { kind: 'other', message: 'O Google recusou a chave do DreamClin para a API do Google Ads. Fale com o suporte do DreamClin.' };
+  }
   if (status === 429 || /RESOURCE_EXHAUSTED|RATE_EXCEEDED/.test(txt)) {
     return { kind: 'rate', message: 'O Google pediu uma pausa nas consultas. Tente de novo em alguns minutos.' };
   }
