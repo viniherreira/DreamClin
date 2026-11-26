@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { activeHref, navFor, CLINIC_NAV, CRM_NAV } from './app-sidebar';
-import { clinicHomeFor } from './module-switcher';
+import { clinicHomeFor, planScreens } from './module-switcher';
 
 /**
  * O que cada perfil enxerga no menu.
@@ -123,5 +123,17 @@ describe('clínica só com o CRM', () => {
     expect(navFor('OWNER', 'crm', true).map((i) => i.href)).toEqual(navFor('OWNER', 'crm').map((i) => i.href));
     expect(clinicHomeFor(true)).toBe('/configuracoes');
     expect(clinicHomeFor(false)).toBe('/dashboard');
+  });
+
+  it('cada plano vê só o que comprou', () => {
+    // Completo: a chave Clínica/CRM aparece.
+    expect(planScreens({ clinic: true, crm: true, entraNoCrm: true, space: 'clinic' })).toEqual({ showSwitcher: true, shownSpace: 'clinic' });
+    // Completo, mas a pessoa não entra no CRM: sem chave.
+    expect(planScreens({ clinic: true, crm: true, entraNoCrm: false, space: 'clinic' }).showSwitcher).toBe(false);
+    // Só a Agenda: nada de CRM.
+    expect(planScreens({ clinic: true, crm: false, entraNoCrm: false, space: 'clinic' })).toEqual({ showSwitcher: false, shownSpace: 'clinic' });
+    // Só o CRM: nada de "Clínica"; Configurações abre com o menu do CRM.
+    expect(planScreens({ clinic: false, crm: true, entraNoCrm: true, space: 'clinic' })).toEqual({ showSwitcher: false, shownSpace: 'crm' });
+    expect(planScreens({ clinic: false, crm: true, entraNoCrm: true, space: 'crm' })).toEqual({ showSwitcher: false, shownSpace: 'crm' });
   });
 });

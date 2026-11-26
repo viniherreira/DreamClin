@@ -17,16 +17,8 @@ export async function CrmSeatsSection() {
   if (!acesso) return null;
   const a = await loadCrmAddon(acesso.tenantId);
 
-  if (a.status === 'off') {
-    return (
-      <section aria-labelledby="crm-acesso" className="rounded-xl border border-dashed border-border p-4 text-sm">
-        <h2 id="crm-acesso" className="font-semibold">Acesso ao CRM</h2>
-        <p className="mt-1 text-muted-foreground">
-          O CRM está desligado. Ligue em <Link href="#plano" className="text-primary hover:underline">Plano</Link> para escolher quem da equipe usa.
-        </p>
-      </section>
-    );
-  }
+  // Sem o CRM (plano só Agenda), nada de CRM aparece na clínica.
+  if (a.status === 'off') return null;
 
   if (a.status === 'complimentary') {
     return (

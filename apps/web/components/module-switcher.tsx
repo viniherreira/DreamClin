@@ -10,6 +10,16 @@ export type Space = 'clinic' | 'crm';
  */
 export const CRM_ONLY_CLINIC_PATHS = ['/configuracoes', '/planos', '/sem-acesso', '/crm-indisponivel'] as const;
 
+/**
+ * O que o plano mostra: a chave Clínica/CRM só no Completo (e para quem entra
+ * no CRM). Só a Agenda: nada de CRM. Só o CRM: nada de "Clínica", e as telas de
+ * Configurações e Plano (que moram do lado da clínica) abrem com o menu do CRM.
+ */
+export function planScreens(m: { clinic: boolean; crm: boolean; entraNoCrm: boolean; space: Space }): { showSwitcher: boolean; shownSpace: Space } {
+  const entra = m.crm && m.entraNoCrm;
+  return { showSwitcher: m.clinic && entra, shownSpace: !m.clinic && entra ? 'crm' : m.space };
+}
+
 /** Onde o lado "Clínica" abre. */
 export const clinicHomeFor = (crmOnly: boolean) => (crmOnly ? '/configuracoes' : '/dashboard');
 

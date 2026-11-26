@@ -53,7 +53,7 @@ export function LgpdCard({ patientId, anonimizado }: { patientId: string; anonim
       ) : (
         <div className="space-y-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3">
           <p className="text-xs leading-relaxed">
-            Apaga nome, CPF, contatos, endereço, notas da equipe e o que o CRM tem desta pessoa. O
+            Apaga nome, CPF, contatos, endereço, notas da equipe e as conversas desta pessoa. O
             prontuário (anamnese, evoluções, odontograma, imagens, orçamentos e pagamentos) fica
             guardado pelo prazo legal. <strong>Não tem volta.</strong>
           </p>

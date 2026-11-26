@@ -128,7 +128,13 @@ export default async function CrmConfiguracoesPage({
       label: 'Equipe e permissões',
       aliases: ['usuarios'],
       badge: team.members.filter((m) => m.member).length,
-      panel: <TeamSection members={team.members} meId={ctx.userId} seats={seats} wholeTeam={addon.status === 'complimentary'} />,
+      panel: <TeamSection
+          members={team.members}
+          meId={ctx.userId}
+          seats={seats}
+          wholeTeam={addon.status === 'complimentary'}
+          perfil={can(ctx.role, 'equipe') ? { meRole: ctx.role, agenda: modules.clinic } : null}
+        />,
     },
     {
       id: 'distribuicao',

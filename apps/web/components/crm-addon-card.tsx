@@ -4,7 +4,6 @@ import { prisma } from '@clinicaiq/db';
 import { currentAccess } from '@/lib/guard';
 import { loadCrmAddon } from '@/crm/addon';
 import { crmOfferText, formatCents, usersLabel } from '@/crm/format';
-import { CrmTurnOnButton } from './crm-turn-on-button';
 import { CrmTurnOffButton } from './crm-addon-controls';
 
 const dataBR = (iso: string) =>
@@ -15,8 +14,9 @@ const dataBR = (iso: string) =>
  * grátis, quanto soma, em que situação está e o botão de ligar ou desligar. O
  * total do mês mostra plano + CRM.
  *
- * Não aparece para a clínica só com o CRM (o CRM é o plano dela) nem no teste
- * grátis da clínica, em que acrescentar o CRM é escolher o Completo nos planos.
+ * Não aparece para a clínica só com o CRM (o CRM é o plano dela), nem no teste
+ * grátis, nem com o CRM desligado: quem escolheu só a Agenda não vê nada do CRM.
+ * Para passar ao Completo, troca o plano na tela de planos.
  */
 export async function CrmAddonCard() {
   const acesso = await currentAccess();
@@ -28,17 +28,16 @@ export async function CrmAddonCard() {
   if (!sub || !sub.clinicEnabled) return null;
   if (sub.status === 'TRIALING' && !sub.asaasSubscriptionId && !sub.complimentary) return null;
   const a = await loadCrmAddon(acesso.tenantId);
+  if (a.status === 'off') return null;
   const oferta = crmOfferText(a);
   const usuarios = usersLabel(a.seats);
 
   const situacao =
-    a.status === 'off'
-      ? `Desligado. Com o CRM, o plano vira o Completo: ${oferta}, somado à mensalidade.`
-      : a.status === 'trial'
-        ? `Em teste grátis até ${dataBR(a.trialEndsAt!)}. Depois, ${oferta} (hoje: ${usuarios} = ${formatCents(a.crmMonthlyCents)}/mês).`
-        : a.status === 'complimentary'
-          ? 'Incluído na cortesia, sem custo: toda a equipe com perfil de dono, administração ou recepção tem acesso.'
-          : `Ativo · ${usuarios} no CRM = ${formatCents(a.crmMonthlyCents)}/mês (${oferta}).`;
+    a.status === 'trial'
+      ? `Em teste grátis até ${dataBR(a.trialEndsAt!)}. Depois, ${oferta} (hoje: ${usuarios} = ${formatCents(a.crmMonthlyCents)}/mês).`
+      : a.status === 'complimentary'
+        ? 'Incluído na cortesia, sem custo: toda a equipe com perfil de dono, administração ou recepção tem acesso.'
+        : `Ativo · ${usuarios} no CRM = ${formatCents(a.crmMonthlyCents)}/mês (${oferta}).`;
 
   return (
     <section aria-labelledby="crm-adicional" className="rounded-xl border border-border bg-surface p-5 shadow-card">
@@ -61,8 +60,6 @@ export async function CrmAddonCard() {
           <div className="mt-4 flex flex-wrap items-center gap-2">
             {a.status === 'complimentary' ? (
               <Link href="/crm" className="btn-primary btn-md">Abrir o CRM</Link>
-            ) : a.status === 'off' ? (
-              <CrmTurnOnButton label={a.trialAvailable ? 'Experimentar 14 dias grátis' : 'Ativar o CRM'} />
             ) : (
               <>
                 <Link href="#equipe" className="btn-primary btn-md">Escolher quem tem acesso</Link>

@@ -49,7 +49,7 @@ export function UnitsPanel({ units, clinicHours }: { units: UnitRow[]; clinicHou
         <div className="max-w-xl">
           <h2 id="units-heading" className="text-base font-semibold">Unidades</h2>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            Tem mais de uma clínica? Cadastre cada uma como unidade. Pacientes, orçamentos, financeiro e CRM são os mesmos; cada unidade tem
+            Tem mais de uma clínica? Cadastre cada uma como unidade. Pacientes, orçamentos e financeiro são os mesmos; cada unidade tem
             endereço, horário e agenda próprios. {ativas > 1 ? 'Troque a unidade no topo da tela.' : 'Com duas ou mais, aparece a escolha da unidade no topo da tela.'}
           </p>
         </div>
