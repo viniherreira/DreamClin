@@ -16,6 +16,7 @@ import { decryptPhone, isValidPhone } from '@/crm/phone';
 import type { BoardTag } from '@/crm/types';
 import { eraseLeadPersonalData } from '@/crm/anonymize';
 import { deleteChatMedia } from '@/crm/media-store';
+import { sameTag } from '@/crm/auto-tags-rules';
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; message: string };
 
@@ -83,10 +84,12 @@ export async function createTagAction(name: string): Promise<Result<{ tag: Board
   const nome = name.trim().toLowerCase().slice(0, 30);
   if (!nome) return { ok: false, message: 'Escreva o nome da tag.' };
 
-  const existente = await g.db.leadTag.findFirst({ where: { name: nome } });
+  // "Prótese" com a tag "protese" já existindo é a mesma tag (acento, hífen e maiúscula não contam).
+  const todas = await g.db.leadTag.findMany({ select: { id: true, name: true, color: true } });
+  const existente = sameTag(todas, nome);
   if (existente) return { ok: true, tag: { id: existente.id, name: existente.name, color: existente.color } };
 
-  const total = await g.db.leadTag.count();
+  const total = todas.length;
   const tag = await g.db.leadTag.create({
     data: { tenantId: g.tenantId, name: nome, color: CRM_COLORS[(total + 1) % CRM_COLORS.length] },
   });

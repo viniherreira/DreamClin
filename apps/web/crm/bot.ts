@@ -11,6 +11,7 @@ import { readFlow } from './flow-legacy';
 import { createLead, moveLead, OPEN_LEAD } from './leads';
 import { setLeadFields } from './lead-fields';
 import { decryptPhone } from './phone';
+import { fillInterestFromTags } from './auto-tags';
 
 /**
  * O robô rodando nas conversas, no jeito do Salesbot do Kommo: decide se
@@ -279,7 +280,10 @@ async function act(db: TenantPrismaClient, tenantId: string, conv: Conv, a: Flow
       const tag = await db.leadTag.findFirst({ where: { id: a.tagId }, select: { id: true } });
       if (!tag) return;
       const { count } = await db.leadTagOnLead.createMany({ data: [{ tenantId, leadId, tagId: tag.id }], skipDuplicates: true });
-      if (count) await db.leadActivity.create({ data: { tenantId, leadId, type: 'TAG_ADDED', actorId: null, data: { tagId: tag.id } } });
+      if (count) {
+        await db.leadActivity.create({ data: { tenantId, leadId, type: 'TAG_ADDED', actorId: null, data: { tagId: tag.id } } });
+        await fillInterestFromTags(db, leadId, [tag.id]);
+      }
       return;
     }
     case 'untag': {

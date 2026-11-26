@@ -6,6 +6,7 @@ import { queueStageAutomations } from './stage-queue';
 import { conversionForRole } from './meta-conversions-rules';
 import { reportConversion } from './meta-conversions';
 import { runAfter } from './run-after';
+import { fillInterestFromTags } from './auto-tags';
 
 /**
  * Operações do lead. Cada uma grava a mudança e o registro no histórico na
@@ -387,7 +388,8 @@ export async function addNote(db: TenantPrismaClient, actor: Actor, leadId: stri
 /** Troca as tags do lead pela lista dada, registrando o que entrou e saiu. */
 export async function setTags(db: TenantPrismaClient, actor: Actor, leadId: string, tagIds: string[]) {
   const { tenantId } = actor;
-  return db.$transaction(async (tx) => {
+  let entraram: string[] = [];
+  const r = await db.$transaction(async (tx) => {
     const lead = await tx.lead.findFirst({ where: { id: leadId, tenantId, deletedAt: null }, select: { id: true } });
     if (!lead) return { ok: false as const, message: 'Lead não encontrado.' };
 
@@ -402,6 +404,7 @@ export async function setTags(db: TenantPrismaClient, actor: Actor, leadId: stri
 
     if (saem.length) await tx.leadTagOnLead.deleteMany({ where: { tenantId, leadId, tagId: { in: saem } } });
     if (entram.length) {
+      entraram = entram;
       await tx.leadTagOnLead.createMany({ data: entram.map((tagId) => ({ tenantId, leadId, tagId })) });
       // Robô com gatilho "tag posta no lead" (Salesbot do Kommo).
       await queueTriggeredBot(tx, tenantId, leadId, { tagIds: entram });
@@ -417,6 +420,9 @@ export async function setTags(db: TenantPrismaClient, actor: Actor, leadId: stri
     }
     return { ok: true as const };
   });
+  // Tag de procedimento que entrou preenche o interesse vazio (fora da transação: nunca desfaz a troca).
+  if (r.ok && entraram.length) await fillInterestFromTags(db, leadId, entraram);
+  return r;
 }
 
 export async function softDeleteLead(db: TenantPrismaClient, actor: Actor, leadId: string) {

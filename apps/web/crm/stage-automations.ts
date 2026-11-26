@@ -10,6 +10,7 @@ import { moveLead } from './leads';
 import { queueTriggeredBot } from './bot-queue';
 import { startBotOnConversation } from './bot';
 import { parseConditions, type StageTriggerKind } from './stage-automation-rules';
+import { fillInterestFromTags } from './auto-tags';
 
 export { queueStageAutomations } from './stage-queue';
 
@@ -269,6 +270,7 @@ async function execute(
       await db.leadActivity.createMany({ data: novas.map((tagId) => ({ tenantId, leadId: lead.id, type: 'TAG_ADDED' as const, actorId: null, data: { tagId } })) });
       // Bot com gatilho "ganhou a tag".
       await queueTriggeredBot(db, tenantId, lead.id, { tagIds: novas });
+      await fillInterestFromTags(db, lead.id, novas);
       return { status: 'DONE' };
     }
     case 'REMOVE_TAG': {
