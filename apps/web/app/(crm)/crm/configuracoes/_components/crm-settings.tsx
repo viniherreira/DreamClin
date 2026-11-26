@@ -3,14 +3,15 @@
 import { useId, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, Save, Trash2 } from 'lucide-react';
+import { Merge, Plus, Save, Trash2 } from 'lucide-react';
 import { COLOR_LABEL, colorClasses } from '@/crm/colors';
 import { AGENDA_ROLES, AGENDA_ROLE_LABEL, CRM_COLORS, type AgendaRole } from '@/crm/defaults';
 import { normalizeShortcut } from '@/crm/quick-replies';
+import { tagKey } from '@/crm/auto-tags-rules';
 import type { FieldDef } from '@/crm/custom-fields';
 import { FieldsTab } from './fields-tab';
 import {
-  deleteQuickReplyAction, deleteTagAction, setAgendaStageAction, toggleLostReasonAction, upsertLostReasonAction, upsertQuickReplyAction, upsertTagAction,
+  deleteQuickReplyAction, deleteTagAction, mergeTagsAction, setAgendaStageAction, toggleLostReasonAction, upsertLostReasonAction, upsertQuickReplyAction, upsertTagAction,
 } from '../actions';
 
 type StageRow = { id: string; name: string; role: string | null };
@@ -232,20 +233,77 @@ function AgendaEtapas({ pipelines, pending, agir }: { pipelines: PipelineRow[]; 
   );
 }
 
+/** A tag "gêmea" (mesmo nome sem contar acento, hífen e maiúscula) com mais leads, para onde juntar. */
+function gemeaDe(t: Tag, tags: Tag[]): Tag | null {
+  const k = tagKey(t.name);
+  const iguais = tags.filter((o) => o.id !== t.id && tagKey(o.name) === k);
+  if (!iguais.length) return null;
+  const maior = [...iguais].sort((a, b) => b.leads - a.leads || a.name.localeCompare(b.name))[0];
+  // Só a menor sugere juntar (empate: a de nome que vem depois), para não aparecer nas duas.
+  return maior.leads > t.leads || (maior.leads === t.leads && maior.name < t.name) ? maior : null;
+}
+
 function Tags({ tags, pending, agir }: { tags: Tag[]; pending: boolean; agir: Agir }) {
   const [nova, setNova] = useState({ name: '', color: 'violet' });
+  const juntar = (de: Tag, para: Tag) => {
+    const n = `${de.leads} ${de.leads === 1 ? 'lead' : 'leads'}`;
+    if (confirm(`Juntar a tag "${de.name}" na "${para.name}"?
+
+Os ${n} de "${de.name}" passam para "${para.name}", e "${de.name}" deixa de existir. Automações, robôs e transmissões que usavam "${de.name}" passam a usar "${para.name}".`)) {
+      agir(() => mergeTagsAction(de.id, para.id), `Tag "${de.name}" juntada em "${para.name}".`);
+    }
+  };
+  const repetidas = tags.filter((t) => gemeaDe(t, tags)).length;
   return (
     <section aria-label="Tags">
       {tags.length === 0 && <p className="text-sm text-muted-foreground">Nenhuma tag ainda. Elas também podem ser criadas direto na ficha do lead.</p>}
+      {repetidas > 0 && (
+        <p role="status" className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-200">
+          {repetidas === 1 ? 'Uma tag está repetida' : `${repetidas} tags estão repetidas`} (mesmo nome com outro acento, hífen ou maiúscula). Junte para o filtro achar todos os leads.
+        </p>
+      )}
       <ul className="space-y-2">
-        {tags.map((t) => (
-          <li key={t.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface p-3">
+        {tags.map((t) => {
+          const gemea = gemeaDe(t, tags);
+          const outras = tags.filter((o) => o.id !== t.id);
+          return (
+          <li key={t.id} className={`flex flex-wrap items-center gap-2 rounded-lg border bg-surface p-3 ${gemea ? 'border-amber-300 dark:border-amber-900' : 'border-border'}`}>
             <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${colorClasses(t.color).chip}`}>{t.name}</span>
             <div className="min-w-40 flex-1">
               <NameInput value={t.name} label={`Nome da tag ${t.name}`} onSave={(v) => agir(() => upsertTagAction({ id: t.id, name: v, color: t.color }), 'Tag renomeada.')} />
             </div>
             <ColorSelect value={t.color} label={`Cor da tag ${t.name}`} onChange={(v) => agir(() => upsertTagAction({ id: t.id, name: t.name, color: v }), 'Cor alterada.')} />
             <span className="text-xs text-muted-foreground">{t.leads} {t.leads === 1 ? 'lead' : 'leads'}</span>
+            {gemea && (
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-1 text-xs font-medium text-amber-900 hover:bg-amber-200 disabled:opacity-60 dark:bg-amber-900/40 dark:text-amber-100 dark:hover:bg-amber-900/60"
+                disabled={pending}
+                onClick={() => juntar(t, gemea)}
+              >
+                <Merge className="h-3.5 w-3.5" aria-hidden="true" />
+                Igual a &ldquo;{gemea.name}&rdquo;: juntar
+              </button>
+            )}
+            {outras.length > 0 && (
+              <select
+                aria-label={`Juntar a tag ${t.name} com outra`}
+                className="h-8 rounded-md border border-border bg-surface px-2 text-xs text-muted-foreground"
+                value=""
+                disabled={pending}
+                onChange={(e) => {
+                  const para = outras.find((o) => o.id === e.target.value);
+                  if (para) juntar(t, para);
+                }}
+              >
+                <option value="">Juntar com…</option>
+                {outras.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.name} ({o.leads})
+                  </option>
+                ))}
+              </select>
+            )}
             <button
               type="button"
               className={`${iconBtn} hover:text-destructive`}
@@ -258,7 +316,8 @@ function Tags({ tags, pending, agir }: { tags: Tag[]; pending: boolean; agir: Ag
               <Trash2 className="h-4 w-4" aria-hidden="true" />
             </button>
           </li>
-        ))}
+          );
+        })}
       </ul>
       <form
         className="mt-3 flex flex-wrap items-end gap-2 rounded-lg border border-dashed border-border p-3"

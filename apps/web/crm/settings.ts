@@ -2,6 +2,7 @@ import type { TenantPrismaClient } from '@clinicaiq/db';
 import { AGENDA_ROLE_LABEL, CRM_COLORS, NEW_PIPELINE_STAGES, type AgendaRole } from './defaults';
 import { boardStages, canDeleteStage, isAgendaRole, isClosedStage, mainPipeline } from './pipeline';
 import { MAX_QUICK_REPLY, normalizeShortcut } from './quick-replies';
+import { sameTag } from './auto-tags-rules';
 
 /**
  * O que dono e admin mudam no CRM: funis, etapas, tags, motivos de perda e
@@ -260,8 +261,9 @@ export async function upsertTag(
   const nome = cleanName(input.name).toLowerCase().slice(0, 30);
   if (!nome) return { ok: false, message: 'Escreva o nome da tag.' };
   if (!isColor(input.color)) return { ok: false, message: 'Cor inválida.' };
-  const igual = await db.leadTag.findFirst({ where: { name: nome, ...(input.id ? { id: { not: input.id } } : {}) } });
-  if (igual) return { ok: false, message: 'Já existe uma tag com esse nome.' };
+  const outras = await db.leadTag.findMany({ where: input.id ? { id: { not: input.id } } : {}, select: { id: true, name: true } });
+  const igual = sameTag(outras, nome);
+  if (igual) return { ok: false, message: `Já existe a tag "${igual.name}". Use "Juntar" para unir as duas.` };
   if (input.id) {
     const r = await db.leadTag.updateMany({ where: { id: input.id }, data: { name: nome, color: input.color } });
     return r.count ? ok : { ok: false, message: 'Tag não encontrada.' };
@@ -277,6 +279,46 @@ export async function deleteTag(db: TenantPrismaClient, tenantId: string, tagId:
     if (!tag) return { ok: false as const, message: 'Tag não encontrada.' };
     await tx.leadTagOnLead.deleteMany({ where: { tenantId, tagId } });
     await tx.leadTag.deleteMany({ where: { id: tagId, tenantId } });
+    return ok;
+  });
+}
+
+/**
+ * Junta duas tags: os leads da `fromId` passam para a `intoId` e a `fromId`
+ * deixa de existir. Automações, robôs, transmissões, regras de captação e o
+ * histórico dos leads que apontavam para ela passam a apontar para a outra.
+ * Ninguém perde tag: quem tinha as duas fica com uma só.
+ */
+export async function mergeTags(db: TenantPrismaClient, tenantId: string, fromId: string, intoId: string): Promise<Result> {
+  if (!fromId || !intoId || fromId === intoId) return { ok: false, message: 'Escolha duas tags diferentes.' };
+  return db.$transaction(async (tx) => {
+    const [de, para] = await Promise.all([
+      tx.leadTag.findFirst({ where: { id: fromId, tenantId }, select: { id: true } }),
+      tx.leadTag.findFirst({ where: { id: intoId, tenantId }, select: { id: true } }),
+    ]);
+    if (!de || !para) return { ok: false as const, message: 'Tag não encontrada.' };
+
+    const links = await tx.leadTagOnLead.findMany({ where: { tenantId, tagId: fromId }, select: { leadId: true, createdAt: true } });
+    await tx.leadTagOnLead.createMany({
+      data: links.map((l) => ({ tenantId, leadId: l.leadId, tagId: intoId, createdAt: l.createdAt })),
+      skipDuplicates: true,
+    });
+
+    // Os ids das tags moram dentro de JSON (automação, robô, transmissão,
+    // regras de captação, histórico). O id é único (cuid): trocar o texto é seguro.
+    await tx.$executeRaw`UPDATE "stage_automations" SET "config" = replace("config"::text, ${fromId}, ${intoId})::jsonb, "conditions" = replace("conditions"::text, ${fromId}, ${intoId})::jsonb
+      WHERE "tenantId" = ${tenantId} AND ("config"::text LIKE ${`%${fromId}%`} OR "conditions"::text LIKE ${`%${fromId}%`})`;
+    await tx.$executeRaw`UPDATE "chatbot_flows" SET "steps" = replace("steps"::text, ${fromId}, ${intoId})::jsonb
+      WHERE "tenantId" = ${tenantId} AND "steps"::text LIKE ${`%${fromId}%`}`;
+    await tx.$executeRaw`UPDATE "broadcasts" SET "audience" = replace("audience"::text, ${fromId}, ${intoId})::jsonb
+      WHERE "tenantId" = ${tenantId} AND "audience"::text LIKE ${`%${fromId}%`}`;
+    await tx.$executeRaw`UPDATE "tenants" SET "settings" = replace("settings"::text, ${fromId}, ${intoId})::jsonb
+      WHERE "id" = ${tenantId} AND "settings"::text LIKE ${`%${fromId}%`}`;
+    await tx.$executeRaw`UPDATE "lead_activities" SET "data" = replace("data"::text, ${fromId}, ${intoId})::jsonb
+      WHERE "tenantId" = ${tenantId} AND "data"::text LIKE ${`%${fromId}%`}`;
+
+    await tx.leadTagOnLead.deleteMany({ where: { tenantId, tagId: fromId } });
+    await tx.leadTag.deleteMany({ where: { id: fromId, tenantId } });
     return ok;
   });
 }

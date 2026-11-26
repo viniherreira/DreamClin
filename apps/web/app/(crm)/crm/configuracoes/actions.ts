@@ -36,6 +36,7 @@ export const setAgendaStageAction = async (role: AgendaRole, stageId: string | n
 
 export const upsertTagAction = async (input: { id?: string; name: string; color: string }) => run((g) => s.upsertTag(g.db, g.tenantId, input));
 export const deleteTagAction = async (id: string) => run((g) => s.deleteTag(g.db, g.tenantId, id));
+export const mergeTagsAction = async (fromId: string, intoId: string) => run((g) => s.mergeTags(g.db, g.tenantId, fromId, intoId));
 
 export const upsertLostReasonAction = async (input: { id?: string; name: string }) => run((g) => s.upsertLostReason(g.db, g.tenantId, input));
 export const toggleLostReasonAction = async (id: string, active: boolean) => run((g) => s.toggleLostReason(g.db, id, active));
