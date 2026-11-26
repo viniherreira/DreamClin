@@ -384,8 +384,16 @@ export async function choosePlan(
     } else {
       // A clinic still inside its trial keeps every day of it: the first charge
       // lands when the trial ends, not today.
-      const firstDueDate =
-        existing?.trialEndsAt && existing.trialEndsAt > new Date() ? existing.trialEndsAt : new Date();
+      // Quem cancelou e volta com o mês ainda pago, idem: a cobrança começa
+      // quando o período pago acaba, não em dobro hoje.
+      const agora = new Date();
+      const fimDoTeste = existing?.trialEndsAt && existing.trialEndsAt > agora ? existing.trialEndsAt : null;
+      const testeAberto = fimDoTeste !== null;
+      const firstDueDate = fimDoTeste
+        ? fimDoTeste
+        : existing?.cancelledAt && existing.currentPeriodEnd > agora
+          ? existing.currentPeriodEnd
+          : agora;
 
       const sub = await createSubscription({
         customerId,
@@ -413,6 +421,11 @@ export async function choosePlan(
           currentPeriodEnd: new Date(sub.nextDueDate),
           cancelledAt: null,
           billedValueCents: cobranca.valueCents,
+          // Fora do teste (acabou sem plano, ou estava cancelada): volta a valer
+          // a mensalidade nova. Sem isto o status ficava SUSPENDED ou CANCELLED
+          // e a tolerância antiga já vencida, e escolher o plano não devolvia o
+          // acesso, ao contrário do que o aviso promete.
+          ...(testeAberto ? {} : { status: 'ACTIVE' as const, trialEndsAt: null, graceEndsAt: null }),
         },
       });
     }

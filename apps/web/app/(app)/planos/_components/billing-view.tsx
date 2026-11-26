@@ -420,7 +420,7 @@ export function BillingView({
                     : data.access.status === 'ACTIVE'
                     ? 'Assinatura em dia'
                     : data.access.status === 'PAST_DUE'
-                      ? 'Pagamento em atraso'
+                      ? 'Fatura em aberto'
                       : data.access.status === 'CANCELLED'
                         ? // Cancelada ainda tem o período pago pela frente;
                           // "encerrada" só depois que ele acaba.

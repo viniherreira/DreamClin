@@ -4,6 +4,7 @@ import { activeCloudAccount } from './cloud';
 import { ensureConversationForLead, writeChatMessage } from './conversations';
 import { audienceWhere, parseAudience, type Audience } from './audience';
 import { decryptPhone, isValidPhone, maskPhone } from './phone';
+import { readonlyTenants } from '@/lib/tenant-standing';
 
 /**
  * Transmissões: uma mensagem para um grupo de leads, como no Kommo.
@@ -225,10 +226,16 @@ export async function startDueBroadcasts(now: Date = new Date()): Promise<number
   const due = await prisma.broadcast.findMany({
     where: { status: 'SCHEDULED', scheduledAt: { lte: now } },
     select: { id: true, tenantId: true },
-    take: 5,
+    orderBy: { scheduledAt: 'asc' },
+    take: 20,
   });
+  // Clínica em só leitura: a transmissão fica agendada, sem gastar a lista em
+  // mensagens que não sairiam. Pagou, ela começa no minuto seguinte.
+  const semPlano = await readonlyTenants(due.map((b) => b.tenantId), now);
   let n = 0;
-  for (const b of due) if ((await startBroadcast(b.tenantId, b.id, now)).ok) n += 1;
+  for (const b of due.filter((x) => !semPlano.has(x.tenantId)).slice(0, 5)) {
+    if ((await startBroadcast(b.tenantId, b.id, now)).ok) n += 1;
+  }
   return n;
 }
 

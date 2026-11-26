@@ -35,10 +35,13 @@ export function ClinicSidebar({
   clinicName,
   showSwitcher,
   clinicHome,
+  standing = { label: 'Ativo', tone: 'ok' },
 }: {
   items: ClinicNavItem[];
   active: string | undefined;
   clinicName: string;
+  /** A situação do plano (teste, fatura em aberto, só leitura), sempre à vista. */
+  standing?: { label: string; tone: 'ok' | 'warn' | 'blocked' };
   showSwitcher: boolean;
   clinicHome?: string;
 }) {
@@ -215,8 +218,11 @@ export function ClinicSidebar({
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">{clinicName}</p>
               <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                <span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden="true" />
-                Ativo
+                <span
+                  className={`h-1.5 w-1.5 shrink-0 rounded-full ${standing.tone === 'blocked' ? 'bg-destructive' : standing.tone === 'warn' ? 'bg-amber-500' : 'bg-success'}`}
+                  aria-hidden="true"
+                />
+                <span className="truncate">{standing.label}</span>
               </p>
             </div>
           )}

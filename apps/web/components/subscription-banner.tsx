@@ -9,7 +9,7 @@ import type { Access } from '@/lib/subscription';
  * there is still time: a clinic that loses the ability to book an appointment
  * mid-morning with no prior warning blames the software, not the invoice.
  */
-export function SubscriptionBanner({ access }: { access: Access }) {
+export function SubscriptionBanner({ access, canManage = true }: { access: Access; canManage?: boolean }) {
   if (!access.warning) return null;
 
   const blocked = access.level === 'readonly';
@@ -27,14 +27,19 @@ export function SubscriptionBanner({ access }: { access: Access }) {
         <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
         <span>{access.warning}</span>
       </p>
-      <Link
-        href="/configuracoes#plano"
-        className={`shrink-0 rounded-md px-3 py-1 font-medium underline-offset-2 hover:underline ${
-          blocked ? 'bg-destructive text-destructive-foreground no-underline hover:opacity-90' : ''
-        }`}
-      >
-        {access.trialEnded ? 'Escolher um plano' : blocked ? 'Regularizar agora' : 'Ver planos'}
-      </Link>
+      {/* Só quem cuida do plano chega na tela dele; para o resto da equipe o botão não levaria a lugar nenhum. */}
+      {canManage ? (
+        <Link
+          href="/configuracoes#plano"
+          className={`shrink-0 rounded-md px-3 py-1 font-medium underline-offset-2 hover:underline ${
+            blocked ? 'bg-destructive text-destructive-foreground no-underline hover:opacity-90' : ''
+          }`}
+        >
+          {access.trialEnded ? 'Escolher um plano' : blocked ? 'Regularizar agora' : 'Ver planos'}
+        </Link>
+      ) : (
+        <span className="shrink-0 text-xs font-medium">Avise o responsável pela clínica.</span>
+      )}
     </div>
   );
 }

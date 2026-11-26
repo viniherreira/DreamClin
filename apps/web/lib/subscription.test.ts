@@ -5,6 +5,7 @@ import {
   TRIAL_DAYS,
   canWrite,
   resolveAccess,
+  standingLabel,
   trialEndFrom,
   type SubscriptionSnapshot,
 } from './subscription';
@@ -65,6 +66,21 @@ describe('resolveAccess', () => {
     expect(access.warning).not.toContain('atraso');
   });
 
+  it('teste sem plano continua só leitura depois que a reconciliação grava SUSPENDED', () => {
+    // A linha como a reconciliação diária deixa: vencimento = fim do teste.
+    const fim = at(-1);
+    for (const status of ['SUSPENDED', 'PAST_DUE'] as const) {
+      const access = resolveAccess(
+        snapshot({ status, trialEndsAt: fim, currentPeriodEnd: fim, billingLinked: false }),
+        NOW,
+      );
+      expect(access.level).toBe('readonly');
+      expect(access.trialEnded).toBe(true);
+      expect(access.inGrace).toBe(false);
+      expect(access.warning).toContain('teste grátis terminou');
+    }
+  });
+
   it('quem já assinou no teste não recebe o aviso de escolher plano', () => {
     const access = resolveAccess(snapshot({ status: 'TRIALING', trialEndsAt: at(3), billingLinked: true }), NOW);
     expect(access.level).toBe('full');
@@ -76,7 +92,7 @@ describe('resolveAccess', () => {
     expect(access.level).toBe('full');
     expect(access.status).toBe('PAST_DUE');
     expect(access.daysLeft).toBe(GRACE_DAYS - 3);
-    expect(access.warning).toContain('atraso');
+    expect(access.warning).toContain('em aberto');
   });
 
   it('limita a escrita quando a tolerância acaba', () => {
@@ -205,3 +221,15 @@ describe('teste grátis de clínica nova', () => {
     expect(fim.level).toBe('readonly');
   });
 });
+
+describe('standingLabel (cartão da clínica no menu)', () => {
+  it('mostra os dias do teste, o aviso de fatura e o só leitura', () => {
+    expect(standingLabel(resolveAccess(snapshot({ status: 'TRIALING', trialEndsAt: at(12) }), NOW))).toEqual({ label: 'Teste grátis · faltam 12 dias', tone: 'ok' });
+    expect(standingLabel(resolveAccess(snapshot({ status: 'TRIALING', trialEndsAt: at(1) }), NOW)).label).toBe('Teste grátis · último dia');
+    expect(standingLabel(resolveAccess(snapshot({ currentPeriodEnd: at(-2) }), NOW))).toEqual({ label: 'Fatura em aberto', tone: 'warn' });
+    expect(standingLabel(resolveAccess(snapshot({ status: 'SUSPENDED', trialEndsAt: at(-1), currentPeriodEnd: at(-1), billingLinked: false }), NOW))).toEqual({ label: 'Teste encerrado', tone: 'blocked' });
+    expect(standingLabel(resolveAccess(snapshot(), NOW))).toEqual({ label: 'Ativo', tone: 'ok' });
+    expect(standingLabel(resolveAccess(snapshot({ complimentary: true }), NOW)).label).toBe('Ativo');
+  });
+});
+
