@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { classifyGoogleError, customerLabel, customerNumber, microsToCents, parseGoogleRow, readGoogleAdsSettings, streamResults } from './google-ads-rules';
+import { ageKey, buildGoogleAudience, classifyGoogleError, customerLabel, customerNumber, genderKey, microsToCents, parseGoogleBreakdown, parseGoogleRow, readGoogleAdsSettings, streamResults } from './google-ads-rules';
+import { buildAdHours, buildPlatforms } from './ads-rules';
 
 describe('Google Ads: regras', () => {
   it('lê o id da conta em qualquer formato', () => {
@@ -63,3 +64,43 @@ describe('Google Ads: regras', () => {
     expect(classifyGoogleError(500, {}).kind).toBe('other');
   });
 });
+
+describe('Google Ads: recortes no formato dos gráficos', () => {
+  const linha = (extra: object, conv = 2, clicks = 10) => ({ ...extra, metrics: { costMicros: '10000000', impressions: '100', clicks: String(clicks), conversions: conv } });
+
+  it('rede e aparelho viram os lugares', () => {
+    const rede = [parseGoogleBreakdown(linha({ segments: { adNetworkType: 'SEARCH' } }, 5), 'network'), parseGoogleBreakdown(linha({ segments: { adNetworkType: 'YOUTUBE_WATCH' } }, 1), 'network')];
+    expect(buildPlatforms(rede).lines.map((l) => [l.label, l.value])).toEqual([['Pesquisa Google', 5], ['YouTube', 1]]);
+    const aparelho = parseGoogleBreakdown(linha({ segments: { device: 'MOBILE' } }), 'device');
+    expect(aparelho.keys.publisher_platform).toBe('Celular');
+    expect(parseGoogleBreakdown(linha({ segments: { device: 'XYZ' } }), 'device').keys.publisher_platform).toBe('unknown');
+  });
+
+  it('idade e gênero', () => {
+    expect(ageKey('AGE_RANGE_25_34')).toBe('25-34');
+    expect(ageKey('AGE_RANGE_65_UP')).toBe('65+');
+    expect(ageKey('AGE_RANGE_UNDETERMINED')).toBe('unknown');
+    expect(genderKey('FEMALE')).toBe('female');
+    expect(genderKey('UNDETERMINED')).toBe('unknown');
+    const idades = [
+      parseGoogleBreakdown(linha({ adGroupCriterion: { ageRange: { type: 'AGE_RANGE_35_44' } } }, 3), 'age'),
+      parseGoogleBreakdown(linha({ adGroupCriterion: { ageRange: { type: 'AGE_RANGE_25_34' } } }, 4), 'age'),
+      parseGoogleBreakdown(linha({ adGroupCriterion: { ageRange: { type: 'AGE_RANGE_UNDETERMINED' } } }, 9), 'age'),
+    ];
+    const generos = [
+      parseGoogleBreakdown(linha({ adGroupCriterion: { gender: { type: 'FEMALE' } } }, 6), 'gender'),
+      parseGoogleBreakdown(linha({ adGroupCriterion: { gender: { type: 'MALE' } } }, 2), 'gender'),
+    ];
+    const a = buildGoogleAudience(idades, generos);
+    expect(a.metric).toBe('conversations');
+    expect(a.ages.map((x) => [x.age, x.unknown])).toEqual([['25-34', 4], ['35-44', 3]]);
+    expect(a.totals).toEqual({ female: 6, male: 2, unknown: 0 });
+  });
+
+  it('hora do dia', () => {
+    const h = buildAdHours([parseGoogleBreakdown(linha({ segments: { hour: 14 } }, 7), 'hour'), parseGoogleBreakdown(linha({ segments: { hour: 9 } }, 2), 'hour')]);
+    expect(h.peak).toBe(14);
+    expect(h.hours[9]).toBe(2);
+  });
+});
+
