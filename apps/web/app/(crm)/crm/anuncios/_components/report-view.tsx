@@ -24,9 +24,12 @@ export function AdsReportView({
   range,
   fetchedAt,
   extra,
+  tabs,
 }: {
   /** O que vem depois dos números (o assunto de cada anúncio). */
   extra?: React.ReactNode;
+  /** As abas Meta / Google do topo. */
+  tabs?: { href: string; label: string; active: boolean }[];
   report: AdsReport;
   breakdowns: AdsBreakdowns;
   period: ReportPeriodKey;
@@ -51,6 +54,7 @@ export function AdsReportView({
       select={{ name: 'campanha', label: 'Campanha', all: 'Todas as campanhas', value: r.campaignId ?? '', options: r.campaigns }}
       refresh={refreshAdsAction}
       updatedAt={`Atualizado às ${chatTime(new Date(fetchedAt))}`}
+      tabs={tabs}
     >
       <p className="text-sm text-muted-foreground">
         <span className="font-medium text-foreground">{accountName ?? 'Conta de anúncios'}</span> · {rangeText(range.since, range.until)} · as setas comparam com {versus}

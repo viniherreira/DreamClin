@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition, type ReactNode } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { RefreshCw } from 'lucide-react';
 
@@ -19,9 +20,12 @@ export function ReportFrame({
   select,
   refresh,
   updatedAt,
+  tabs,
   children,
 }: {
   title: string;
+  /** Abas ao lado do título (ex.: Meta e Google em Anúncios). */
+  tabs?: { href: string; label: string; active: boolean; icon?: ReactNode }[];
   basePath: string;
   periods: { key: string; label: string }[];
   period: string;
@@ -68,6 +72,21 @@ export function ReportFrame({
             </span>
             {title}
           </h1>
+          {tabs && tabs.length > 1 && (
+            <nav aria-label={`${title}: canal`} className="segmented">
+              {tabs.map((t) => (
+                <Link
+                  key={t.href}
+                  href={t.href}
+                  aria-current={t.active ? 'page' : undefined}
+                  className="segmented-item inline-flex items-center gap-1.5 whitespace-nowrap"
+                >
+                  {t.icon}
+                  {t.label}
+                </Link>
+              ))}
+            </nav>
+          )}
           <div role="group" aria-label="Período" className="segmented -mx-1 max-w-full overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {periods.map((p) => (
               <button
