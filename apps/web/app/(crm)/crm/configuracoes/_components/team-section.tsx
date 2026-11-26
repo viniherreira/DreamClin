@@ -11,6 +11,7 @@ import { DISTRIBUTION_MODE_INFO, type DistributionMode, type DistributionSetting
 import type { TeamMember } from '@/crm/team';
 import { initials } from '@/crm/format';
 import { CrmSeatToggle } from '@/components/crm-addon-controls';
+import { updateTeamRole } from '@/app/(app)/configuracoes/actions';
 import { distributeUnassignedAction, saveDistributionAction, transferPortfolioAction, updateMemberAction } from '../team-actions';
 
 const PERFIL: Record<string, string> = {
@@ -27,6 +28,8 @@ const selectCls =
 const card = 'rounded-xl border border-border bg-surface p-4 shadow-card sm:p-5';
 
 type Seats = { hint: string } | null;
+/** Quem vê pode trocar o perfil das pessoas (Recepção, Administrador...). O servidor confere de novo. */
+type Perfil = { meRole: string; agenda: boolean } | null;
 
 const cargoLabel = (m: Pick<TeamMember, 'member' | 'custom' | 'crmRole'>) =>
   !m.member ? 'Sem acesso' : m.custom ? 'Personalizado' : CRM_ROLE_INFO[m.crmRole].label;
@@ -41,9 +44,11 @@ export function TeamSection({
   meId,
   seats,
   wholeTeam,
+  perfil = null,
 }: {
   members: TeamMember[];
   meId: string;
+  perfil?: Perfil;
   /** Quem vê pode dar e tirar o acesso ao CRM (conta na mensalidade). */
   seats: Seats;
   /** Cortesia: toda a equipe entra, sem chave. */
@@ -145,6 +150,7 @@ export function TeamSection({
                 me={pessoa.id === meId}
                 team={comAcesso}
                 seats={seats}
+                perfil={perfil}
                 onClose={() => setAberto(null)}
                 onAnnounce={setAviso}
               />
@@ -174,12 +180,66 @@ function Avatar({ m }: { m: TeamMember }) {
   );
 }
 
+/**
+ * O perfil da pessoa (Proprietário, Administrador, Recepção, Profissional), o
+ * mesmo da tela Configurações › Usuários e acessos e com a mesma ação: ninguém
+ * muda o próprio, só o proprietário mexe com proprietário e a clínica nunca fica
+ * sem administrador (o servidor confere). Troca na hora, sem o Salvar da gaveta.
+ */
+function PerfilField({ m, me, perfil, onAnnounce }: { m: TeamMember; me: boolean; perfil: Perfil; onAnnounce: (s: string) => void }) {
+  const id = useId();
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [valor, setValor] = useState(m.role);
+  const [erro, setErro] = useState('');
+  const podeOwner = perfil?.meRole === 'OWNER';
+  if (!perfil || me || (m.role === 'OWNER' && !podeOwner)) return <>{PERFIL[m.role] ?? m.role}</>;
+
+  const opcoes = Object.entries(PERFIL).filter(([v]) => v !== 'OWNER' || podeOwner);
+  const trocar = (novo: string) => {
+    const antes = valor;
+    setValor(novo);
+    setErro('');
+    start(async () => {
+      const r = await updateTeamRole(m.id, novo);
+      if (!r.ok) {
+        setValor(antes);
+        setErro(r.message ?? 'Não foi possível trocar o perfil.');
+        return;
+      }
+      onAnnounce(`Perfil de ${m.name}: ${PERFIL[novo] ?? novo}.`);
+      router.refresh();
+    });
+  };
+
+  return (
+    <span className="flex flex-col gap-1">
+      <label htmlFor={`${id}-perfil`} className="sr-only">
+        Perfil de {m.name}
+      </label>
+      <select id={`${id}-perfil`} value={valor} disabled={pending} onChange={(e) => trocar(e.target.value)} className={`${selectCls} w-fit`}>
+        {opcoes.map(([v, label]) => (
+          <option key={v} value={v}>
+            {label}
+          </option>
+        ))}
+      </select>
+      {erro && (
+        <span role="alert" className="text-xs text-destructive">
+          {erro}
+        </span>
+      )}
+    </span>
+  );
+}
+
 /** A gaveta de uma pessoa: dados, cargo, quadro de permissões, distribuição e carteira. */
 function MemberPanel({
   m,
   me,
   team,
   seats,
+  perfil,
   onClose,
   onAnnounce,
 }: {
@@ -187,6 +247,7 @@ function MemberPanel({
   me: boolean;
   team: TeamMember[];
   seats: Seats;
+  perfil: Perfil;
   onClose: () => void;
   onAnnounce: (s: string) => void;
 }) {
@@ -251,8 +312,10 @@ function MemberPanel({
           <dl className="grid flex-1 grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2 text-sm">
             <dt className="text-muted-foreground">E-mail</dt>
             <dd className="truncate">{m.email}</dd>
-            <dt className="text-muted-foreground">Perfil na clínica</dt>
-            <dd>{PERFIL[m.role] ?? m.role}</dd>
+            <dt className="text-muted-foreground">{perfil && !perfil.agenda ? 'Perfil' : 'Perfil na clínica'}</dt>
+            <dd>
+              <PerfilField m={m} me={me} perfil={perfil} onAnnounce={onAnnounce} />
+            </dd>
             <dt className="text-muted-foreground">Acesso ao CRM</dt>
             <dd>
               {seats && !m.locked ? (

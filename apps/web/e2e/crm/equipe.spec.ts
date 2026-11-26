@@ -32,6 +32,29 @@ test('Configurações › Equipe e permissões: o dono é Gestor e a permissão 
   await expect(gaveta).toBeHidden();
 });
 
+test('Configurações › Equipe: o perfil da pessoa também muda pelo CRM', async ({ page }) => {
+  const t = await prisma.tenant.findUniqueOrThrow({ where: { slug: E2E_TENANT_SLUG }, select: { id: true } });
+  const recepcao = await prisma.user.findFirstOrThrow({ where: { tenantId: t.id, name: 'Recepção E2E' }, select: { id: true, role: true } });
+  try {
+    await page.goto('/crm/configuracoes#equipe');
+    const equipe = page.getByRole('region', { name: 'Gestão de usuários' });
+    await equipe.getByRole('button', { name: /Recepção E2E/ }).click();
+    const gaveta = page.getByRole('dialog', { name: 'Recepção E2E' });
+    const perfil = gaveta.getByLabel('Perfil de Recepção E2E');
+    await expect(perfil).toHaveValue('RECEPTIONIST');
+    await perfil.selectOption('ADMIN');
+    await expect.poll(async () => (await prisma.user.findUniqueOrThrow({ where: { id: recepcao.id }, select: { role: true } })).role).toBe('ADMIN');
+    if (process.env.E2E_SHOTS) await page.screenshot({ path: `${process.env.E2E_SHOTS}/crm-perfil.png` });
+    await gaveta.getByRole('button', { name: 'Cancelar' }).click();
+    await expect(equipe.getByRole('row', { name: /Recepção E2E/ })).toContainText('Administrador');
+    // O próprio perfil não muda (nem aparece a escolha).
+    await equipe.getByRole('button', { name: /Dono E2E/ }).click();
+    await expect(page.getByRole('dialog', { name: 'Dono E2E' }).getByLabel(/^Perfil de/)).toHaveCount(0);
+  } finally {
+    await prisma.user.update({ where: { id: recepcao.id }, data: { role: recepcao.role } });
+  }
+});
+
 test('Configurações › Distribuição salva', async ({ page }) => {
   await page.goto('/crm/configuracoes#distribuicao');
   const dist = page.getByRole('region', { name: 'Distribuição de leads' });
