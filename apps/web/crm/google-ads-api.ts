@@ -11,7 +11,7 @@ import type { MetaErrorKind } from './ads-rules';
  * Variáveis na Vercel (o dono cria no Google Cloud e no Google Ads):
  * - GOOGLE_ADS_CLIENT_ID e GOOGLE_ADS_CLIENT_SECRET: o cliente OAuth (Web).
  * - GOOGLE_ADS_DEVELOPER_TOKEN: o token de desenvolvedor da conta de administrador.
- * - GOOGLE_ADS_API_VERSION (opcional): a versão da API, ex. "v22".
+ * - GOOGLE_ADS_API_VERSION (opcional): a versão da API, ex. "v26". O Google desliga cada versão cerca de um ano depois de lançar (a v22 saiu do ar em nov/2026).
  */
 
 export class GoogleAdsError extends Error {
@@ -33,7 +33,7 @@ export function googleAdsConfigured(): boolean {
   return Boolean(env('GOOGLE_ADS_CLIENT_ID') && env('GOOGLE_ADS_CLIENT_SECRET') && env('GOOGLE_ADS_DEVELOPER_TOKEN'));
 }
 
-const apiVersion = () => (process.env.GOOGLE_ADS_API_VERSION?.trim().match(/^v\d{2,3}$/) ? process.env.GOOGLE_ADS_API_VERSION.trim() : 'v22');
+const apiVersion = () => (process.env.GOOGLE_ADS_API_VERSION?.trim().match(/^v\d{2,3}$/) ? process.env.GOOGLE_ADS_API_VERSION.trim() : 'v26');
 const adsBase = () => `https://googleads.googleapis.com/${apiVersion()}`;
 
 /** O endereço da janela de login do Google. `state` amarra a volta a esta clínica e pessoa. */
